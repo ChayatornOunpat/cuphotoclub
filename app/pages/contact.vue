@@ -1,0 +1,82 @@
+<script setup lang="ts">
+const { data: settings } = useSiteSettings()
+
+const form = reactive({ name: '', email: '', subject: '', message: '' })
+const sending = ref(false)
+const sent = ref(false)
+const error = ref('')
+
+async function submit() {
+  sending.value = true
+  error.value = ''
+  try {
+    await $fetch('/api/contact', {
+      method: 'POST',
+      body: { name: form.name, email: form.email, subject: form.subject || undefined, message: form.message }
+    })
+    sent.value = true
+  } catch (e) {
+    error.value = (e as { data?: { message?: string } })?.data?.message || 'ส่งข้อความไม่สำเร็จ'
+  } finally {
+    sending.value = false
+  }
+}
+
+const socials = computed(() =>
+  [
+    { url: settings.value?.facebookUrl, icon: 'simple-icons:facebook', label: 'Facebook' },
+    { url: settings.value?.instagramUrl, icon: 'simple-icons:instagram', label: 'Instagram' },
+    { url: settings.value?.lineUrl, icon: 'simple-icons:line', label: 'LINE' }
+  ].filter(s => s.url)
+)
+
+useSeoMeta({ title: 'ติดต่อเรา', description: 'ติดต่อชมรมถ่ายภาพ' })
+</script>
+
+<template>
+  <div class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
+    <div class="grid gap-12 lg:grid-cols-2">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-ink sm:text-4xl">ติดต่อเรา</h1>
+        <p class="mt-3 text-ink-soft">มีคำถามหรือต้องการติดต่อชมรม ส่งข้อความถึงเราได้เลย</p>
+
+        <dl class="mt-8 space-y-4 text-sm">
+          <div v-if="settings?.contactEmail" class="flex items-center gap-3">
+            <Icon name="heroicons:envelope" class="size-5 text-ink-soft" />
+            <a :href="`mailto:${settings.contactEmail}`" class="text-ink hover:text-accent">{{ settings.contactEmail }}</a>
+          </div>
+        </dl>
+
+        <div v-if="socials.length" class="mt-6 flex gap-4">
+          <a v-for="s in socials" :key="s.label" :href="s.url || undefined" target="_blank" rel="noopener" :aria-label="s.label" class="text-ink-soft hover:text-accent">
+            <Icon :name="s.icon" class="size-6" />
+          </a>
+        </div>
+      </div>
+
+      <div class="rounded-lg border border-line bg-white p-6 sm:p-8">
+        <div v-if="sent" class="flex h-full flex-col items-center justify-center py-8 text-center">
+          <Icon name="heroicons:check-circle" class="size-12 text-green-500" />
+          <p class="mt-4 font-semibold text-ink">ส่งข้อความเรียบร้อยแล้ว</p>
+          <p class="mt-1 text-sm text-ink-soft">ขอบคุณที่ติดต่อเรา เราจะตอบกลับโดยเร็วที่สุด</p>
+        </div>
+        <form v-else class="space-y-4" @submit.prevent="submit">
+          <p v-if="error" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
+          <UiField label="ชื่อ" input-id="c-name">
+            <UiInput id="c-name" v-model="form.name" required />
+          </UiField>
+          <UiField label="อีเมล" input-id="c-email">
+            <UiInput id="c-email" v-model="form.email" type="email" required />
+          </UiField>
+          <UiField label="หัวข้อ" input-id="c-subject">
+            <UiInput id="c-subject" v-model="form.subject" />
+          </UiField>
+          <UiField label="ข้อความ" input-id="c-message">
+            <UiTextarea id="c-message" v-model="form.message" :rows="5" />
+          </UiField>
+          <UiButton type="submit" block :loading="sending">ส่งข้อความ</UiButton>
+        </form>
+      </div>
+    </div>
+  </div>
+</template>

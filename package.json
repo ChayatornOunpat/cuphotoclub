@@ -7,6 +7,7 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "db:generate": "nuxt prepare && drizzle-kit generate --config .nuxt/hub/db/drizzle.config.ts",
     "postinstall": "nuxt prepare"
   },
   "pnpm": {
@@ -15,6 +16,8 @@
     ]
   },
   "dependencies": {
+    "@headlessui/vue": "^1.7.23",
+    "@libsql/client": "^0.17.4",
     "@nuxt/content": "3.14.0",
     "@nuxt/eslint": "1.16.0",
     "@nuxt/fonts": "0.14.0",
@@ -22,10 +25,22 @@
     "@nuxt/image": "2.0.0",
     "@nuxthub/core": "0.10.7",
     "better-sqlite3": "^12.11.1",
+    "drizzle-orm": "^0.45.2",
     "eslint": "^10.5.0",
+    "marked": "^18.0.5",
     "nuxt": "^4.4.8",
     "nuxt-auth-utils": "0.5.29",
+    "unstorage": "^1.17.5",
     "vue": "^3.5.35",
-    "vue-router": "^5.1.0"
+    "vue-router": "^5.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@iconify-json/heroicons": "^1.2.3",
+    "@iconify-json/simple-icons": "^1.2.87",
+    "@tailwindcss/typography": "^0.5.20",
+    "@tailwindcss/vite": "^4.3.1",
+    "drizzle-kit": "^0.31.10",
+    "tailwindcss": "^4.3.1"
   }
 }
