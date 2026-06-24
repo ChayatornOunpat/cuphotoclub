@@ -1,0 +1,17 @@
+import type { AlbumInput } from '~~/shared/types'
+
+export default defineEventHandler(async (event) => {
+  await requireUserSession(event)
+  const id = getRouterParam(event, 'id')!
+  const body = await readBody<AlbumInput>(event)
+
+  const error = validateAlbum(body)
+  if (error) throw createError({ statusCode: 400, statusMessage: error })
+
+  body.coverIndex = Math.min(Math.max(0, Number(body.coverIndex) || 0), body.images.length - 1)
+  if (!body.published) body.published = new Date().toISOString().slice(0, 10)
+
+  const updated = albumStore.update(id, body)
+  if (!updated) throw createError({ statusCode: 404, statusMessage: 'Album not found' })
+  return updated
+})

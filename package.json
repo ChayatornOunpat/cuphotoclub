@@ -21,6 +21,7 @@
     "@nuxt/icon": "2.2.3",
     "@nuxt/image": "2.0.0",
     "@nuxthub/core": "0.10.7",
+    "@nuxtjs/i18n": "^10.4.0",
     "better-sqlite3": "^12.11.1",
     "eslint": "^10.5.0",
     "nuxt": "^4.4.8",

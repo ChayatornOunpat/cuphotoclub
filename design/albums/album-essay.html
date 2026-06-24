@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dawn at Lumphini — A: Photo Essay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,200;0,300;0,400;0,500;0,600;1,200;1,300;1,400;1,500;1,600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --hero-bg: #0C0C0A; --body-bg: #F5F4F0; --dark: #1A1918;
+      --muted: #7C7A72; --subtle: #E2DED8; --paper: #EEEAE2; --accent: #E8186E;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--body-bg); color: var(--dark);
+      font-family: 'Inter', sans-serif; font-weight: 300;
+      -webkit-font-smoothing: antialiased; overflow-x: hidden;
+    }
+    #progress { position: fixed; top: 0; left: 0; z-index: 200; width: 0%; height: 2px; background: var(--accent); transition: width 0.1s linear; }
+
+    nav {
+      position: fixed; inset-block-start: 2px; inset-inline: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 3rem; transition: background 0.4s ease;
+    }
+    nav.light { background: rgba(245,244,240,0.93); backdrop-filter: blur(14px); border-bottom: 1px solid var(--subtle); }
+    .logo { font-size: 0.82rem; font-weight: 500; letter-spacing: 0.18em; text-decoration: none; line-height: 1; color: #F5F4F0; transition: color 0.4s ease; }
+    nav.light .logo { color: var(--dark); }
+    .logo .cu { color: var(--accent); }
+    .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+    .nav-links a { font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(245,244,240,0.55); text-decoration: none; transition: color 0.2s; }
+    nav.light .nav-links a { color: var(--muted); }
+    .nav-links a:hover, nav.light .nav-links a:hover { color: var(--accent); }
+    .nav-links a.join { color: var(--accent) !important; }
+
+    /* ─── COVER HERO ─────────────────────── */
+    .cover {
+      height: 100svh; background: var(--hero-bg); position: relative;
+      display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
+    }
+    .cover__bg {
+      position: absolute; inset: 0;
+      background: url('https://picsum.photos/seed/dawnlumphini_1/1920/1280') center / cover no-repeat;
+      opacity: 0.55; will-change: transform;
+    }
+    .cover__bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(12,12,10,0.4) 0%, transparent 35%, rgba(12,12,10,0.85) 100%); }
+    .cover__back {
+      position: absolute; top: 6rem; left: 3rem; z-index: 3;
+      font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase;
+      color: rgba(245,244,240,0.7); text-decoration: none; transition: color 0.2s;
+    }
+    .cover__back:hover { color: var(--accent); }
+    .cover__body { position: relative; z-index: 2; padding: 0 3rem 3.5rem; max-width: 1380px; margin: 0 auto; width: 100%; }
+    .cover__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245,244,240,0.6); margin-bottom: 1.5rem; }
+    .cover__kicker span { color: var(--accent); }
+    .cover__title { font-family: 'Spectral', serif; font-size: clamp(3.5rem, 9vw, 9rem); font-weight: 200; line-height: 0.9; letter-spacing: -0.03em; color: #F5F4F0; }
+    .cover__title em { font-style: italic; }
+    .cover__meta { margin-top: 2rem; display: flex; gap: 1.5rem; align-items: center; font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245,244,240,0.5); }
+    .cover__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
+    .cut-line { width: 100%; height: 2px; background: var(--accent); }
+
+    /* ─── INTRO ──────────────────────────── */
+    .intro { padding: 6rem 3rem 2rem; max-width: 880px; margin: 0 auto; }
+    .intro__lead { font-family: 'Spectral', serif; font-size: clamp(1.6rem, 3vw, 2.6rem); font-weight: 200; line-height: 1.4; letter-spacing: -0.01em; }
+    .intro__lead em { font-style: italic; color: var(--accent); }
+
+    /* ─── ESSAY FLOW ─────────────────────── */
+    .essay { padding: 3rem 3rem 6rem; max-width: 1380px; margin: 0 auto; }
+    figure { margin: 0; }
+    .frame { overflow: hidden; background: var(--hero-bg); }
+    .frame img { width: 100%; display: block; object-fit: cover; transition: transform 1s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .frame:hover img { transform: scale(1.03); }
+    figcaption { display: flex; gap: 1rem; align-items: baseline; margin-top: 1rem; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+    figcaption .n { color: var(--accent); font-weight: 500; }
+
+    .row { margin-bottom: 4.5rem; }
+    .row--single { max-width: 760px; }
+    .row--single.right { margin-left: auto; }
+    .row--bleed { max-width: 100%; }
+    .row--pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .row--offset { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; align-items: end; }
+
+    /* ─── ALBUM NAV ──────────────────────── */
+    .albnav { background: var(--paper); border-top: 1px solid var(--subtle); border-bottom: 1px solid var(--subtle); padding: 3.5rem 3rem; }
+    .albnav__inner { max-width: 1380px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 2rem; flex-wrap: wrap; }
+    .albnav__back { font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.2s; }
+    .albnav__back:hover { color: var(--accent); }
+    .albnav__next { text-align: right; text-decoration: none; display: block; }
+    .albnav__next-label { font-size: 0.5rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.5rem; }
+    .albnav__next-title { font-family: 'Spectral', serif; font-size: clamp(1.4rem, 2.2vw, 2rem); font-weight: 300; color: var(--dark); transition: color 0.2s; }
+    .albnav__next:hover .albnav__next-title { color: var(--accent); }
+
+    footer { background: var(--dark); color: rgba(245,244,240,0.7); padding: 3rem; text-align: center; }
+    .footer__brand { font-size: 0.82rem; font-weight: 500; letter-spacing: 0.18em; text-decoration: none; color: #F5F4F0; }
+    .footer__brand .cu { color: var(--accent); }
+    .footer__tagline { font-size: 0.62rem; color: rgba(245,244,240,0.35); margin-top: 1rem; letter-spacing: 0.1em; }
+
+    @media (max-width: 720px) {
+      nav { padding: 1.25rem 1.5rem; } .nav-links { display: none; }
+      .cover__back { left: 1.5rem; } .cover__body { padding: 0 1.5rem 2.5rem; }
+      .intro, .essay, .albnav { padding-left: 1.5rem; padding-right: 1.5rem; }
+      .row--pair, .row--offset { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div id="progress"></div>
+  <nav id="nav">
+    <a href="#" class="logo"><span class="cu">CU</span>PHOTOCLUB</a>
+    <ul class="nav-links">
+      <li><a href="#">Home</a></li>
+      <li><a href="#">Albums</a></li>
+      <li><a href="#">Blog</a></li>
+      <li><a href="#">History</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#" class="join">Join</a></li>
+    </ul>
+  </nav>
+
+  <!-- COVER -->
+  <header class="cover" id="cover">
+    <div class="cover__bg" id="parallax"></div>
+    <a href="#" class="cover__back">← The Archive</a>
+    <div class="cover__body">
+      <p class="cover__kicker">Album · <span>Street</span></p>
+      <h1 class="cover__title">Dawn at <em>Lumphini</em></h1>
+      <div class="cover__meta"><span>April 2025</span><span class="dot"></span><span>6 Frames</span><span class="dot"></span><span>Bangkok</span></div>
+    </div>
+  </header>
+  <div class="cut-line"></div>
+
+  <!-- INTRO -->
+  <section class="intro">
+    <p class="intro__lead">Members gathered before sunrise to watch the park become itself in the <em>first gold light</em> — a study in patience as much as exposure.</p>
+  </section>
+
+  <!-- ESSAY -->
+  <section class="essay">
+    <figure class="row row--single">
+      <div class="frame"><img src="https://picsum.photos/seed/dawnlumphini_1/1100/780" alt="Frame 1"></div>
+      <figcaption><span class="n">01</span> First light over the lake</figcaption>
+    </figure>
+
+    <figure class="row row--bleed">
+      <div class="frame"><img src="https://picsum.photos/seed/dawnlumphini_2/1600/760" alt="Frame 2"></div>
+      <figcaption><span class="n">02</span> The eastern path, empty</figcaption>
+    </figure>
+
+    <div class="row row--pair">
+      <figure>
+        <div class="frame"><img src="https://picsum.photos/seed/dawnlumphini_3/900/1150" alt="Frame 3"></div>
+        <figcaption><span class="n">03</span> A runner passes</figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><img src="https://picsum.photos/seed/dawnlumphini_4/900/1150" alt="Frame 4"></div>
+        <figcaption><span class="n">04</span> Reeds at the water's edge</figcaption>
+      </figure>
+    </div>
+
+    <figure class="row row--single right">
+      <div class="frame"><img src="https://picsum.photos/seed/dawnlumphini_5/1100/820" alt="Frame 5"></div>
+      <figcaption><span class="n">05</span> Mist burning off</figcaption>
+    </figure>
+
+    <figure class="row row--bleed">
+      <div class="frame"><img src="https://picsum.photos/seed/dawnlumphini_6/1600/900" alt="Frame 6"></div>
+      <figcaption><span class="n">06</span> Full morning, the city wakes</figcaption>
+    </figure>
+  </section>
+
+  <!-- ALBUM NAV -->
+  <section class="albnav">
+    <div class="albnav__inner">
+      <a href="#" class="albnav__back">← All Albums</a>
+      <a href="#" class="albnav__next">
+        <div class="albnav__next-label">Next Album →</div>
+        <div class="albnav__next-title">Faces of Siam</div>
+      </a>
+    </div>
+  </section>
+
+  <footer>
+    <a href="#" class="footer__brand"><span class="cu">CU</span>PHOTOCLUB</a>
+    <p class="footer__tagline">© 2025 CU Photo Club · Chulalongkorn University · Bangkok</p>
+  </footer>
+
+  <script>
+    const nav = document.getElementById('nav'), cover = document.getElementById('cover');
+    const parallax = document.getElementById('parallax'), progress = document.getElementById('progress');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('light', cover.getBoundingClientRect().bottom < 0);
+      parallax.style.transform = `translateY(${window.scrollY * 0.2}px)`;
+      const total = document.body.scrollHeight - window.innerHeight;
+      progress.style.width = (window.scrollY / total * 100) + '%';
+    }, { passive: true });
+  </script>
+</body>
+</html>

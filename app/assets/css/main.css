@@ -1,0 +1,237 @@
+/* ─── CU Photo Club — global tokens & shared utilities ───────────────────
+   Section-specific styles live in their components (scoped). Anything shared
+   across sections (tokens, type, .wrap, .eyebrow, .section-pad) lives here. */
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --hero-bg: #0C0C0A;
+  --body-bg: #F5F4F0;
+  --dark:    #1A1918;
+  --muted:   #7C7A72;
+  --subtle:  #E2DED8;
+  --paper:   #EEEAE2;
+  --accent:  #E8186E;
+  --font-serif: 'Spectral', serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-latin-sans: 'Inter', sans-serif;
+  --font-latin-serif: 'Spectral', serif;
+}
+
+html { scroll-behavior: smooth; }
+
+html:lang(th) {
+  --font-serif: 'Noto Serif Thai', serif;
+  --font-sans: 'Noto Serif Thai', serif;
+}
+
+body {
+  background: var(--body-bg);
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+html:lang(th) body {
+  line-height: 1.72;
+  word-break: normal;
+}
+
+/* ─── shared layout ─────────────────────── */
+.section-pad { padding: 6rem 3rem; }
+.wrap { max-width: 1380px; margin: 0 auto; }
+
+/* ─── shared eyebrow heading ────────────── */
+.eyebrow {
+  font-size: 0.54rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 3.25rem;
+}
+.eyebrow .num { color: var(--accent); font-weight: 500; }
+.eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--subtle); }
+
+html:lang(th) :where(
+  .eyebrow,
+  .nav-links a,
+  .hero__kicker,
+  .hero__meta,
+  .page-head__kicker,
+  .stat__label,
+  .filter button,
+  .feature__flag,
+  .feature__cat,
+  .feature__meta,
+  .feature__view,
+  .album__frames,
+  .album__view,
+  .album__cat,
+  .album__date,
+  .cover__back,
+  .cover__kicker,
+  .cover__meta,
+  figcaption,
+  .albnav__back,
+  .crumb a,
+  .crumb .here,
+  .meta__cat,
+  .meta__fact,
+  .meta__fact .k,
+  .meta__count,
+  .head__back,
+  .head__kicker,
+  .sheet__hint,
+  .cell__cap,
+  .lb__counter,
+  .lb__close,
+  .scard-lead__tag,
+  .scard-lead__read,
+  .scard__tag,
+  .scard__date,
+  .footer__brand,
+  .footer__col h4,
+  .footer__bottom,
+  .admin__brand,
+  .admin__nav a,
+  .admin__logout,
+  .login__brand,
+  .login__label,
+  .login__btn,
+  .field label,
+  .btn-ghost,
+  .btn-solid,
+  .tbl th,
+  .pill,
+  .back
+) {
+  letter-spacing: 0.035em !important;
+  text-transform: none !important;
+}
+
+html:lang(th) :where(
+  .hero__title,
+  .page-head__title,
+  .cover__title,
+  .head__title,
+  .meta__title,
+  .post__title,
+  .about__heading,
+  .history__quote
+) {
+  line-height: 1.08 !important;
+  letter-spacing: 0 !important;
+  font-weight: 300 !important;
+}
+
+html:lang(th) .nav-links > li > a {
+  font-size: 0.78rem !important;
+  line-height: 1.2 !important;
+  font-weight: 400 !important;
+}
+
+html:lang(th) :where(
+  .logo,
+  .footer__brand,
+  .admin__brand,
+  .login__brand,
+  .langswitch__opt,
+  .langswitch__sep,
+  .bench__back
+) {
+  font-family: var(--font-latin-sans) !important;
+}
+
+html:lang(th) :where(.logo, .footer__brand, .admin__brand, .login__brand, .bench__back) {
+  letter-spacing: 0.18em !important;
+  text-transform: uppercase !important;
+}
+
+html:lang(th) .langswitch__opt {
+  font-size: 0.58rem !important;
+  letter-spacing: 0.22em !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+}
+
+html:lang(th) .langswitch__sep {
+  font-size: 0.5rem !important;
+  line-height: 1 !important;
+}
+
+html:lang(th) .hero__meta {
+  font-size: 0.68rem !important;
+  line-height: 1.9 !important;
+  font-weight: 400 !important;
+}
+
+html:lang(th) .hero__kicker {
+  font-size: 0.68rem !important;
+  line-height: 1.35 !important;
+  font-weight: 400 !important;
+}
+
+html:lang(th) .hero__title {
+  font-size: clamp(3.35rem, 7.8vw, 8.8rem) !important;
+  line-height: 1.04 !important;
+  max-width: 980px;
+}
+
+html:lang(th) :where(.page-head__title, .cover__title) {
+  font-size: clamp(2.8rem, 6.6vw, 7rem) !important;
+  line-height: 1.08 !important;
+}
+
+html:lang(th) .head__title {
+  font-size: clamp(2.5rem, 5.8vw, 5.8rem) !important;
+}
+
+html:lang(th) :where(.about__heading, .history__quote) {
+  font-size: clamp(1.9rem, 3.4vw, 3.8rem) !important;
+  line-height: 1.22 !important;
+}
+
+html:lang(th) :where(.meta__title, .post__title, .feature__title, .index-bar__title) {
+  line-height: 1.18 !important;
+}
+
+html:lang(th) :where(
+  .hero__lead,
+  .page-head__lead,
+  .feature__excerpt,
+  .head__sub,
+  .meta__excerpt,
+  .history__body,
+  .about__body,
+  .post__body
+) {
+  line-height: 1.95 !important;
+}
+
+html:lang(th) :where(.hero__title em, .about__heading em, .history__quote) {
+  font-style: normal !important;
+}
+
+/* The signature pink line that separates dark → light */
+.cut-line {
+  width: 100%;
+  height: 2px;
+  background: var(--accent);
+  display: block;
+}
+
+/* Reading-progress bar (rendered by the site layout) */
+#progress {
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 200;
+  height: 2px;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}

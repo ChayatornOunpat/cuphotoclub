@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Night Markets — CU Photo Club</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,200;0,300;0,400;0,500;0,600;1,200;1,300;1,400;1,500;1,600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --hero-bg: #0C0C0A; --body-bg: #F5F4F0; --dark: #1A1918;
+      --muted: #7C7A72; --subtle: #E2DED8; --paper: #EEEAE2; --accent: #E8186E;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--hero-bg); color: #F5F4F0;
+      font-family: 'Inter', sans-serif; font-weight: 300;
+      -webkit-font-smoothing: antialiased; overflow-x: hidden;
+    }
+    #progress {
+      position: fixed; top: 0; left: 0; z-index: 200;
+      width: 0%; height: 2px; background: var(--accent); transition: width 0.1s linear;
+    }
+    nav {
+      position: fixed; inset-block-start: 2px; inset-inline: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 3rem; transition: background 0.4s ease;
+    }
+    nav.light {
+      background: rgba(12,12,10,0.9); backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .logo {
+      font-family: 'Inter', sans-serif; font-size: 0.82rem; font-weight: 500;
+      letter-spacing: 0.18em; text-decoration: none; line-height: 1;
+      color: #F5F4F0; transition: color 0.4s ease;
+    }
+    .logo .cu { color: var(--accent); }
+    .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+    .nav-links a {
+      font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase;
+      color: rgba(245,244,240,0.4); text-decoration: none; transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--accent); }
+
+    /* ─── MINIMAL HEADER ───────────────────── */
+    .essay-head {
+      text-align: center; padding: 10rem 3rem 6rem;
+      max-width: 720px; margin: 0 auto;
+    }
+    .essay-head__back {
+      display: inline-block; font-size: 0.54rem; letter-spacing: 0.2em;
+      text-transform: uppercase; color: rgba(245,244,240,0.3);
+      text-decoration: none; margin-bottom: 2.5rem; transition: color 0.2s;
+    }
+    .essay-head__back:hover { color: var(--accent); }
+    .essay-head__tag {
+      font-size: 0.52rem; letter-spacing: 0.24em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 1.25rem;
+    }
+    .essay-head__title {
+      font-family: 'Spectral', serif;
+      font-size: clamp(3rem, 6vw, 5rem); font-weight: 200;
+      line-height: 0.92; letter-spacing: -0.03em; margin-bottom: 1.25rem;
+    }
+    .essay-head__title em { font-style: italic; }
+    .essay-head__sub {
+      font-size: 0.95rem; color: rgba(245,244,240,0.45);
+      line-height: 1.8; max-width: 520px; margin: 0 auto 2rem;
+    }
+    .essay-head__meta {
+      display: flex; align-items: center; justify-content: center; gap: 0.75rem;
+      font-size: 0.56rem; letter-spacing: 0.12em; color: rgba(245,244,240,0.35);
+    }
+    .essay-head__meta .author { color: var(--accent); letter-spacing: 0.16em; text-transform: uppercase; }
+    .essay-head__sep { width: 2px; height: 2px; border-radius: 50%; background: rgba(245,244,240,0.2); }
+
+    /* ─── ESSAY BODY (dark on dark) ────────── */
+    .essay {
+      max-width: 720px; margin: 0 auto; padding: 0 3rem;
+    }
+    .essay__intro {
+      font-family: 'Spectral', serif; font-size: 1.15rem; font-weight: 300;
+      line-height: 1.75; color: rgba(245,244,240,0.75);
+      text-align: center; margin-bottom: 4rem;
+    }
+    .essay p {
+      font-size: 0.9rem; line-height: 1.9; color: rgba(245,244,240,0.6);
+      margin-bottom: 1.5rem;
+    }
+
+    /* ─── FULL-BLEED PHOTO BLOCKS ──────────── */
+    .photo-block {
+      margin: 5rem 0; position: relative;
+    }
+    .photo-block img {
+      width: 100%; display: block;
+    }
+    .photo-block--full {
+      margin-left: calc(-50vw + 50%);
+      margin-right: calc(-50vw + 50%);
+      width: 100vw;
+    }
+    .photo-block--full img {
+      width: 100%; height: 90vh; object-fit: cover;
+    }
+    .photo-block--pair {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+      margin-left: calc(-50vw + 50%);
+      margin-right: calc(-50vw + 50%);
+      width: 100vw;
+      padding: 0 3rem;
+    }
+    .photo-block--pair img {
+      width: 100%; height: 70vh; object-fit: cover; display: block;
+    }
+    .photo-block__caption {
+      font-size: 0.58rem; color: rgba(245,244,240,0.25);
+      letter-spacing: 0.08em; padding: 0.75rem 0 0;
+      text-align: right;
+    }
+    .photo-block--full .photo-block__caption,
+    .photo-block--pair .photo-block__caption {
+      padding-left: 3rem; padding-right: 3rem;
+    }
+
+    .essay__pullquote {
+      font-family: 'Spectral', serif; font-size: 1.8rem; font-weight: 200;
+      font-style: italic; line-height: 1.3; color: var(--accent);
+      text-align: center; margin: 4rem auto; max-width: 560px;
+    }
+
+    .essay__divider {
+      text-align: center; font-size: 0.8rem; color: rgba(245,244,240,0.15);
+      margin: 4rem 0; letter-spacing: 0.5em;
+    }
+
+    .essay__footer {
+      margin-top: 4rem; padding: 2.5rem 0 4rem;
+      border-top: 1px solid rgba(245,244,240,0.08);
+      display: flex; justify-content: space-between;
+    }
+    .essay__tags {
+      display: flex; gap: 0.5rem; flex-wrap: wrap;
+    }
+    .essay__tags a {
+      font-size: 0.52rem; letter-spacing: 0.16em; text-transform: uppercase;
+      color: rgba(245,244,240,0.3); text-decoration: none; padding: 0.35rem 0.75rem;
+      border: 1px solid rgba(245,244,240,0.1); transition: border-color 0.2s, color 0.2s;
+    }
+    .essay__tags a:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ─── LIGHT SECTION DIVIDER ────────────── */
+    .light-section {
+      background: var(--body-bg); color: var(--dark); padding: 5rem 3rem 6rem;
+    }
+    .light-section .wrap { max-width: 1380px; margin: 0 auto; }
+    .eyebrow {
+      font-size: 0.54rem; letter-spacing: 0.28em; text-transform: uppercase;
+      color: var(--muted); display: flex; align-items: center; gap: 1.25rem;
+      margin-bottom: 2.5rem;
+    }
+    .eyebrow .num { color: var(--accent); font-weight: 500; }
+    .eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--subtle); }
+    .related__grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+    }
+    .rcard {
+      cursor: pointer; padding: 2rem; background: var(--body-bg);
+      border: 1px solid var(--subtle); transition: border-color 0.25s;
+    }
+    .rcard:hover { border-color: var(--accent); }
+    .rcard__img {
+      aspect-ratio: 4/3; overflow: hidden; margin: -2rem -2rem 1.5rem;
+    }
+    .rcard__img img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      transition: transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    .rcard:hover .rcard__img img { transform: scale(1.05); }
+    .rcard__tag {
+      font-size: 0.52rem; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 0.65rem;
+    }
+    .rcard__title {
+      font-family: 'Spectral', serif; font-size: 1.1rem; font-weight: 400;
+      line-height: 1.25; letter-spacing: -0.01em; transition: color 0.2s;
+    }
+    .rcard:hover .rcard__title { color: var(--accent); }
+    .rcard__date {
+      font-size: 0.58rem; color: var(--muted); letter-spacing: 0.1em;
+      margin-top: 0.85rem;
+    }
+
+    /* ─── FOOTER (still dark) ──────────────── */
+    footer {
+      background: var(--hero-bg); color: rgba(245,244,240,0.6);
+      padding: 3.5rem 3rem 2.5rem; border-top: 1px solid rgba(245,244,240,0.05);
+    }
+    .footer__grid {
+      display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 3rem;
+      max-width: 1380px; margin: 0 auto 3rem;
+    }
+    .footer__brand {
+      font-size: 0.82rem; font-weight: 500; letter-spacing: 0.18em;
+      text-decoration: none; color: #F5F4F0; display: block; margin-bottom: 0.85rem;
+    }
+    .footer__brand .cu { color: var(--accent); }
+    .footer__tagline { font-size: 0.7rem; color: rgba(245,244,240,0.3); line-height: 1.7; }
+    .footer__col h4 {
+      font-size: 0.5rem; letter-spacing: 0.28em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 1.1rem;
+    }
+    .footer__col ul { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+    .footer__col a {
+      font-size: 0.74rem; color: rgba(245,244,240,0.35);
+      text-decoration: none; transition: color 0.2s;
+    }
+    .footer__col a:hover { color: #F5F4F0; }
+    .footer__bottom {
+      max-width: 1380px; margin: 0 auto; padding-top: 2rem;
+      border-top: 1px solid rgba(245,244,240,0.06);
+      display: flex; justify-content: space-between;
+      font-size: 0.58rem; letter-spacing: 0.1em; color: rgba(245,244,240,0.2);
+    }
+
+    @media (max-width: 1000px) {
+      .related__grid { grid-template-columns: 1fr 1fr; }
+      .photo-block--pair { grid-template-columns: 1fr; }
+      .photo-block--pair img { height: 60vh; }
+    }
+    @media (max-width: 720px) {
+      nav { padding: 1.25rem 1.5rem; }
+      .nav-links { display: none; }
+      .essay-head { padding: 8rem 1.5rem 4rem; }
+      .essay { padding: 0 1.5rem; }
+      .photo-block--pair { padding: 0 1.5rem; grid-template-columns: 1fr; }
+      .photo-block--pair img { height: 50vh; }
+      .photo-block--full img { height: 60vh; }
+      .related__grid { grid-template-columns: 1fr; }
+      .light-section { padding: 4rem 1.5rem; }
+      .essay__footer { flex-direction: column; gap: 1rem; }
+      footer { padding: 2.5rem 1.5rem 2rem; }
+      .footer__grid { grid-template-columns: 1fr; gap: 2rem; }
+      .footer__bottom { flex-direction: column; gap: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="progress"></div>
+
+  <nav id="nav">
+    <a href="#" class="logo"><span class="cu">CU</span>PHOTOCLUB</a>
+    <ul class="nav-links">
+      <li><a href="#">Home</a></li>
+      <li><a href="#">Gallery</a></li>
+      <li><a href="#" class="active">Blog</a></li>
+      <li><a href="#">History</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#" class="join">Join</a></li>
+    </ul>
+  </nav>
+
+  <!-- MINIMAL HEADER -->
+  <header class="essay-head">
+    <a href="#" class="essay-head__back">← Back to Blog</a>
+    <p class="essay-head__tag">Documentary · Photo Essay</p>
+    <h1 class="essay-head__title">
+      Night <em>Markets</em>
+    </h1>
+    <p class="essay-head__sub">
+      Six frames from Bangkok's after-dark bazaars — where light is scarce,
+      colour is loud, and every stall tells a story.
+    </p>
+    <div class="essay-head__meta">
+      <span class="author">Pim W.</span>
+      <span class="essay-head__sep"></span>
+      <span>February 2025</span>
+      <span class="essay-head__sep"></span>
+      <span>6 photographs</span>
+    </div>
+  </header>
+
+  <!-- PHOTO ESSAY BODY (all dark) -->
+  <div class="essay">
+
+    <p class="essay__intro">
+      There is a particular quality of light at a night market that no studio can replicate.
+      It is the light of bare bulbs, fluorescent tubes, and the occasional streetlamp —
+      inconsistent, chaotic, and alive. These are photographs from four different markets
+      across Bangkok, shot over the course of a single month.
+    </p>
+
+    <!-- Full-bleed single image -->
+    <div class="photo-block photo-block--full">
+      <img src="https://picsum.photos/seed/nightmarket01/1600/1000" alt="Night market">
+      <p class="photo-block__caption">01 · A vendor arranging fruit, Yaowarat Road, 8:42 PM</p>
+    </div>
+
+    <p>
+      The first rule of photographing night markets: accept that you will never have enough
+      light. The second rule: stop worrying about it. At ISO 3200, the grain becomes part of
+      the texture — it looks the way the market <em>feels</em>. Crisp and sharp is for studios.
+      Night photography is about what you can almost see.
+    </p>
+
+    <!-- Image pair -->
+    <div class="photo-block photo-block--pair">
+      <img src="https://picsum.photos/seed/nightmarket02/1000/1400" alt="Night market">
+      <img src="https://picsum.photos/seed/nightmarket03/1000/1000" alt="Night market">
+      <p class="photo-block__caption">02–03 · Portrait of a grill master, and the queue that followed</p>
+    </div>
+
+    <p>
+      I spent three evenings at the same seafood stall in Yaowarat before the owner stopped
+      noticing my camera. That is when the real photographs began. The portrait on the left
+      was taken on the third night — he was tired, it was hot, and for a moment he forgot
+      to perform for the lens.
+    </p>
+
+    <div class="essay__pullquote">
+      "The best night market photographs are not about what is for sale.
+      They are about the people who stay when everything closes."
+    </div>
+
+    <!-- Another full-bleed -->
+    <div class="photo-block photo-block--full">
+      <img src="https://picsum.photos/seed/nightmarket04/1600/1000" alt="Night market">
+      <p class="photo-block__caption">04 · Textile stall under fluorescent light, Chatuchak weekend market</p>
+    </div>
+
+    <p>
+      Colour becomes a different language at night. Under fluorescent light, reds turn
+      electric. Blues disappear into black. The photograph above is almost entirely
+      magenta and green — colours that would look artificial in daylight but feel natural
+      at 10 PM under a corrugated roof.
+    </p>
+
+    <!-- Single image -->
+    <div class="photo-block">
+      <img src="https://picsum.photos/seed/nightmarket05/1200/800" alt="Night market">
+      <p class="photo-block__caption">05 · A quiet moment between rushes, 11:15 PM</p>
+    </div>
+
+    <p>
+      The quietest moment at a night market is just before closing. The crowd thins, the
+      vendors begin packing, and the temporary architecture of stalls and tarpaulins starts
+      coming down. This is when the market reveals its second self — not as a place of
+      commerce, but as a place of work. The photographs from this hour are always the best.
+    </p>
+
+    <!-- Final full-bleed -->
+    <div class="photo-block photo-block--full">
+      <img src="https://picsum.photos/seed/nightmarket06/1600/1000" alt="Night market">
+      <p class="photo-block__caption">06 · Last customer, Talad Rot Fai, 12:07 AM</p>
+    </div>
+
+    <p>
+      I packed my camera at midnight and walked home through streets that smelled of grilled
+      meat and diesel. The photographs felt like evidence — not of anything extraordinary,
+      but of ordinary life, well-lived and well-lit.
+    </p>
+
+    <div class="essay__divider">· · ·</div>
+
+    <p style="font-size: 0.82rem; color: rgba(245,244,240,0.35);">
+      <em>All photographs shot on a Fujifilm X-T5 with a 35mm f/1.4 lens.
+      No flash. No tripod. Just patience.</em>
+    </p>
+
+    <div class="essay__footer">
+      <div class="essay__tags">
+        <a href="#">Photo Essay</a>
+        <a href="#">Documentary</a>
+        <a href="#">Night</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- RELATED (light section) -->
+  <div class="light-section">
+    <div class="wrap">
+      <div class="eyebrow"><span class="num">More</span> photo essays</div>
+      <div class="related__grid">
+        <div class="rcard">
+          <div class="rcard__img">
+            <img src="https://picsum.photos/seed/blog05/800/550" alt="Related">
+          </div>
+          <p class="rcard__tag">Documentary</p>
+          <h3 class="rcard__title">Monsoon: Bangkok Before the Flood</h3>
+          <p class="rcard__date">January 2025</p>
+        </div>
+        <div class="rcard">
+          <div class="rcard__img">
+            <img src="https://picsum.photos/seed/blog04/800/550" alt="Related">
+          </div>
+          <p class="rcard__tag">Portrait</p>
+          <h3 class="rcard__title">Faces of Siam: Street Portraits</h3>
+          <p class="rcard__date">March 2025</p>
+        </div>
+        <div class="rcard">
+          <div class="rcard__img">
+            <img src="https://picsum.photos/seed/blog06/800/550" alt="Related">
+          </div>
+          <p class="rcard__tag">Workshop</p>
+          <h3 class="rcard__title">Cyanotype Diaries: Printing with Sunlight</h3>
+          <p class="rcard__date">May 2025</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER (dark) -->
+  <footer>
+    <div class="footer__grid">
+      <div>
+        <a href="#" class="footer__brand"><span class="cu">CU</span>PHOTOCLUB</a>
+        <p class="footer__tagline">Official photography club of<br>Chulalongkorn University, Bangkok, Thailand</p>
+      </div>
+      <div class="footer__col">
+        <h4>Navigate</h4>
+        <ul>
+          <li><a href="#">Gallery</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">History</a></li>
+          <li><a href="#">About</a></li>
+          <li><a href="#">Join</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer__col">
+        <h4>Follow</h4>
+        <ul>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">Facebook</a></li>
+          <li><a href="#">YouTube</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span>© 2025 CU Photo Club, Chulalongkorn University</span>
+      <span>Bangkok, Thailand</span>
+    </div>
+  </footer>
+
+  <script>
+    const nav = document.getElementById('nav');
+    const progress = document.getElementById('progress');
+    const head = document.querySelector('.essay-head');
+    window.addEventListener('scroll', () => {
+      if (head) {
+        const hb = head.getBoundingClientRect().bottom;
+        nav.classList.toggle('light', hb < 0);
+      }
+      const total = document.body.scrollHeight - window.innerHeight;
+      progress.style.width = (window.scrollY / total * 100) + '%';
+    }, { passive: true });
+  </script>
+</body>
+</html>

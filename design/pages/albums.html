@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CU Photo Club — Albums / The Archive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,200;0,300;0,400;0,500;0,600;1,200;1,300;1,400;1,500;1,600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --hero-bg: #0C0C0A;
+      --body-bg: #F5F4F0;
+      --dark:    #1A1918;
+      --muted:   #7C7A72;
+      --subtle:  #E2DED8;
+      --paper:   #EEEAE2;
+      --accent:  #E8186E;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--body-bg);
+      color: var(--dark);
+      font-family: 'Inter', sans-serif;
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ─── PROGRESS BAR ────────────────────── */
+    #progress {
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 200;
+      width: 0%;
+      height: 2px;
+      background: var(--accent);
+      transition: width 0.1s linear;
+    }
+
+    /* ─── NAV ─────────────────────────────── */
+    nav {
+      position: fixed;
+      inset-block-start: 2px;
+      inset-inline: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem 3rem;
+      transition: background 0.4s ease;
+    }
+    nav.light {
+      background: rgba(245,244,240,0.93);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--subtle);
+    }
+    .logo {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-decoration: none;
+      line-height: 1;
+      color: #F5F4F0;
+      transition: color 0.4s ease;
+    }
+    nav.light .logo { color: var(--dark); }
+    .logo .cu { color: var(--accent); }
+
+    .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+    .nav-links a {
+      font-size: 0.58rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(245,244,240,0.55);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    nav.light .nav-links a { color: var(--muted); }
+    .nav-links a:hover,
+    nav.light .nav-links a:hover { color: var(--accent); }
+    .nav-links a.active { color: #F5F4F0; }
+    nav.light .nav-links a.active { color: var(--dark); }
+    .nav-links a.active::after {
+      content: '';
+      display: block;
+      height: 1px;
+      margin-top: 5px;
+      background: var(--accent);
+    }
+    .nav-links a.join { color: var(--accent) !important; }
+
+    /* ─── PAGE HEADER (dark, compact) ─────── */
+    .page-head {
+      min-height: 64svh;
+      background: var(--hero-bg);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow: hidden;
+    }
+    .page-head__bg {
+      position: absolute;
+      inset: 0;
+      background: url('https://picsum.photos/seed/dawnlumphini_4/1920/1280') center 30% / cover no-repeat;
+      opacity: 0.32;
+      will-change: transform;
+    }
+    .page-head__bg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(12,12,10,0.55) 0%, rgba(12,12,10,0.2) 40%, rgba(12,12,10,0.9) 100%);
+    }
+    .page-head__body {
+      position: relative;
+      z-index: 2;
+      padding: 0 3rem 0;
+      max-width: 1380px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .page-head__kicker {
+      font-size: 0.56rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: rgba(245,244,240,0.5);
+      margin-bottom: 1.5rem;
+    }
+    .page-head__kicker span { color: var(--accent); }
+    .page-head__title {
+      font-family: 'Spectral', serif;
+      font-size: clamp(3.5rem, 8vw, 8.5rem);
+      font-weight: 200;
+      line-height: 0.9;
+      letter-spacing: -0.03em;
+      color: #F5F4F0;
+    }
+    .page-head__title em { font-style: italic; font-weight: 200; color: var(--accent); }
+
+    .page-head__foot {
+      position: relative;
+      z-index: 2;
+      margin-top: 3rem;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 3rem;
+      padding: 0 3rem 3rem;
+      max-width: 1380px;
+      margin-left: auto;
+      margin-right: auto;
+      width: 100%;
+    }
+    .page-head__lead {
+      font-size: 0.82rem;
+      color: rgba(245,244,240,0.5);
+      line-height: 1.85;
+      max-width: 420px;
+      font-weight: 300;
+    }
+    .page-head__stats {
+      text-align: right;
+      display: flex;
+      gap: 2.5rem;
+    }
+    .stat__num {
+      font-family: 'Spectral', serif;
+      font-size: 2.6rem;
+      font-weight: 200;
+      color: #F5F4F0;
+      line-height: 1;
+    }
+    .stat__label {
+      font-size: 0.52rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: rgba(245,244,240,0.4);
+      margin-top: 0.6rem;
+    }
+
+    .cut-line { width: 100%; height: 2px; background: var(--accent); display: block; }
+
+    /* ─── ARCHIVE INDEX BAR (filter) ──────── */
+    .section-pad { padding: 5rem 3rem 6rem; }
+    .wrap { max-width: 1380px; margin: 0 auto; }
+
+    .index-bar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin-bottom: 3.5rem;
+    }
+    .eyebrow {
+      font-size: 0.54rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .eyebrow .num { color: var(--accent); font-weight: 500; }
+    .index-bar__title {
+      font-family: 'Spectral', serif;
+      font-size: clamp(1.6rem, 2.4vw, 2.3rem);
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    .index-bar__title em { font-style: italic; color: var(--accent); }
+
+    /* Editorial filter — a section index, not a chip grid */
+    .filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem 1.6rem;
+      max-width: 640px;
+      justify-content: flex-end;
+    }
+    .filter button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 400;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0.35rem 0;
+      position: relative;
+      transition: color 0.2s;
+    }
+    .filter button:hover { color: var(--dark); }
+    .filter button sup {
+      font-size: 0.78em;
+      color: var(--subtle);
+      margin-left: 0.2em;
+      transition: color 0.2s;
+    }
+    .filter button:hover sup { color: var(--muted); }
+    .filter button.active { color: var(--accent); }
+    .filter button.active sup { color: var(--accent); }
+    .filter button.active::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: -1px;
+      height: 1px;
+      background: var(--accent);
+    }
+
+    /* ─── FEATURED ALBUM (lead split) ─────── */
+    .feature {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 0;
+      margin-bottom: 4.5rem;
+      background: var(--hero-bg);
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .feature__img { position: relative; overflow: hidden; min-height: 460px; }
+    .feature__img img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transition: transform 0.8s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    .feature:hover .feature__img img { transform: scale(1.04); }
+    .feature__flag {
+      position: absolute;
+      top: 1.5rem; left: 1.5rem;
+      z-index: 2;
+      font-size: 0.5rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: #F5F4F0;
+      background: var(--accent);
+      padding: 0.5rem 0.85rem;
+    }
+    .feature__body {
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      color: #F5F4F0;
+    }
+    .feature__cat {
+      font-size: 0.54rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1.25rem;
+    }
+    .feature__title {
+      font-family: 'Spectral', serif;
+      font-size: clamp(2rem, 3.2vw, 3.2rem);
+      font-weight: 300;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin-bottom: 1.5rem;
+    }
+    .feature__title em { font-style: italic; }
+    .feature__excerpt {
+      font-size: 0.82rem;
+      color: rgba(245,244,240,0.52);
+      line-height: 1.85;
+      margin-bottom: 2rem;
+      max-width: 420px;
+    }
+    .feature__meta {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(245,244,240,0.45);
+      margin-bottom: 2rem;
+    }
+    .feature__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
+    .feature__view {
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      width: fit-content;
+      border-bottom: 1px solid rgba(232,24,110,0.35);
+      padding-bottom: 3px;
+      transition: border-color 0.2s;
+    }
+    .feature:hover .feature__view { border-color: var(--accent); }
+
+    /* ─── ALBUM MASONRY ───────────────────── */
+    .albums {
+      column-count: 3;
+      column-gap: 1.5rem;
+    }
+    .album {
+      break-inside: avoid;
+      margin-bottom: 2.75rem;
+      cursor: pointer;
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .album.is-hidden { display: none; }
+
+    /* Stacked-print effect: the cover sits on top of two offset "prints" */
+    .album__stack {
+      position: relative;
+      margin-bottom: 1.1rem;
+    }
+    .album__stack::before,
+    .album__stack::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--paper);
+      border: 1px solid var(--subtle);
+      z-index: 0;
+      transition: transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    .album__stack::before { transform: translate(6px, 6px); }
+    .album__stack::after  { transform: translate(11px, 11px); opacity: 0.6; }
+    .album:hover .album__stack::before { transform: translate(10px, 10px); }
+    .album:hover .album__stack::after  { transform: translate(18px, 18px); }
+
+    .album__cover {
+      position: relative;
+      z-index: 1;
+      overflow: hidden;
+      background: var(--hero-bg);
+    }
+    .album__cover img {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+      transition: transform 0.8s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    .album:hover .album__cover img { transform: scale(1.05); }
+
+    /* frame count — always faintly present, brightens on hover */
+    .album__frames {
+      position: absolute;
+      top: 0.85rem; right: 0.85rem;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.5rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #F5F4F0;
+      background: rgba(12,12,10,0.55);
+      backdrop-filter: blur(4px);
+      padding: 0.4rem 0.6rem;
+      transition: background 0.25s;
+    }
+    .album:hover .album__frames { background: var(--accent); }
+    .album__frames svg { width: 9px; height: 9px; display: block; }
+
+    .album__view {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      z-index: 2;
+      padding: 2.5rem 1rem 1rem;
+      background: linear-gradient(transparent, rgba(12,12,10,0.8));
+      font-size: 0.54rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #F5F4F0;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .album:hover .album__view { opacity: 1; transform: translateY(0); }
+
+    .album__cat {
+      font-size: 0.52rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.55rem;
+    }
+    .album__title {
+      font-family: 'Spectral', serif;
+      font-size: 1.3rem;
+      font-weight: 400;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.6rem;
+      transition: color 0.2s;
+    }
+    .album:hover .album__title { color: var(--accent); }
+    .album__date {
+      font-size: 0.58rem;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+
+    .empty {
+      display: none;
+      text-align: center;
+      padding: 4rem 0;
+      font-family: 'Spectral', serif;
+      font-style: italic;
+      font-size: 1.2rem;
+      color: var(--muted);
+    }
+    .empty.show { display: block; }
+
+    /* ─── FOOTER ──────────────────────────── */
+    footer {
+      background: var(--dark);
+      color: rgba(245,244,240,0.7);
+      padding: 3.5rem 3rem 2.5rem;
+    }
+    .footer__grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 3rem;
+      max-width: 1380px;
+      margin: 0 auto 3rem;
+    }
+    .footer__brand {
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-decoration: none;
+      color: #F5F4F0;
+      display: block;
+      margin-bottom: 0.85rem;
+    }
+    .footer__brand .cu { color: var(--accent); }
+    .footer__tagline { font-size: 0.7rem; color: rgba(245,244,240,0.38); line-height: 1.7; }
+    .footer__col h4 {
+      font-size: 0.5rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1.1rem;
+    }
+    .footer__col ul { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+    .footer__col a {
+      font-size: 0.74rem;
+      color: rgba(245,244,240,0.42);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer__col a:hover { color: #F5F4F0; }
+    .footer__bottom {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(245,244,240,0.1);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.58rem;
+      letter-spacing: 0.1em;
+      color: rgba(245,244,240,0.28);
+    }
+
+    /* ─── RESPONSIVE ──────────────────────── */
+    @media (max-width: 1000px) {
+      .albums { column-count: 2; }
+      .feature { grid-template-columns: 1fr; }
+      .feature__img { min-height: 320px; }
+    }
+    @media (max-width: 720px) {
+      nav { padding: 1.25rem 1.5rem; }
+      .nav-links { display: none; }
+      .section-pad { padding: 4rem 1.5rem 5rem; }
+      .page-head__body, .page-head__foot { padding-left: 1.5rem; padding-right: 1.5rem; }
+      .page-head__foot { grid-template-columns: 1fr; }
+      .page-head__stats { justify-content: flex-start; }
+      .albums { column-count: 1; }
+      .filter { justify-content: flex-start; }
+      .index-bar { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="progress"></div>
+
+  <nav id="nav">
+    <a href="#" class="logo"><span class="cu">CU</span>PHOTOCLUB</a>
+    <ul class="nav-links">
+      <li><a href="#">Home</a></li>
+      <li><a href="#" class="active">Albums</a></li>
+      <li><a href="#">Blog</a></li>
+      <li><a href="#">History</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#" class="join">Join</a></li>
+    </ul>
+  </nav>
+
+  <!-- PAGE HEADER: dark -->
+  <header class="page-head" id="head">
+    <div class="page-head__bg" id="parallax"></div>
+    <div class="page-head__body">
+      <p class="page-head__kicker">CU Photo Club · <span>The Archive</span></p>
+      <h1 class="page-head__title">Albums &amp; <em>collections</em></h1>
+    </div>
+    <div class="page-head__foot">
+      <p class="page-head__lead">
+        Every album is a complete body of work — a morning, a place, a single roll of an idea
+        pursued to its end. Browse the collections our members have made since 2024.
+      </p>
+      <div class="page-head__stats">
+        <div>
+          <div class="stat__num">12</div>
+          <div class="stat__label">Collections</div>
+        </div>
+        <div>
+          <div class="stat__num">59</div>
+          <div class="stat__label">Frames</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="cut-line"></div>
+
+  <!-- ARCHIVE -->
+  <section class="section-pad">
+    <div class="wrap">
+
+      <div class="index-bar">
+        <div>
+          <div class="eyebrow"><span class="num">01</span> The Archive</div>
+          <h2 class="index-bar__title">Sequenced by <em>date</em>, newest first</h2>
+        </div>
+        <div class="filter" id="filter">
+          <button class="active" data-cat="all">All <sup>12</sup></button>
+          <button data-cat="Street">Street <sup>1</sup></button>
+          <button data-cat="Portrait">Portrait <sup>2</sup></button>
+          <button data-cat="Architecture">Architecture <sup>1</sup></button>
+          <button data-cat="Documentary">Documentary <sup>2</sup></button>
+          <button data-cat="Landscape">Landscape <sup>1</sup></button>
+          <button data-cat="Student Life">Student Life <sup>1</sup></button>
+          <button data-cat="Abstract">Abstract <sup>1</sup></button>
+          <button data-cat="Still Life">Still Life <sup>1</sup></button>
+          <button data-cat="Travel">Travel <sup>1</sup></button>
+          <button data-cat="Urban">Urban <sup>1</sup></button>
+        </div>
+      </div>
+
+      <!-- FEATURED / latest album -->
+      <article class="feature album-item" data-cat="Street">
+        <div class="feature__img">
+          <span class="feature__flag">Latest</span>
+          <img src="https://picsum.photos/seed/dawnlumphini_1/1200/900" alt="Dawn at Lumphini">
+        </div>
+        <div class="feature__body">
+          <p class="feature__cat">Street</p>
+          <h3 class="feature__title">Dawn at <em>Lumphini</em></h3>
+          <p class="feature__excerpt">
+            Members gathered before sunrise to watch the park become itself in the first
+            gold light — a study in patience as much as in exposure.
+          </p>
+          <div class="feature__meta">
+            <span>April 2025</span><span class="dot"></span><span>6 Frames</span>
+          </div>
+          <span class="feature__view">View Album →</span>
+        </div>
+      </article>
+
+      <!-- MASONRY -->
+      <div class="albums" id="albums">
+
+        <article class="album album-item" data-cat="Portrait">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                5
+              </span>
+              <img src="https://picsum.photos/seed/facessiam_3/800/1000" alt="Faces of Siam">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Portrait</p>
+          <h3 class="album__title">Faces of Siam</h3>
+          <p class="album__date">March 2025</p>
+        </article>
+
+        <article class="album album-item" data-cat="Architecture">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                5
+              </span>
+              <img src="https://picsum.photos/seed/concretelight_1/800/600" alt="Concrete & Light">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Architecture</p>
+          <h3 class="album__title">Concrete &amp; Light</h3>
+          <p class="album__date">March 2025</p>
+        </article>
+
+        <article class="album album-item" data-cat="Documentary">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                6
+              </span>
+              <img src="https://picsum.photos/seed/nightmarkets_2/800/1100" alt="Night Markets">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Documentary</p>
+          <h3 class="album__title">Night Markets</h3>
+          <p class="album__date">February 2025</p>
+        </article>
+
+        <article class="album album-item" data-cat="Landscape">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                4
+              </span>
+              <img src="https://picsum.photos/seed/riversedge_1/800/600" alt="The River's Edge">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Landscape</p>
+          <h3 class="album__title">The River's Edge</h3>
+          <p class="album__date">February 2025</p>
+        </article>
+
+        <article class="album album-item" data-cat="Student Life">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                5
+              </span>
+              <img src="https://picsum.photos/seed/campusmorn_4/800/950" alt="Campus Mornings">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Student Life</p>
+          <h3 class="album__title">Campus Mornings</h3>
+          <p class="album__date">January 2025</p>
+        </article>
+
+        <article class="album album-item" data-cat="Abstract">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                4
+              </span>
+              <img src="https://picsum.photos/seed/monsoon_1/800/600" alt="Monsoon">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Abstract</p>
+          <h3 class="album__title">Monsoon</h3>
+          <p class="album__date">January 2025</p>
+        </article>
+
+        <article class="album album-item" data-cat="Documentary">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                6
+              </span>
+              <img src="https://picsum.photos/seed/festlights_3/800/1050" alt="Festival of Lights">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Documentary</p>
+          <h3 class="album__title">Festival of Lights</h3>
+          <p class="album__date">December 2024</p>
+        </article>
+
+        <article class="album album-item" data-cat="Still Life">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                4
+              </span>
+              <img src="https://picsum.photos/seed/interiors_1/800/600" alt="Quiet Interiors">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Still Life</p>
+          <h3 class="album__title">Quiet Interiors</h3>
+          <p class="album__date">December 2024</p>
+        </article>
+
+        <article class="album album-item" data-cat="Travel">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                5
+              </span>
+              <img src="https://picsum.photos/seed/ayutthaya_2/800/1000" alt="Train to Ayutthaya">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Travel</p>
+          <h3 class="album__title">Train to Ayutthaya</h3>
+          <p class="album__date">November 2024</p>
+        </article>
+
+        <article class="album album-item" data-cat="Portrait">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                5
+              </span>
+              <img src="https://picsum.photos/seed/studio_1/800/640" alt="Studio Sessions">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Portrait</p>
+          <h3 class="album__title">Studio Sessions</h3>
+          <p class="album__date">November 2024</p>
+        </article>
+
+        <article class="album album-item" data-cat="Urban">
+          <div class="album__stack">
+            <div class="album__cover">
+              <span class="album__frames">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1"/><rect x="6" y="3" width="14" height="3" rx="1"/></svg>
+                4
+              </span>
+              <img src="https://picsum.photos/seed/rooftops_3/800/980" alt="Rooftops">
+              <div class="album__view">View Album →</div>
+            </div>
+          </div>
+          <p class="album__cat">Urban</p>
+          <h3 class="album__title">Rooftops</h3>
+          <p class="album__date">October 2024</p>
+        </article>
+
+      </div>
+      <p class="empty" id="empty">No albums in this category yet.</p>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer__grid">
+      <div>
+        <a href="#" class="footer__brand"><span class="cu">CU</span>PHOTOCLUB</a>
+        <p class="footer__tagline">Official photography club of<br>Chulalongkorn University, Bangkok, Thailand</p>
+      </div>
+      <div class="footer__col">
+        <h4>Navigate</h4>
+        <ul>
+          <li><a href="#">Albums</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">History</a></li>
+          <li><a href="#">About</a></li>
+          <li><a href="#">Join</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer__col">
+        <h4>Follow</h4>
+        <ul>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">Facebook</a></li>
+          <li><a href="#">YouTube</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span>© 2025 CU Photo Club, Chulalongkorn University</span>
+      <span>Bangkok, Thailand</span>
+    </div>
+  </footer>
+
+  <script>
+    const nav = document.getElementById('nav');
+    const head = document.getElementById('head');
+    const parallax = document.getElementById('parallax');
+    const progress = document.getElementById('progress');
+
+    window.addEventListener('scroll', () => {
+      const headBottom = head.getBoundingClientRect().bottom;
+      nav.classList.toggle('light', headBottom < 0);
+      parallax.style.transform = `translateY(${window.scrollY * 0.18}px)`;
+      const total = document.body.scrollHeight - window.innerHeight;
+      progress.style.width = (window.scrollY / total * 100) + '%';
+    }, { passive: true });
+
+    // Editorial filter
+    const filter = document.getElementById('filter');
+    const items = Array.from(document.querySelectorAll('.album-item'));
+    const empty = document.getElementById('empty');
+
+    filter.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      filter.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const cat = btn.dataset.cat;
+      let shown = 0;
+      items.forEach(it => {
+        const match = cat === 'all' || it.dataset.cat === cat;
+        it.classList.toggle('is-hidden', !match);
+        if (match) shown++;
+      });
+      empty.classList.toggle('show', shown === 0);
+    });
+  </script>
+</body>
+</html>

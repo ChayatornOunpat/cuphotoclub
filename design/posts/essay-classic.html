@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Art of Waiting — CU Photo Club</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,200;0,300;0,400;0,500;0,600;1,200;1,300;1,400;1,500;1,600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --hero-bg: #0C0C0A; --body-bg: #F5F4F0; --dark: #1A1918;
+      --muted: #7C7A72; --subtle: #E2DED8; --paper: #EEEAE2; --accent: #E8186E;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--body-bg); color: var(--dark);
+      font-family: 'Inter', sans-serif; font-weight: 300;
+      -webkit-font-smoothing: antialiased; overflow-x: hidden;
+    }
+    #progress {
+      position: fixed; top: 0; left: 0; z-index: 200;
+      width: 0%; height: 2px; background: var(--accent); transition: width 0.1s linear;
+    }
+    nav {
+      position: fixed; inset-block-start: 2px; inset-inline: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 3rem; transition: background 0.4s ease;
+    }
+    nav.light {
+      background: rgba(245,244,240,0.93); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--subtle);
+    }
+    .logo {
+      font-family: 'Inter', sans-serif; font-size: 0.82rem; font-weight: 500;
+      letter-spacing: 0.18em; text-decoration: none; line-height: 1;
+      color: #F5F4F0; transition: color 0.4s ease;
+    }
+    nav.light .logo { color: var(--dark); }
+    .logo .cu { color: var(--accent); }
+    .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+    .nav-links a {
+      font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase;
+      color: rgba(245,244,240,0.55); text-decoration: none; transition: color 0.2s;
+    }
+    nav.light .nav-links a { color: var(--muted); }
+    .nav-links a:hover, nav.light .nav-links a:hover { color: var(--accent); }
+    .nav-links a.active { color: #F5F4F0; }
+    nav.light .nav-links a.active { color: var(--dark); }
+    .nav-links a.active::after { content: ''; display: block; height: 1px; margin-top: 5px; background: var(--accent); }
+    .nav-links a.join { color: var(--accent) !important; }
+
+    .page-head {
+      min-height: 72svh; background: var(--hero-bg); position: relative;
+      display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
+    }
+    .page-head__bg {
+      position: absolute; inset: 0;
+      background: url('https://picsum.photos/seed/classicpost/1920/1280') center 45% / cover no-repeat;
+      opacity: 0.4;
+    }
+    .page-head__bg::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(to bottom, rgba(12,12,10,0.5) 0%, rgba(12,12,10,0.1) 40%, rgba(12,12,10,0.9) 100%);
+    }
+    .page-head__body {
+      position: relative; z-index: 2; padding: 0 3rem 0;
+      max-width: 900px; margin: 0 auto; width: 100%;
+    }
+    .page-head__back {
+      display: inline-block; font-size: 0.56rem; letter-spacing: 0.2em;
+      text-transform: uppercase; color: rgba(245,244,240,0.45);
+      text-decoration: none; margin-bottom: 2rem; transition: color 0.2s;
+    }
+    .page-head__back:hover { color: var(--accent); }
+    .page-head__tag {
+      font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 1.25rem;
+    }
+    .page-head__title {
+      font-family: 'Spectral', serif;
+      font-size: clamp(3rem, 6.5vw, 5.5rem); font-weight: 200;
+      line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0;
+      margin-bottom: 2rem; max-width: 800px;
+    }
+    .page-head__title em { font-style: italic; }
+    .page-head__meta {
+      display: flex; align-items: center; gap: 1rem;
+      font-size: 0.58rem; letter-spacing: 0.12em;
+      color: rgba(245,244,240,0.45); margin-bottom: 3.5rem;
+    }
+    .page-head__meta .author { color: var(--accent); letter-spacing: 0.16em; text-transform: uppercase; }
+    .page-head__meta .sep { width: 2px; height: 2px; border-radius: 50%; background: rgba(245,244,240,0.3); }
+
+    /* ─── ARTICLE BODY ─────────────────────── */
+    .article {
+      max-width: 740px; margin: 0 auto; padding: 4rem 3rem 6rem;
+    }
+    .article__lead {
+      font-family: 'Spectral', serif; font-size: 1.15rem; font-weight: 400;
+      line-height: 1.7; color: var(--dark); margin-bottom: 2.5rem;
+      padding-left: 1.5rem; border-left: 2px solid var(--accent);
+    }
+    .article p {
+      font-size: 0.95rem; line-height: 1.95; color: var(--dark);
+      margin-bottom: 1.5rem;
+    }
+    .article p.muted {
+      color: var(--muted); font-size: 0.85rem;
+    }
+    .article h2 {
+      font-family: 'Spectral', serif; font-size: 1.8rem; font-weight: 300;
+      line-height: 1.15; letter-spacing: -0.02em; margin: 3.5rem 0 1.25rem;
+    }
+    .article h2 em { font-style: italic; color: var(--accent); }
+    .article h3 {
+      font-family: 'Spectral', serif; font-size: 1.3rem; font-weight: 400;
+      line-height: 1.2; margin: 2.5rem 0 1rem;
+    }
+    .article blockquote {
+      font-family: 'Spectral', serif; font-size: 1.5rem; font-weight: 200;
+      font-style: italic; line-height: 1.4; color: var(--dark);
+      margin: 2.5rem 0; padding: 1.5rem 2rem;
+      border-left: 2px solid var(--accent); background: var(--paper);
+    }
+    .article blockquote cite {
+      display: block; font-size: 0.7rem; font-style: normal;
+      letter-spacing: 0.12em; color: var(--muted); margin-top: 0.75rem;
+    }
+    .article__image {
+      margin: 3rem -4rem; overflow: hidden;
+    }
+    .article__image img { width: 100%; display: block; }
+    .article__image figcaption {
+      font-size: 0.62rem; color: var(--muted); letter-spacing: 0.08em;
+      padding: 0.75rem 0 0; text-align: right;
+    }
+    .article__pullquote {
+      font-family: 'Spectral', serif; font-size: 2rem; font-weight: 200;
+      font-style: italic; line-height: 1.25; color: var(--accent);
+      margin: 3rem 0; padding: 0 0 0 3rem;
+      border-left: 2px solid var(--accent);
+    }
+    .article__divider {
+      text-align: center; font-size: 0.8rem; color: var(--subtle);
+      margin: 3rem 0; letter-spacing: 0.5em;
+    }
+
+    .article__footer {
+      margin-top: 4rem; padding-top: 2.5rem;
+      border-top: 1px solid var(--subtle);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .article__tags {
+      display: flex; gap: 0.5rem; flex-wrap: wrap;
+    }
+    .article__tags a {
+      font-size: 0.54rem; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--muted); text-decoration: none; padding: 0.35rem 0.75rem;
+      border: 1px solid var(--subtle); transition: border-color 0.2s, color 0.2s;
+    }
+    .article__tags a:hover { border-color: var(--accent); color: var(--accent); }
+    .article__share {
+      display: flex; gap: 0.75rem;
+    }
+    .article__share a {
+      font-size: 0.54rem; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--muted); text-decoration: none; transition: color 0.2s;
+    }
+    .article__share a:hover { color: var(--accent); }
+
+    /* ─── AUTHOR BIO ───────────────────────── */
+    .author-bio {
+      background: var(--paper); border-top: 1px solid var(--subtle);
+      padding: 3rem;
+    }
+    .author-bio__inner {
+      max-width: 740px; margin: 0 auto;
+      display: grid; grid-template-columns: auto 1fr; gap: 1.5rem; align-items: start;
+    }
+    .author-bio__avatar {
+      width: 56px; height: 56px; border-radius: 50%; overflow: hidden;
+      background: var(--subtle);
+    }
+    .author-bio__avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .author-bio__name {
+      font-family: 'Spectral', serif; font-size: 1.1rem; font-weight: 400;
+      margin-bottom: 0.4rem;
+    }
+    .author-bio__text {
+      font-size: 0.8rem; color: var(--muted); line-height: 1.7;
+    }
+
+    /* ─── RELATED ──────────────────────────── */
+    .related {
+      padding: 5rem 3rem 6rem; background: var(--body-bg);
+    }
+    .related__inner { max-width: 1380px; margin: 0 auto; }
+    .eyebrow {
+      font-size: 0.54rem; letter-spacing: 0.28em; text-transform: uppercase;
+      color: var(--muted); display: flex; align-items: center; gap: 1.25rem;
+      margin-bottom: 2.5rem;
+    }
+    .eyebrow .num { color: var(--accent); font-weight: 500; }
+    .eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--subtle); }
+    .related__grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+    }
+    .rcard {
+      cursor: pointer; border-top: 1px solid var(--subtle); padding-top: 1.5rem;
+    }
+    .rcard__img {
+      aspect-ratio: 16/9; overflow: hidden; margin-bottom: 1.25rem;
+    }
+    .rcard__img img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      transition: transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    .rcard:hover .rcard__img img { transform: scale(1.05); }
+    .rcard__tag {
+      font-size: 0.52rem; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 0.65rem;
+    }
+    .rcard__title {
+      font-family: 'Spectral', serif; font-size: 1.15rem; font-weight: 400;
+      line-height: 1.25; letter-spacing: -0.01em; transition: color 0.2s;
+    }
+    .rcard:hover .rcard__title { color: var(--accent); }
+    .rcard__date {
+      font-size: 0.58rem; color: var(--muted); letter-spacing: 0.1em;
+      margin-top: 0.75rem;
+    }
+
+    /* ─── FOOTER ──────────────────────────── */
+    footer {
+      background: var(--dark); color: rgba(245,244,240,0.7);
+      padding: 3.5rem 3rem 2.5rem;
+    }
+    .footer__grid {
+      display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 3rem;
+      max-width: 1380px; margin: 0 auto 3rem;
+    }
+    .footer__brand {
+      font-size: 0.82rem; font-weight: 500; letter-spacing: 0.18em;
+      text-decoration: none; color: #F5F4F0; display: block; margin-bottom: 0.85rem;
+    }
+    .footer__brand .cu { color: var(--accent); }
+    .footer__tagline { font-size: 0.7rem; color: rgba(245,244,240,0.38); line-height: 1.7; }
+    .footer__col h4 {
+      font-size: 0.5rem; letter-spacing: 0.28em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 1.1rem;
+    }
+    .footer__col ul { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+    .footer__col a {
+      font-size: 0.74rem; color: rgba(245,244,240,0.42);
+      text-decoration: none; transition: color 0.2s;
+    }
+    .footer__col a:hover { color: #F5F4F0; }
+    .footer__bottom {
+      max-width: 1380px; margin: 0 auto; padding-top: 2rem;
+      border-top: 1px solid rgba(245,244,240,0.1);
+      display: flex; justify-content: space-between;
+      font-size: 0.58rem; letter-spacing: 0.1em; color: rgba(245,244,240,0.28);
+    }
+
+    @media (max-width: 1000px) {
+      .article__image { margin: 2.5rem 0; }
+      .related__grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 720px) {
+      nav { padding: 1.25rem 1.5rem; }
+      .nav-links { display: none; }
+      .article { padding: 3rem 1.5rem 4rem; }
+      .page-head__body { padding-left: 1.5rem; padding-right: 1.5rem; }
+      .page-head { min-height: 60svh; }
+      .related__grid { grid-template-columns: 1fr; }
+      .author-bio__inner { grid-template-columns: 1fr; }
+      .article__footer { flex-direction: column; gap: 1rem; align-items: flex-start; }
+      footer { padding: 2.5rem 1.5rem 2rem; }
+      .footer__grid { grid-template-columns: 1fr; gap: 2rem; }
+      .footer__bottom { flex-direction: column; gap: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="progress"></div>
+
+  <nav id="nav">
+    <a href="#" class="logo"><span class="cu">CU</span>PHOTOCLUB</a>
+    <ul class="nav-links">
+      <li><a href="#">Home</a></li>
+      <li><a href="#">Gallery</a></li>
+      <li><a href="#" class="active">Blog</a></li>
+      <li><a href="#">History</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#" class="join">Join</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO: dark full-bleed -->
+  <header class="page-head" id="head">
+    <div class="page-head__bg" id="parallax"></div>
+    <div class="page-head__body">
+      <a href="#" class="page-head__back">← Back to Blog</a>
+      <p class="page-head__tag">Feature · Photography</p>
+      <h1 class="page-head__title">
+        The Art of <em>Waiting</em>:<br>
+        Finding the Frame in Stillness
+      </h1>
+      <div class="page-head__meta">
+        <span class="author">Ananda K.</span>
+        <span class="sep"></span>
+        <span>June 12, 2025</span>
+        <span class="sep"></span>
+        <span>8 min read</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="cut-line"></div>
+
+  <!-- ARTICLE -->
+  <article class="article">
+    <p class="article__lead">
+      The first thing you learn in photography is how to see. The second — the harder lesson —
+      is how to wait. This is not the passive waiting of boredom, but an active, alert stillness.
+      A kind of listening with your eyes.
+    </p>
+
+    <p>
+      I remember my first morning with the CU Photo Club. We gathered at Lumphini Park before
+      sunrise, a dozen of us with cameras hanging from our necks like talismans. The air was
+      cool and damp, heavy with the promise of the first light. Our instructor, a third-year
+      student with patient eyes, gave us a single instruction: <em>find a spot and stay there
+      for an hour.</em>
+    </p>
+
+    <p>
+      No walking. No chasing shots. Just stand — or sit, or kneel — and watch what happens.
+      I thought it was absurd. I had come to make photographs, not to meditate. But I complied,
+      choosing a bench near the water where the lotus leaves clustered like green palm prints.
+    </p>
+
+    <div class="article__image">
+      <img src="https://picsum.photos/seed/postwait01/1200/800" alt="Lumphini Park at dawn">
+      <figcaption>Lumphini Park, 5:47 AM — the moment before the light breaks</figcaption>
+    </div>
+
+    <h2>The <em>first</em> fifteen minutes</h2>
+
+    <p>
+      The first quarter of an hour was agony. My thumb hovered over the shutter release.
+      A heron stood motionless at the water's edge — <em>click</em>. A jogger passed through
+      a shaft of amber — <em>click</em>. I was making pictures, but I wasn't <em>seeing</em>.
+      I was collecting, not composing.
+    </p>
+
+    <p>
+      Then something shifted. The heron, which I had already photographed, lifted its head.
+      Not to fly — just to turn it slightly, catching the light at a new angle. I raised my
+      camera, then stopped. I watched instead. The bird took one slow step, then another.
+      The jogger came again, this time from the opposite direction. The light had changed
+      colour — from amber to gold to something almost pink.
+    </p>
+
+    <p class="muted">
+      I hadn't moved. But everything around me had moved, and suddenly there were a hundred
+      photographs where before there had been none.
+    </p>
+
+    <div class="article__pullquote">
+      "The photograph is not made by the camera. It is made by the interval between what you
+      expect and what arrives."
+    </div>
+
+    <h2>Learning to <em>listen</em> with your eyes</h2>
+
+    <p>
+      There is a Japanese concept called <em>ma</em> — the interval, the pause, the space
+      between things. In photography, <em>ma</em> is the distance between you and your subject,
+      but also the distance between one frame and the next. It is the breath you take before
+      pressing the shutter. Without it, your images are noise. With it, they become sentences.
+    </p>
+
+    <p>
+      At the club, we talk about this constantly. The best photographers on our roster are not
+      the ones with the most expensive gear or the fastest reflexes. They are the ones who know
+      how to wait. They arrive early and leave late. They shoot less but keep more.
+    </p>
+
+    <blockquote>
+      "I think of waiting as a kind of focusing — not of the lens, but of the attention.
+      The more still you become, the more the world reveals itself to you."
+      <cite>— Mintra S., club member and street photographer</cite>
+    </blockquote>
+
+    <p>
+      This is not mysticism. It is a practical discipline. Consider: when you stand still in
+      a busy street, people eventually stop noticing you. You become part of the furniture,
+      part of the background. And then the real moments happen — not the posed smiles or the
+      performative gestures, but the unguarded ones. The yawn, the glance, the hand reaching
+      for another hand.
+    </p>
+
+    <h2>Waiting as <em>presence</em></h2>
+
+    <p>
+      In our workshop last semester, we asked members to photograph the same location — a
+      corner of the university campus — every day for a week, for exactly thirty minutes each
+      time. The results were illuminating. Day one yielded frantic, scattered images. Day two
+      was only slightly better. But by day four, something opened up. The compositions grew
+      simpler. The light became a collaborator rather than an obstacle. The photographs began
+      to look like the place actually felt.
+    </p>
+
+    <div class="article__image">
+      <img src="https://picsum.photos/seed/postwait02/1200/800" alt="University corner">
+      <figcaption>Day four of the workshop — same corner, different eyes</figcaption>
+    </div>
+
+    <p>
+      What changed was not the location. It was the photographer's relationship to time.
+      By day four, the pressure to produce had dissolved. There was nothing left to prove.
+      The camera became a secondary instrument — the primary one was attention.
+    </p>
+
+    <p>
+      The next time you go out to make photographs, try this: find one spot and stay for an
+      hour. Don't leave. Don't scroll through your phone. Just watch. The first fifteen minutes
+      will feel wasteful. The next fifteen will feel uncomfortable. Somewhere in the third
+      quarter, the world will forget you're there. And that is when the photograph arrives.
+    </p>
+
+    <div class="article__divider">· · ·</div>
+
+    <p>
+      <em>This essay is part of an ongoing series on photographic craft. The CU Photo Club
+      meets every Saturday at 8 AM on the CU campus. All skill levels welcome.</em>
+    </p>
+
+    <div class="article__footer">
+      <div class="article__tags">
+        <a href="#">Craft</a>
+        <a href="#">Process</a>
+        <a href="#">Street Photography</a>
+      </div>
+      <div class="article__share">
+        <a href="#">Share →</a>
+      </div>
+    </div>
+  </article>
+
+  <!-- AUTHOR BIO -->
+  <div class="author-bio">
+    <div class="author-bio__inner">
+      <div class="author-bio__avatar">
+        <img src="https://picsum.photos/seed/author01/200/200" alt="Ananda K.">
+      </div>
+      <div>
+        <p class="author-bio__name">Ananda K.</p>
+        <p class="author-bio__text">
+          Ananda is a third-year Communication Arts student and the editor of the CU Photo Club
+          blog. She shoots with a battered Canon AE-1 and believes that the best camera is the
+          one you've had long enough to stop thinking about.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- RELATED -->
+  <section class="related">
+    <div class="related__inner">
+      <div class="eyebrow"><span class="num">More</span> from the blog</div>
+      <div class="related__grid">
+        <article class="rcard">
+          <div class="rcard__img">
+            <img src="https://picsum.photos/seed/blog02/800/550" alt="Related">
+          </div>
+          <p class="rcard__tag">Interview</p>
+          <h3 class="rcard__title">The Archive Keeper: A Conversation with Somchai P.</h3>
+          <p class="rcard__date">May 2025</p>
+        </article>
+        <article class="rcard">
+          <div class="rcard__img">
+            <img src="https://picsum.photos/seed/blog03/800/550" alt="Related">
+          </div>
+          <p class="rcard__tag">Workshop</p>
+          <h3 class="rcard__title">Cyanotype Diaries: Printing with Sunlight</h3>
+          <p class="rcard__date">May 2025</p>
+        </article>
+        <article class="rcard">
+          <div class="rcard__img">
+            <img src="https://picsum.photos/seed/blog04/800/550" alt="Related">
+          </div>
+          <p class="rcard__tag">Exhibition</p>
+          <h3 class="rcard__title">Fifty Frames: A Decade of Annual Exhibitions</h3>
+          <p class="rcard__date">April 2025</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer__grid">
+      <div>
+        <a href="#" class="footer__brand"><span class="cu">CU</span>PHOTOCLUB</a>
+        <p class="footer__tagline">Official photography club of<br>Chulalongkorn University, Bangkok, Thailand</p>
+      </div>
+      <div class="footer__col">
+        <h4>Navigate</h4>
+        <ul>
+          <li><a href="#">Gallery</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">History</a></li>
+          <li><a href="#">About</a></li>
+          <li><a href="#">Join</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer__col">
+        <h4>Follow</h4>
+        <ul>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">Facebook</a></li>
+          <li><a href="#">YouTube</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span>© 2025 CU Photo Club, Chulalongkorn University</span>
+      <span>Bangkok, Thailand</span>
+    </div>
+  </footer>
+
+  <script>
+    const nav = document.getElementById('nav');
+    const head = document.getElementById('head');
+    const parallax = document.getElementById('parallax');
+    const progress = document.getElementById('progress');
+    window.addEventListener('scroll', () => {
+      const hb = head.getBoundingClientRect().bottom;
+      nav.classList.toggle('light', hb < 0);
+      parallax.style.transform = `translateY(${window.scrollY * 0.15}px)`;
+      const total = document.body.scrollHeight - window.innerHeight;
+      progress.style.width = (window.scrollY / total * 100) + '%';
+    }, { passive: true });
+  </script>
+</body>
+</html>

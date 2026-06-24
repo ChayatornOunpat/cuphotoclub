@@ -1,0 +1,185 @@
+{
+  "nav": {
+    "logo": "CU PHOTO CLUB",
+    "home": "หน้าแรก",
+    "albums": "อัลบั้ม",
+    "blog": "บทความ",
+    "history": "ประวัติ",
+    "about": "เกี่ยวกับ",
+    "join": "เข้าร่วม"
+  },
+  "common": {
+    "album": "อัลบั้ม",
+    "post": "บทความ",
+    "frames": "ภาพ",
+    "frame": "ภาพ",
+    "collections": "คอลเลกชัน",
+    "latest": "ล่าสุด",
+    "viewAlbum": "ดูอัลบั้ม →",
+    "readEssay": "อ่านบทความ →",
+    "all": "ทั้งหมด",
+    "noResults": "ยังไม่มีอัลบั้มในหมวดนี้",
+    "close": "ปิด"
+  },
+  "home": {
+    "featuredWork": "ผลงานประจำวัน",
+    "latest": "ล่าสุด",
+    "ourHistory": "ประวัติของเรา",
+    "aboutUs": "เกี่ยวกับเรา"
+  },
+  "site": {
+    "hero": {
+      "kicker": "จุฬาลงกรณ์มหาวิทยาลัย · ",
+      "kickerAccent": "ก่อตั้ง 1967",
+      "title": [
+        { "text": "มองโลก" },
+        { "text": "ผ่านเลนส์", "em": true },
+        { "text": "ไปด้วยกัน" }
+      ],
+      "lead": "ชมรมศิลปะการถ่ายภาพแห่งจุฬาลงกรณ์มหาวิทยาลัย — ชั้น 3 อาคารจุลจักรพงษ์ ถนนพญาไท แขวงวังใหม่ เขตปทุมวัน กรุงเทพฯ 10330",
+      "meta": [
+        "สมาคม · คนถ่ายภาพ",
+        "กรุงเทพมหานคร ประเทศไทย"
+      ]
+    },
+    "history": {
+      "eyebrow": "ประวัติของเรา",
+      "quote": "ภาพถ่ายทุกภาพที่เราสร้างคือจดหมายถึงอนาคต",
+      "body": [
+        "ก่อตั้งขึ้นในปี 1967 โดยนิสิตจุฬาลงกรณ์มหาวิทยาลัยกลุ่มเล็ก ๆ ที่มีกล้องยืมและความหลงใหลในภาพถ่ายร่วมกัน CU Photo Club เติบโตเป็นหนึ่งในชมรมนักศึกษาด้านภาพถ่ายที่ได้รับการยอมรับในประเทศไทย",
+        "ตลอดเวลากว่าห้าทศวรรษ เราบันทึกชีวิตนิสิต ความเปลี่ยนแปลงทางวัฒนธรรม และภูมิทัศน์เมืองกรุงเทพฯ ที่เติบโตไปพร้อมกัน จนกลายเป็นคลังภาพที่เป็นทั้งความทรงจำส่วนบุคคลและหลักฐานทางประวัติศาสตร์"
+      ],
+      "sinceText": [
+        "ปีที่ก่อตั้ง",
+        "กรุงเทพฯ ประเทศไทย"
+      ]
+    },
+    "about": {
+      "eyebrow": "เกี่ยวกับเรา",
+      "heading": [
+        { "text": "พื้นที่ของ" },
+        { "text": "คนรัก" },
+        { "text": "ภาพถ่าย", "em": true }
+      ],
+      "body": "CU Photo Club เปิดรับนิสิตจุฬาลงกรณ์มหาวิทยาลัยทุกคน ไม่ว่าจะมีประสบการณ์มาก่อนหรือไม่ เราจัดเวิร์กช็อป, Photo Camp, ทริปถ่ายภาพแบบ 1 Day Trip, นิทรรศการประจำปี และดูแลคลังผลงานภาพถ่ายจากหลายยุคสมัย หากคุณมีความอยากรู้อยากเห็นและมีกล้องสักตัว ที่นี่คือพื้นที่ของคุณ",
+      "ctaLabel": "เข้าร่วมชมรม"
+    },
+    "footer": {
+      "tagline": "ชมรมศิลปะการถ่ายภาพแห่ง\nจุฬาลงกรณ์มหาวิทยาลัย กรุงเทพฯ ประเทศไทย",
+      "columns": [
+        {
+          "title": "นำทาง",
+          "links": [
+            { "label": "อัลบั้ม", "to": "/albums" },
+            { "label": "บทความ", "to": "/#stories" },
+            { "label": "ประวัติ", "to": "/#history" },
+            { "label": "เกี่ยวกับ", "to": "/#about" },
+            { "label": "เข้าร่วม", "to": "/#about" },
+            { "label": "ติดต่อ", "to": "#" }
+          ]
+        },
+        {
+          "title": "ติดตาม",
+          "links": [
+            { "label": "Instagram", "to": "https://www.instagram.com/cuphotoclub/" },
+            { "label": "Facebook", "to": "https://www.facebook.com/cuphoto" },
+            { "label": "YouTube", "to": "#" }
+          ]
+        }
+      ],
+      "copyright": "© 2025 CU Photo Club, จุฬาลงกรณ์มหาวิทยาลัย",
+      "location": "กรุงเทพฯ ประเทศไทย"
+    }
+  },
+  "albums": {
+    "pageTitle": "อัลบั้มและคอลเลกชัน",
+    "pageKicker": "CU Photo Club · คลังภาพ",
+    "pageLead": "ทุกอัลบั้มคือชุดผลงานที่สมบูรณ์ — เช้าวันหนึ่ง สถานที่แห่งหนึ่ง ม้วนฟิล์มม้วนเดียวที่ไล่ตามความคิดจนถึงที่สุด สำรวจคอลเลกชันที่สมาชิกของเราสร้างขึ้น",
+    "theArchive": "คลังภาพ",
+    "sequencedBy": "เรียงตามวันที่ ล่าสุดก่อน",
+    "collections": "คอลเลกชัน",
+    "frames": "ภาพ",
+    "latest": "ล่าสุด",
+    "album": "อัลบั้ม",
+    "noAlbums": "ยังไม่มีอัลบั้มในหมวดนี้",
+    "viewAlbum": "ดูอัลบั้ม →",
+    "coverBack": "← คลังภาพ",
+    "allAlbums": "← อัลบั้มทั้งหมด",
+    "albumKicker": "อัลบั้ม · {category}",
+    "metaFrames": "{count} ภาพ",
+    "framesInThisSet": "{count} ภาพในชุดนี้",
+    "framesInThisSetLabel": "ภาพในชุดนี้",
+    "clickToEnlarge": "คลิกที่ภาพเพื่อดูขนาดใหญ่",
+    "close": "ปิด ✕",
+    "scrollSet": "เลื่อนดูชุดภาพ →",
+    "category": "หมวดหมู่",
+    "date": "วันที่",
+    "location": "สถานที่",
+    "stickyBreadcrumb": "อัลบั้ม"
+  },
+  "posts": {
+    "backToHome": "← CU Photo Club"
+  },
+  "admin": {
+    "brand": "CU PHOTO · ผู้ดูแล",
+    "albums": "อัลบั้ม",
+    "viewSite": "ดูเว็บไซต์ ↗",
+    "logOut": "ออกจากระบบ",
+    "loginTitle": "เข้าสู่ระบบ",
+    "password": "รหัสผ่าน",
+    "signingIn": "กำลังเข้าสู่ระบบ…",
+    "signIn": "เข้าสู่ระบบ",
+    "newAlbum": "+ อัลบั้มใหม่",
+    "editAlbum": "แก้ไขอัลบั้ม",
+    "createAlbum": "สร้างอัลบั้ม",
+    "saveChanges": "บันทึกการเปลี่ยนแปลง",
+    "cancel": "ยกเลิก",
+    "save": "บันทึก",
+    "saving": "กำลังบันทึก…",
+    "delete": "ลบ",
+    "edit": "แก้ไข",
+    "tableTitle": "ชื่อ",
+    "tableCategory": "หมวดหมู่",
+    "tableStyle": "รูปแบบ",
+    "tablePlacement": "ตำแหน่ง",
+    "tableFrames": "ภาพ",
+    "tableDate": "วันที่",
+    "noAlbums": "ยังไม่มีอัลบั้ม",
+    "createFirst": "สร้างอัลบั้มแรก →",
+    "albumCount": "{count} อัลบั้ม",
+    "albumCountOther": "{count} อัลบั้ม",
+    "deleteConfirm": "ลบ \"{title}\" หรือไม่? การกระทำนี้ย้อนกลับไม่ได้",
+    "deleteFailed": "ลบไม่สำเร็จ",
+    "saveFailed": "บันทึกไม่สำเร็จ",
+    "loginFailed": "เข้าสู่ระบบไม่สำเร็จ"
+  },
+  "adminForm": {
+    "title": "ชื่อ",
+    "titlePlaceholder": "รุ่งสางที่ลุมพินี",
+    "category": "หมวดหมู่",
+    "categoryPlaceholder": "สตรีท",
+    "location": "สถานที่",
+    "locationOptional": "(ไม่บังคับ)",
+    "locationPlaceholder": "สวนลุมพินี",
+    "dateDisplay": "วันที่ (แสดง)",
+    "datePlaceholder": "เมษายน 2025",
+    "publishedSort": "วันที่เผยแพร่ (เรียงลำดับ)",
+    "style": "รูปแบบ",
+    "styleEssay": "เรียงความ",
+    "styleSticky": "ติดหนึบ",
+    "styleContact": "แผ่นสัมผัส",
+    "placement": "ตำแหน่ง",
+    "placementGallery": "แกลเลอรี",
+    "placementBlog": "บล็อก",
+    "placementBoth": "ทั้งสอง",
+    "excerpt": "คำอธิบายสั้น",
+    "excerptPlaceholder": "คำอธิบายสั้น ๆ ของชุดภาพนี้…",
+    "images": "ภาพ",
+    "coverHint": "· ภาพปก = เลือกปุ่มเรดิโอ",
+    "addImage": "+ เพิ่มภาพ",
+    "imageUrlPlaceholder": "https://… URL ของภาพ",
+    "captionPlaceholder": "คำบรรยาย (ไม่บังคับ)",
+    "setAsCover": "ตั้งเป็นภาพปก",
+    "cover": "ภาพปก"
+  }
+}
