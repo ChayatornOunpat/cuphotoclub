@@ -6,11 +6,14 @@ import AlbumContact from '~/components/AlbumContact.vue'
 definePageMeta({ layout: 'site' })
 
 const route = useRoute()
-const contentPath = useContentRoutePath()
+const slug = computed(() => {
+  const value = route.params.slug
+  return Array.isArray(value) ? value.join('/') : String(value)
+})
 
-const { data: album } = await useAsyncData(`album-${route.path}`, () =>
-  queryCollection('albums').path(contentPath.value).first()
-)
+const { data: album } = await useAsyncData(`album-${route.path}`, async () => {
+  return await $fetch(`/api/albums/${slug.value}`).catch(() => null)
+})
 
 if (!album.value) {
   throw createError({ statusCode: 404, statusMessage: 'Album not found', fatal: true })

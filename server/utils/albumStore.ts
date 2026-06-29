@@ -1,88 +1,156 @@
 import type { Album, AlbumInput } from '~~/shared/types'
-
-/**
- * ─────────────────────────────────────────────────────────────────────────────
- * ALBUM REPOSITORY — the single swap point for the real backend.
- *
- * This is the ONLY module that knows where albums are stored. Today it's an
- * in-memory store (resets when the dev server restarts; not synced to the public
- * @nuxt/content site yet). To connect the real backend later, replace the bodies
- * of these functions with DB calls and keep the signatures identical:
- *   - NuxtHub/Cloudflare  → D1 (hubDatabase()) + R2 for image uploads
- *   - Node host           → better-sqlite3 / Drizzle, local or volume storage
- * Nothing in the API routes or the admin UI needs to change.
- * ─────────────────────────────────────────────────────────────────────────────
- */
+import { appDb } from './appDb'
+import { readContentAlbums } from './contentAlbumFiles'
 
 function slugify(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
-// Seed data so the admin isn't empty in dev. Mirrors a few content albums.
-const seed: Album[] = [
-  {
-    id: 'dawn-at-lumphini',
-    title: 'Dawn at Lumphini',
-    category: 'Street',
-    date: 'April 2025',
-    published: '2025-04-12',
-    location: 'Lumphini Park',
-    excerpt: 'Members gathered before sunrise to watch the park become itself in the first gold light.',
-    style: 'essay',
-    placement: 'gallery',
-    coverIndex: 0,
-    images: [
-      { src: 'https://picsum.photos/seed/dawnlumphini_1/1000/750', caption: 'First light over the lake' },
-      { src: 'https://picsum.photos/seed/dawnlumphini_2/1000/750', caption: 'The eastern path, empty' },
-      { src: 'https://picsum.photos/seed/dawnlumphini_3/1000/750', caption: 'A runner passes' }
-    ]
-  },
-  {
-    id: 'faces-of-siam',
-    title: 'Faces of Siam',
-    category: 'Portrait',
-    date: 'March 2025',
-    published: '2025-03-20',
-    location: 'Central Bangkok',
-    excerpt: 'A series of environmental portraits made across the markets and sois of central Bangkok.',
-    style: 'sticky',
-    placement: 'gallery',
-    coverIndex: 0,
-    images: [
-      { src: 'https://picsum.photos/seed/facessiam_1/1000/750', caption: 'Vendor, morning' },
-      { src: 'https://picsum.photos/seed/facessiam_2/1000/750', caption: 'At the loom' }
-    ]
-  }
-]
+function withoutOrderPrefix(s: string): string {
+  return s.replace(/^\d+-/, '')
+}
 
-// Module-scoped store (in-memory). Replace with a real DB — see header.
-const albums = new Map<string, Album>(seed.map(a => [a.id, a]))
+// Ensure app_meta table exists first so we can check schema version.
+appDb.exec(`
+  CREATE TABLE IF NOT EXISTS app_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )
+`)
+
+// Schema v3: replaced blocks_json with rows_json (Lego grid system).
+// Drop albums table on any schema older than v3 so it is recreated and re-seeded.
+const versionRow = appDb.prepare('SELECT value FROM app_meta WHERE key = ?').get('schema_version') as { value: string } | undefined
+const schemaVersion = versionRow ? Number(versionRow.value) : 0
+
+if (schemaVersion < 3) {
+  appDb.exec('DROP TABLE IF EXISTS albums')
+  appDb.prepare(`
+    INSERT INTO app_meta (key, value) VALUES ('schema_version', '3')
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run()
+  appDb.prepare(`DELETE FROM app_meta WHERE key = 'albums_seeded_from_content'`).run()
+}
+
+appDb.exec(`
+  CREATE TABLE IF NOT EXISTS albums (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    date TEXT NOT NULL,
+    published TEXT NOT NULL,
+    location TEXT,
+    excerpt TEXT NOT NULL,
+    style TEXT NOT NULL,
+    placement TEXT NOT NULL,
+    cover_src TEXT NOT NULL DEFAULT '',
+    rows_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`)
+
+function rowToAlbum(row: any): Album {
+  return {
+    id: row.id,
+    title: row.title,
+    category: row.category,
+    date: row.date,
+    published: row.published,
+    location: row.location ?? undefined,
+    excerpt: row.excerpt,
+    style: row.style,
+    placement: row.placement,
+    coverSrc: row.cover_src,
+    rows: JSON.parse(row.rows_json)
+  }
+}
+
+function writeAlbum(album: Album) {
+  appDb.prepare(`
+    INSERT INTO albums (
+      id, title, category, date, published, location, excerpt, style, placement, cover_src, rows_json, updated_at
+    )
+    VALUES (
+      @id, @title, @category, @date, @published, @location, @excerpt, @style, @placement, @coverSrc, @rowsJson, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT(id) DO UPDATE SET
+      title = excluded.title,
+      category = excluded.category,
+      date = excluded.date,
+      published = excluded.published,
+      location = excluded.location,
+      excerpt = excluded.excerpt,
+      style = excluded.style,
+      placement = excluded.placement,
+      cover_src = excluded.cover_src,
+      rows_json = excluded.rows_json,
+      updated_at = CURRENT_TIMESTAMP
+  `).run({
+    ...album,
+    location: album.location ?? null,
+    rowsJson: JSON.stringify(album.rows)
+  })
+}
+
+function seedFromContentOnce() {
+  const count = (appDb.prepare('SELECT COUNT(*) as count FROM albums').get() as { count: number }).count
+  const seeded = appDb.prepare('SELECT value FROM app_meta WHERE key = ?').get('albums_seeded_from_content')
+  if (count > 0 && seeded) return
+
+  const insertMany = appDb.transaction((albums: Album[]) => {
+    const exists = appDb.prepare('SELECT id FROM albums WHERE id = ?')
+    for (const album of albums) {
+      if (!exists.get(album.id)) writeAlbum(album)
+    }
+    appDb.prepare(`
+      INSERT INTO app_meta (key, value)
+      VALUES ('albums_seeded_from_content', CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run()
+  })
+  insertMany(readContentAlbums())
+}
 
 export const albumStore = {
   list(): Album[] {
-    return [...albums.values()].sort((a, b) => b.published.localeCompare(a.published))
+    seedFromContentOnce()
+    return appDb
+      .prepare('SELECT * FROM albums ORDER BY published DESC')
+      .all()
+      .map(rowToAlbum)
   },
 
   get(id: string): Album | null {
-    return albums.get(id) ?? null
+    seedFromContentOnce()
+    const exact = appDb.prepare('SELECT * FROM albums WHERE id = ?').get(id)
+    if (exact) return rowToAlbum(exact)
+
+    return this.list().find(album => withoutOrderPrefix(album.id) === id) ?? null
   },
 
   create(input: AlbumInput): Album {
+    seedFromContentOnce()
     let id = slugify(input.title) || `album-${Date.now()}`
-    if (albums.has(id)) id = `${id}-${Date.now().toString(36)}`
+    if (this.get(id)) id = `${id}-${Date.now().toString(36)}`
+
     const album: Album = { ...input, id }
-    albums.set(id, album)
+    writeAlbum(album)
     return album
   },
 
   update(id: string, input: AlbumInput): Album | null {
-    if (!albums.has(id)) return null
+    seedFromContentOnce()
+    if (!this.get(id)) return null
+
     const album: Album = { ...input, id }
-    albums.set(id, album)
+    writeAlbum(album)
     return album
   },
 
   remove(id: string): boolean {
-    return albums.delete(id)
+    seedFromContentOnce()
+    const result = appDb.prepare('DELETE FROM albums WHERE id = ?').run(id)
+    return (result as { changes: number }).changes > 0
   }
 }

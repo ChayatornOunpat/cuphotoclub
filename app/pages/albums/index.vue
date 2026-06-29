@@ -3,12 +3,14 @@ definePageMeta({ layout: 'site' })
 
 const { t } = useI18n()
 const localizedPath = useLocalizedContentPath()
-const { data: albums } = await useAsyncData('albums-archive', () =>
-  queryCollection('albums').order('published', 'DESC').all()
-)
+const { data: albums } = await useAsyncData('albums-archive', async () => {
+  const adminAlbums = await $fetch('/api/albums').catch(() => [])
+  if (adminAlbums.length) return adminAlbums.map(album => ({ ...album, path: `/albums/${album.id}` }))
+  return []
+})
 
 function coverOf(a: NonNullable<typeof albums.value>[number]) {
-  return a.images[a.coverIndex]?.src ?? a.images[0]!.src
+  return a.coverSrc || a.rows?.flatMap((r: any) => r.cells).find((c: any) => c.type === 'image' && c.src)?.src || ''
 }
 
 // Gallery section lists albums whose placement includes the gallery.
@@ -32,7 +34,10 @@ const filtered = computed(() =>
 const featured = computed(() => filtered.value[0] ?? null)
 const rest = computed(() => filtered.value.slice(1))
 
-const totalFrames = computed(() => galleryAlbums.value.reduce((n, a) => n + a.images.length, 0))
+function imageCount(a: NonNullable<typeof albums.value>[number]): number {
+  return (a.rows ?? []).reduce((n: number, r: any) => n + r.cells.filter((c: any) => c.type === 'image').length, 0)
+}
+const totalFrames = computed(() => galleryAlbums.value.reduce((n, a) => n + imageCount(a), 0))
 const headerBg = computed(() => (galleryAlbums.value[0] ? coverOf(galleryAlbums.value[0]) : ''))
 
 useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
@@ -101,7 +106,7 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
             <h3 class="feature__title">{{ featured.title }}</h3>
             <p class="feature__excerpt">{{ featured.excerpt }}</p>
             <div class="feature__meta">
-              <span>{{ featured.date }}</span><span class="dot" /><span>{{ t('albums.metaFrames', { count: featured.images.length }) }}</span>
+              <span>{{ featured.date }}</span><span class="dot" /><span>{{ t('albums.metaFrames', { count: imageCount(featured) }) }}</span>
             </div>
             <span class="feature__view">{{ t('albums.viewAlbum') }}</span>
           </div>
@@ -114,7 +119,7 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
               <div class="album__cover">
                 <span class="album__frames">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1" /><rect x="6" y="3" width="14" height="3" rx="1" /></svg>
-                  {{ a.images.length }}
+                  {{ imageCount(a) }}
                 </span>
                 <AppImg :src="coverOf(a)" :alt="a.title" sizes="sm:100vw md:50vw lg:33vw" />
                 <div class="album__view">{{ t('albums.viewAlbum') }}</div>

@@ -2,11 +2,15 @@
 const route = useRoute()
 const { t } = useI18n()
 const localePath = useLocalePath()
-const contentPath = useContentRoutePath()
+const slug = computed(() => {
+  const value = route.params.slug
+  return Array.isArray(value) ? value.join('/') : String(value)
+})
 
-const { data: post } = await useAsyncData(`post-${route.path}`, () =>
-  queryCollection('posts').path(contentPath.value).first()
-)
+const { data: post } = await useAsyncData(`post-${route.path}`, async () => {
+  return await $fetch(`/api/posts/${slug.value}`).catch(() => null)
+})
+const paragraphs = computed(() => post.value?.body.split(/\n{2,}/).map(p => p.trim()).filter(Boolean) ?? [])
 
 if (!post.value) {
   throw createError({ statusCode: 404, statusMessage: 'Post not found', fatal: true })
@@ -28,7 +32,7 @@ useHead({ title: () => `${post.value?.title} — CU Photo Club` })
     </div>
 
     <div class="post__body">
-      <ContentRenderer :value="post" />
+      <p v-for="(paragraph, index) in paragraphs" :key="index">{{ paragraph }}</p>
     </div>
   </article>
 </template>

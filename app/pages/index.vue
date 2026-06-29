@@ -1,17 +1,25 @@
 <script setup lang="ts">
-// ── Data layer: albums + blog posts come from @nuxt/content; page copy from the
-//    `site` singleton. Sections below are just different views over this data.
-const { data: site } = await useAsyncData('site', () => queryCollection('site').first())
-const { data: albums } = await useAsyncData('albums', () => queryCollection('albums').all())
-const { data: posts } = await useAsyncData('posts', () => queryCollection('posts').all())
+import { defaultSite } from '~/utils/defaultSite'
+
+// ── Data layer: albums + blog posts come from the same SQLite-backed APIs used
+//    by admin. Sections below are just different views over this data.
+const site = ref(defaultSite)
+const { data: albums } = await useAsyncData('albums', async () => {
+  const adminAlbums = await $fetch('/api/albums').catch(() => [])
+  if (adminAlbums.length) return adminAlbums.map(album => ({ ...album, path: `/albums/${album.id}` }))
+  return []
+})
+const { data: posts } = await useAsyncData('posts', async () => {
+  const adminPosts = await $fetch('/api/posts').catch(() => [])
+  if (adminPosts.length) return adminPosts.map(post => ({ ...post, path: `/posts/${post.id}` }))
+  return []
+})
 const { t } = useI18n()
 const localizedPath = useLocalizedContentPath()
 const localizedSite = useLocalizedSite(site)
 
 function coverOf(album: NonNullable<typeof albums.value>[number]) {
-  const images = Array.isArray(album.images) ? album.images : []
-  const cover = images[album.coverIndex] ?? images[0]
-  return cover?.src ?? ''
+  return album.coverSrc || (album.rows ?? []).flatMap((r: any) => r.cells).find((c: any) => c.type === 'image' && c.src)?.src || ''
 }
 
 // ── Featured Work: FeaturedWork.vue lays out a randomised, rectangle-guaranteed

@@ -1,48 +1,45 @@
 <script setup lang="ts">
-interface AlbumImage { src: string, caption?: string }
+interface AlbumCell { type: string, span: number, src?: string, caption?: string, content?: string }
+interface AlbumRow { cells: AlbumCell[] }
 interface Album {
   title: string
   category: string
   date: string
   location?: string
   excerpt: string
-  coverIndex: number
-  images: AlbumImage[]
+  coverSrc: string
+  rows: AlbumRow[]
 }
-const props = defineProps<{ album: Album }>()
+const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number, draggableCells?: boolean }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
 
-const cover = computed(() => props.album.images[props.album.coverIndex]?.src ?? props.album.images[0]!.src)
-
-// Set-and-forget: the admin only supplies images; the essay rhythm is generated
-// here (deterministic, so SSR-safe). Recipes cycle and consume the flat image
-// list; if a recipe needs more images than remain, it falls back to a single.
-interface Row { type: 'single' | 'single-right' | 'bleed' | 'pair', items: { src: string, caption?: string, n: number }[] }
-const rows = computed<Row[]>(() => {
-  const recipe: { type: Row['type'], n: number }[] = [
-    { type: 'single', n: 1 },
-    { type: 'bleed', n: 1 },
-    { type: 'pair', n: 2 },
-    { type: 'single-right', n: 1 },
-    { type: 'bleed', n: 1 }
-  ]
-  const out: Row[] = []
-  const imgs = props.album.images
-  let i = 0
-  let r = 0
-  while (i < imgs.length) {
-    let step = recipe[r % recipe.length]!
-    if (step.n > imgs.length - i) step = { type: 'single', n: 1 } // graceful tail
-    const items = imgs.slice(i, i + step.n).map((img, k) => ({ src: img.src, caption: img.caption, n: i + k + 1 }))
-    out.push({ type: step.type, items })
-    i += step.n
-    r++
+// Sequential image number keyed by "ri-ci"
+const imageNumbers = computed(() => {
+  const map = new Map<string, number>()
+  let n = 1
+  for (let ri = 0; ri < props.album.rows.length; ri++) {
+    for (let ci = 0; ci < props.album.rows[ri].cells.length; ci++) {
+      if (props.album.rows[ri].cells[ci].type === 'image') {
+        map.set(`${ri}-${ci}`, n++)
+      }
+    }
   }
-  return out
+  return map
 })
 
+const totalImages = computed(() =>
+  props.album.rows.reduce((sum, row) => sum + row.cells.filter(c => c.type === 'image').length, 0)
+)
+
 const pad = (n: number) => String(n).padStart(2, '0')
+
+function imgSizes(span: number): string {
+  if (span >= 6) return 'xs:100vw sm:100vw md:100vw lg:1380px'
+  if (span >= 4) return 'xs:100vw sm:100vw md:65vw lg:920px'
+  if (span >= 3) return 'xs:100vw sm:50vw lg:690px'
+  return 'xs:100vw sm:33vw lg:460px'
+}
 </script>
 
 <template>
@@ -50,15 +47,16 @@ const pad = (n: number) => String(n).padStart(2, '0')
     <!-- COVER -->
     <header class="cover" data-chrome-header>
       <div class="cover__bg" data-parallax>
-        <AppImg :src="cover" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="cover__img" eager />
+        <AppImg :src="album.coverSrc" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="cover__img" eager />
       </div>
-      <NuxtLink :to="localePath('/albums')" class="cover__back">{{ t('albums.coverBack') }}</NuxtLink>
+      <span v-if="disableNavigation" class="cover__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
+      <NuxtLink v-else :to="localePath('/albums')" class="cover__back">{{ t('albums.coverBack') }}</NuxtLink>
       <div class="cover__body">
         <p class="cover__kicker">{{ t('albums.albumKicker', { category: album.category }) }}</p>
         <h1 class="cover__title">{{ album.title }}</h1>
         <div class="cover__meta">
           <span>{{ album.date }}</span><span class="dot" />
-          <span>{{ t('albums.metaFrames', { count: album.images.length }) }}</span>
+          <span>{{ t('albums.metaFrames', { count: totalImages }) }}</span>
           <template v-if="album.location"><span class="dot" /><span>{{ album.location }}</span></template>
         </div>
       </div>
@@ -70,30 +68,63 @@ const pad = (n: number) => String(n).padStart(2, '0')
       <p class="intro__lead">{{ album.excerpt }}</p>
     </section>
 
-    <!-- ESSAY FLOW -->
+    <!-- ESSAY FLOW — Lego grid -->
     <section class="essay">
-      <template v-for="(row, ri) in rows" :key="ri">
-        <div v-if="row.type === 'pair'" class="row row--pair">
-          <figure v-for="item in row.items" :key="item.n">
-            <div class="frame"><AppImg :src="item.src" :alt="item.caption || album.title" sizes="sm:100vw lg:50vw" /></div>
-            <figcaption><span class="n">{{ pad(item.n) }}</span> {{ item.caption }}</figcaption>
+      <div v-for="(row, ri) in album.rows" :key="ri" class="lego-row" :data-row-n="ri">
+        <template v-for="(cell, ci) in row.cells" :key="ci">
+
+          <!-- IMAGE cell -->
+          <figure
+            v-if="cell.type === 'image'"
+            class="cell cell--image"
+            :style="`--span: ${cell.span}`"
+            :data-row-n="ri"
+            :data-cell-n="ci"
+            :draggable="draggableCells ? true : undefined"
+            :class="{ 'is-admin-selected': selectedRow === ri && selectedCell === ci }"
+          >
+            <div class="frame">
+              <AppImg :src="cell.src || ''" :alt="cell.caption || album.title" :sizes="imgSizes(cell.span)" />
+            </div>
+            <figcaption>
+              <span class="n">{{ pad(imageNumbers.get(`${ri}-${ci}`) ?? 0) }}</span>
+              {{ cell.caption }}
+            </figcaption>
           </figure>
-        </div>
-        <figure
-          v-else
-          class="row"
-          :class="{ 'row--single': row.type === 'single' || row.type === 'single-right', right: row.type === 'single-right', 'row--bleed': row.type === 'bleed' }"
-        >
-          <div class="frame"><AppImg :src="row.items[0]!.src" :alt="row.items[0]!.caption || album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:1400px xxl:1400px" /></div>
-          <figcaption><span class="n">{{ pad(row.items[0]!.n) }}</span> {{ row.items[0]!.caption }}</figcaption>
-        </figure>
-      </template>
+
+          <!-- TEXT cell -->
+          <div
+            v-else-if="cell.type === 'text'"
+            class="cell cell--text"
+            :style="`--span: ${cell.span}`"
+            :data-row-n="ri"
+            :data-cell-n="ci"
+            :draggable="draggableCells ? true : undefined"
+            :class="{ 'is-admin-selected': selectedRow === ri && selectedCell === ci }"
+          >
+            <p class="text-block">{{ cell.content }}</p>
+          </div>
+
+          <!-- PAD cell — empty spacer -->
+          <div
+            v-else
+            class="cell cell--pad"
+            :style="`--span: ${cell.span}`"
+            :data-row-n="ri"
+            :data-cell-n="ci"
+            :draggable="draggableCells ? true : undefined"
+            :class="{ 'is-admin-selected': selectedRow === ri && selectedCell === ci }"
+          />
+
+        </template>
+      </div>
     </section>
 
     <!-- ALBUM NAV -->
     <section class="albnav">
       <div class="albnav__inner">
-        <NuxtLink :to="localePath('/albums')" class="albnav__back">{{ t('albums.allAlbums') }}</NuxtLink>
+        <span v-if="disableNavigation" class="albnav__back is-disabled" aria-disabled="true">{{ t('albums.allAlbums') }}</span>
+        <NuxtLink v-else :to="localePath('/albums')" class="albnav__back">{{ t('albums.allAlbums') }}</NuxtLink>
       </div>
     </section>
   </article>
@@ -123,9 +154,11 @@ const pad = (n: number) => String(n).padStart(2, '0')
   color: rgba(245, 244, 240, 0.7); text-decoration: none; transition: color 0.2s;
 }
 .cover__back:hover { color: var(--accent); }
+.cover__back.is-disabled, .albnav__back.is-disabled { cursor: default; pointer-events: none; }
+.cover__back.is-disabled:hover { color: rgba(245, 244, 240, 0.7); }
+.albnav__back.is-disabled:hover { color: var(--muted); }
 .cover__body { position: relative; z-index: 2; padding: 0 3rem 3.5rem; max-width: 1380px; margin: 0 auto; width: 100%; }
 .cover__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.5rem; }
-.cover__kicker span { color: var(--accent); }
 .cover__title { font-family: var(--font-serif); font-size: clamp(3.5rem, 9vw, 9rem); font-weight: 200; line-height: 0.9; letter-spacing: -0.03em; color: #F5F4F0; }
 .cover__meta { margin-top: 2rem; display: flex; gap: 1.5rem; align-items: center; font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245, 244, 240, 0.5); }
 .cover__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
@@ -134,18 +167,26 @@ const pad = (n: number) => String(n).padStart(2, '0')
 .intro__lead { font-family: var(--font-serif); font-size: clamp(1.6rem, 3vw, 2.6rem); font-weight: 200; line-height: 1.4; letter-spacing: -0.01em; }
 
 .essay { padding: 3rem 3rem 6rem; max-width: 1380px; margin: 0 auto; }
+
+.lego-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 4.5rem;
+}
+
+.cell { min-width: 0; }
+.cell--image { grid-column: span var(--span); }
+.cell--text { grid-column: span var(--span); display: flex; align-items: center; }
+.cell--pad  { grid-column: span var(--span); }
+
 figure { margin: 0; }
 .frame { overflow: hidden; background: var(--hero-bg); }
-.frame :deep(img) { width: 100%; display: block; object-fit: cover; transition: transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
-.frame:hover :deep(img) { transform: scale(1.03); }
-figcaption { display: flex; gap: 1rem; align-items: baseline; margin-top: 1rem; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-figcaption .n { color: var(--accent); font-weight: 500; }
+.frame :deep(img) { width: 100%; display: block; object-fit: cover; }
+figcaption { display: flex; gap: 1rem; align-items: baseline; margin-top: 0.9rem; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+figcaption .n { color: var(--accent); font-weight: 500; flex-shrink: 0; }
 
-.row { margin-bottom: 4.5rem; }
-.row--single { max-width: 760px; }
-.row--single.right { margin-left: auto; }
-.row--bleed { max-width: 100%; }
-.row--pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 4.5rem; }
+.text-block { font-family: var(--font-serif); font-size: clamp(1.1rem, 2vw, 1.4rem); font-weight: 200; line-height: 1.75; color: var(--dark); }
 
 .albnav { background: var(--paper); border-top: 1px solid var(--subtle); border-bottom: 1px solid var(--subtle); padding: 3.5rem 3rem; }
 .albnav__inner { max-width: 1380px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 2rem; flex-wrap: wrap; }
@@ -156,6 +197,7 @@ figcaption .n { color: var(--accent); font-weight: 500; }
   .cover__back { left: 1.5rem; }
   .cover__body { padding: 0 1.5rem 2.5rem; }
   .intro, .essay, .albnav { padding-left: 1.5rem; padding-right: 1.5rem; }
-  .row--pair { grid-template-columns: 1fr; }
+  .lego-row { grid-template-columns: 1fr; gap: 1rem; }
+  .cell--image, .cell--text { grid-column: 1 / -1; }
 }
 </style>

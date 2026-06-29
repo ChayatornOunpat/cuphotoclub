@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import { defaultSite } from '~/utils/defaultSite'
+
 // Shared chrome for inner pages (albums, and later blog): reading-progress bar,
 // the dark→light nav handoff, header parallax, and the footer — all driven by
 // the page's own markup via data-attributes:
 //   [data-chrome-header] → nav goes light once this element scrolls past
 //                          (no such element on a page → nav is always light)
 //   [data-parallax]      → translated on scroll for a parallax header
-const { data: site } = await useAsyncData('site', () => queryCollection('site').first())
+const site = ref(defaultSite)
 const localizedSite = useLocalizedSite(site)
 
 const navLight = ref(false)

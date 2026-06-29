@@ -1,26 +1,40 @@
 <script setup lang="ts">
-interface AlbumImage { src: string, caption?: string }
+interface AlbumCell { type: string, span: number, src?: string, caption?: string, content?: string }
+interface AlbumRow { cells: AlbumCell[] }
 interface Album {
   title: string
   category: string
   date: string
   excerpt: string
-  coverIndex: number
-  images: AlbumImage[]
+  coverSrc: string
+  rows: AlbumRow[]
 }
-const props = defineProps<{ album: Album }>()
+const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
-const cover = computed(() => props.album.images[props.album.coverIndex]?.src ?? props.album.images[0]!.src)
+const cover = computed(() => props.album.coverSrc)
+
+// Flat list of image cells with their row/cell coordinates for admin selection
+const imageCells = computed(() => {
+  const result: { src: string, caption?: string, row: number, cell: number }[] = []
+  for (let ri = 0; ri < props.album.rows.length; ri++) {
+    for (let ci = 0; ci < props.album.rows[ri].cells.length; ci++) {
+      const cell = props.album.rows[ri].cells[ci]
+      if (cell.type === 'image') result.push({ src: cell.src ?? '', caption: cell.caption, row: ri, cell: ci })
+    }
+  }
+  return result
+})
+
 const pad = (n: number) => String(n).padStart(2, '0')
 
 // Lightbox
 const open = ref(false)
 const idx = ref(0)
-const current = computed(() => props.album.images[idx.value])
+const current = computed(() => imageCells.value[idx.value])
 
 function show(i: number) {
-  idx.value = (i + props.album.images.length) % props.album.images.length
+  idx.value = (i + imageCells.value.length) % imageCells.value.length
   open.value = true
 }
 function close() { open.value = false }
@@ -34,7 +48,6 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'ArrowRight') next()
 }
 
-// Lock body scroll while the lightbox is open.
 watch(open, (v) => {
   if (import.meta.client) document.body.style.overflow = v ? 'hidden' : ''
 })
@@ -52,7 +65,8 @@ onUnmounted(() => {
       <div class="head__bg" data-parallax>
         <AppImg :src="cover" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="head__img" eager />
       </div>
-      <NuxtLink :to="localePath('/albums')" class="head__back">{{ t('albums.coverBack') }}</NuxtLink>
+      <span v-if="disableNavigation" class="head__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
+      <NuxtLink v-else :to="localePath('/albums')" class="head__back">{{ t('albums.coverBack') }}</NuxtLink>
       <div class="head__body">
         <p class="head__kicker">{{ t('albums.albumKicker', { category: album.category }) }} · {{ album.date }}</p>
         <h1 class="head__title">{{ album.title }}</h1>
@@ -63,11 +77,19 @@ onUnmounted(() => {
 
     <section class="sheet">
       <div class="sheet__bar">
-        <div class="eyebrow"><span class="num">{{ pad(album.images.length) }}</span> {{ t('albums.framesInThisSetLabel') }}</div>
+        <div class="eyebrow"><span class="num">{{ pad(imageCells.length) }}</span> {{ t('albums.framesInThisSetLabel') }}</div>
         <div class="sheet__hint">{{ t('albums.clickToEnlarge') }}</div>
       </div>
       <div class="grid">
-        <button v-for="(img, i) in album.images" :key="i" class="cell" @click="show(i)">
+        <button
+          v-for="(img, i) in imageCells"
+          :key="i"
+          class="cell"
+          :data-row-n="img.row"
+          :data-cell-n="img.cell"
+          :class="{ 'is-admin-selected': selectedRow === img.row && selectedCell === img.cell }"
+          @click="show(i)"
+        >
           <span class="cell__num">{{ pad(i + 1) }}</span>
           <AppImg :src="img.src" :alt="img.caption || album.title" sizes="sm:50vw lg:460px" />
           <span v-if="img.caption" class="cell__cap">{{ img.caption }}</span>
@@ -78,7 +100,7 @@ onUnmounted(() => {
     <!-- LIGHTBOX -->
     <div v-if="open" class="lb open" @click.self="close">
       <div class="lb__top">
-        <span class="lb__counter"><b>{{ pad(idx + 1) }}</b> / {{ pad(album.images.length) }} · {{ album.title }}</span>
+        <span class="lb__counter"><b>{{ pad(idx + 1) }}</b> / {{ pad(imageCells.length) }} · {{ album.title }}</span>
         <button class="lb__close" @click="close">{{ t('albums.close') }}</button>
       </div>
       <div class="lb__stage">
@@ -98,9 +120,10 @@ onUnmounted(() => {
 :deep(.head__img) { width: 100%; height: 100%; object-fit: cover; opacity: 0.4; display: block; }
 .head__back { position: absolute; top: 6rem; left: 3rem; z-index: 3; font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(245, 244, 240, 0.7); text-decoration: none; }
 .head__back:hover { color: var(--accent); }
+.head__back.is-disabled { cursor: default; pointer-events: none; }
+.head__back.is-disabled:hover { color: rgba(245, 244, 240, 0.7); }
 .head__body { position: relative; z-index: 2; padding: 0 3rem 3rem; max-width: 1380px; margin: 0 auto; width: 100%; }
 .head__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.25rem; }
-.head__kicker span { color: var(--accent); }
 .head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; }
 .head__sub { margin-top: 1.5rem; max-width: 520px; font-size: 0.82rem; color: rgba(245, 244, 240, 0.5); line-height: 1.8; }
 

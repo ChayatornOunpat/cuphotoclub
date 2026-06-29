@@ -3,79 +3,81 @@ definePageMeta({ layout: 'admin', middleware: 'auth' })
 
 const { t } = useI18n()
 const localePath = useLocalePath()
-const { data: albums, refresh } = await useFetch('/api/admin/albums')
-const deleting = ref('')
+const [{ data: albums }, { data: posts }] = await Promise.all([
+  useFetch('/api/admin/albums'),
+  useFetch('/api/admin/posts')
+])
 
-async function del(id: string, title: string) {
-  if (!confirm(t('admin.deleteConfirm', { title }))) return
-  deleting.value = id
-  try {
-    await $fetch(`/api/admin/albums/${id}`, { method: 'DELETE' })
-    await refresh()
-  } catch (e) {
-    alert((e as { data?: { statusMessage?: string } })?.data?.statusMessage || t('admin.deleteFailed'))
-  } finally {
-    deleting.value = ''
+const sections = computed(() => [
+  {
+    key: 'albums',
+    title: t('admin.albums'),
+    count: albums.value?.length ?? 0,
+    meta: t('admin.galleryWork'),
+    to: localePath('/admin/albums'),
+    newTo: localePath('/admin/albums/new')
+  },
+  {
+    key: 'posts',
+    title: t('admin.posts'),
+    count: posts.value?.length ?? 0,
+    meta: t('admin.editorialWriting'),
+    to: localePath('/admin/posts'),
+    newTo: localePath('/admin/posts/new')
   }
-}
+])
 
-useHead({ title: () => `${t('admin.albums')} — Admin` })
+useHead({ title: () => `${t('admin.dashboard')} - Admin` })
 </script>
 
 <template>
-  <div>
-    <div class="page-head">
-      <div>
-        <h1>{{ t('admin.albums') }}</h1>
-        <p class="sub">{{ t((albums?.length ?? 0) === 1 ? 'admin.albumCount' : 'admin.albumCountOther', { count: albums?.length ?? 0 }) }}</p>
-      </div>
-      <NuxtLink :to="localePath('/admin/albums/new')" class="btn-solid">{{ t('admin.newAlbum') }}</NuxtLink>
+  <div class="admin-wrap">
+  <section class="dash">
+    <div class="dash__head">
+      <p class="kicker">{{ t('admin.brand') }}</p>
+      <h1>{{ t('admin.dashboard') }}</h1>
+      <p>{{ t('admin.dashboardLead') }}</p>
     </div>
 
-    <table v-if="albums && albums.length" class="tbl">
-      <thead>
-        <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableCategory') }}</th><th>{{ t('admin.tableStyle') }}</th><th>{{ t('admin.tablePlacement') }}</th><th>{{ t('admin.tableFrames') }}</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
-      </thead>
-      <tbody>
-        <tr v-for="a in albums" :key="a.id">
-          <td class="t-title">{{ a.title }}</td>
-          <td>{{ a.category }}</td>
-          <td><span class="pill">{{ a.style }}</span></td>
-          <td><span class="pill pill--muted">{{ a.placement }}</span></td>
-          <td>{{ a.images.length }}</td>
-          <td class="t-muted">{{ a.date }}</td>
-          <td class="t-actions">
-            <NuxtLink :to="localePath(`/admin/albums/${a.id}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
-            <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title)">
-              {{ deleting === a.id ? '...' : t('admin.delete') }}
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    <p v-else class="empty">{{ t('admin.noAlbums') }} <NuxtLink :to="localePath('/admin/albums/new')">{{ t('admin.createFirst') }}</NuxtLink></p>
+    <div class="dash__tabs" role="list">
+      <NuxtLink v-for="section in sections" :key="section.key" :to="section.to" class="tab" role="listitem">
+        <span class="tab__count">{{ section.count }}</span>
+        <span>
+          <strong>{{ section.title }}</strong>
+          <small>{{ section.meta }}</small>
+        </span>
+      </NuxtLink>
+    </div>
+
+    <div class="quick">
+      <NuxtLink v-for="section in sections" :key="section.key" :to="section.newTo" class="quick__action">
+        {{ t(section.key === 'albums' ? 'admin.newAlbum' : 'admin.newPost') }}
+      </NuxtLink>
+    </div>
+  </section>
   </div>
 </template>
 
 <style scoped>
-.page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 2.5rem; }
-.page-head h1 { font-family: var(--font-serif); font-size: 2.5rem; font-weight: 200; }
-.sub { font-size: 0.7rem; letter-spacing: 0.1em; color: var(--muted); margin-top: 0.35rem; }
-.btn-solid { font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; padding: 0.7rem 1.5rem; background: var(--dark); color: #F5F4F0; border: none; cursor: pointer; text-decoration: none; transition: background 0.2s; }
-.btn-solid:hover { background: var(--accent); }
-
-.tbl { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-.tbl th { text-align: left; font-size: 0.5rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); font-weight: 500; padding: 0 0.75rem 0.85rem; border-bottom: 1px solid var(--subtle); }
-.tbl td { padding: 0.9rem 0.75rem; border-bottom: 1px solid var(--subtle); vertical-align: middle; }
-.t-title { font-weight: 500; }
-.t-muted { color: var(--muted); }
-.pill { font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--subtle); padding: 0.2rem 0.5rem; }
-.pill--muted { color: var(--muted); }
-.t-actions { text-align: right; white-space: nowrap; }
-.link { font-family: var(--font-sans); font-size: 0.7rem; letter-spacing: 0.05em; background: none; border: none; cursor: pointer; color: var(--dark); text-decoration: none; margin-left: 1rem; transition: color 0.2s; }
-.link:hover { color: var(--accent); }
-.link--del { color: var(--muted); }
-.link--del:hover { color: var(--accent); }
-.empty { color: var(--muted); font-size: 0.9rem; }
-.empty a { color: var(--accent); }
+.admin-wrap { max-width: 1120px; margin: 0 auto; padding: 3rem 2rem 5rem; }
+.dash { display: grid; gap: 2rem; }
+.dash__head { max-width: 720px; }
+.kicker { color: var(--accent); font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1rem; }
+.dash__head h1 { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 6.5rem); line-height: 0.95; font-weight: 200; margin-bottom: 1rem; }
+.dash__head p:last-child { color: var(--muted); line-height: 1.8; max-width: 560px; }
+.dash__tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--subtle); }
+.tab { display: grid; grid-template-columns: auto 1fr; gap: 1.25rem; padding: 1.5rem 0; color: var(--dark); text-decoration: none; border-bottom: 1px solid var(--subtle); transition: color 0.2s; }
+.tab:nth-child(odd) { padding-right: 1.5rem; }
+.tab:nth-child(even) { padding-left: 1.5rem; border-left: 1px solid var(--subtle); }
+.tab:hover { color: var(--accent); }
+.tab__count { font-family: var(--font-serif); font-size: 3rem; line-height: 0.9; font-weight: 200; }
+.tab strong { display: block; font-weight: 500; margin-bottom: 0.35rem; }
+.tab small { color: var(--muted); font-size: 0.72rem; line-height: 1.5; }
+.quick { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.quick__action { font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; padding: 0.75rem 1.25rem; background: var(--dark); color: #F5F4F0; text-decoration: none; transition: background 0.2s; }
+.quick__action:hover { background: var(--accent); }
+@media (max-width: 720px) {
+  .dash__tabs { grid-template-columns: 1fr; }
+  .tab:nth-child(n) { padding-left: 0; padding-right: 0; border-left: 0; }
+}
 </style>

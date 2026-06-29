@@ -1,26 +1,42 @@
 <script setup lang="ts">
-interface AlbumImage { src: string, caption?: string }
+interface AlbumCell { type: string, span: number, src?: string, caption?: string, content?: string }
+interface AlbumRow { cells: AlbumCell[] }
 interface Album {
   title: string
   category: string
   date: string
   location?: string
   excerpt: string
-  coverIndex: number
-  images: AlbumImage[]
+  coverSrc: string
+  rows: AlbumRow[]
 }
-const props = defineProps<{ album: Album }>()
+const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
-const cover = computed(() => props.album.images[props.album.coverIndex]?.src ?? props.album.images[0]!.src)
+const cover = computed(() => props.album.coverSrc)
+
+// Flat list of image cells with their row/cell coordinates for admin selection
+const imageCells = computed(() => {
+  const result: { src: string, caption?: string, row: number, cell: number }[] = []
+  for (let ri = 0; ri < props.album.rows.length; ri++) {
+    for (let ci = 0; ci < props.album.rows[ri].cells.length; ci++) {
+      const cell = props.album.rows[ri].cells[ci]
+      if (cell.type === 'image') result.push({ src: cell.src ?? '', caption: cell.caption, row: ri, cell: ci })
+    }
+  }
+  return result
+})
+
 const pad = (n: number) => String(n).padStart(2, '0')
 </script>
 
 <template>
   <article>
     <div class="crumb">
-      <NuxtLink :to="localePath('/albums')">{{ t('albums.stickyBreadcrumb') }}</NuxtLink><span>/</span>
-      <NuxtLink :to="localePath('/albums')">{{ album.category }}</NuxtLink><span>/</span>
+      <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ t('albums.stickyBreadcrumb') }}</span>
+      <NuxtLink v-else :to="localePath('/albums')">{{ t('albums.stickyBreadcrumb') }}</NuxtLink><span>/</span>
+      <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ album.category }}</span>
+      <NuxtLink v-else :to="localePath('/albums')">{{ album.category }}</NuxtLink><span>/</span>
       <span class="here">{{ album.title }}</span>
     </div>
 
@@ -35,14 +51,20 @@ const pad = (n: number) => String(n).padStart(2, '0')
           <div class="meta__fact"><span class="k">{{ t('albums.category') }}</span><span class="v">{{ album.category }}</span></div>
           <div class="meta__fact"><span class="k">{{ t('albums.date') }}</span><span class="v">{{ album.date }}</span></div>
           <div v-if="album.location" class="meta__fact"><span class="k">{{ t('albums.location') }}</span><span class="v">{{ album.location }}</span></div>
-          <div class="meta__fact"><span class="k">{{ t('albums.frames') }}</span><span class="v">{{ album.images.length }}</span></div>
+          <div class="meta__fact"><span class="k">{{ t('albums.frames') }}</span><span class="v">{{ imageCells.length }}</span></div>
         </div>
         <div class="meta__count">{{ t('albums.scrollSet') }}</div>
       </aside>
 
       <!-- SCROLLING FRAMES -->
       <div class="frames">
-        <figure v-for="(img, i) in album.images" :key="i">
+        <figure
+          v-for="(img, i) in imageCells"
+          :key="i"
+          :data-row-n="img.row"
+          :data-cell-n="img.cell"
+          :class="{ 'is-admin-selected': selectedRow === img.row && selectedCell === img.cell }"
+        >
           <div class="frame">
             <span class="frame__num">{{ pad(i + 1) }}</span>
             <AppImg :src="img.src" :alt="img.caption || album.title" sizes="sm:100vw lg:1100px" />
@@ -56,8 +78,9 @@ const pad = (n: number) => String(n).padStart(2, '0')
 
 <style scoped>
 .crumb { padding: 6rem 3rem 0; max-width: 1500px; margin: 0 auto; }
-.crumb :deep(a) { font-size: 0.56rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+.crumb :deep(a), .crumb__link { font-size: 0.56rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
 .crumb :deep(a):hover { color: var(--accent); }
+.crumb__link.is-disabled { cursor: default; pointer-events: none; }
 .crumb span { color: var(--subtle); margin: 0 0.6rem; font-size: 0.56rem; }
 .crumb .here { color: var(--dark); letter-spacing: 0.2em; text-transform: uppercase; }
 

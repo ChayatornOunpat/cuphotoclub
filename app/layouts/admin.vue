@@ -14,7 +14,9 @@ async function logout() {
     <header class="admin__bar">
       <NuxtLink :to="localePath('/admin')" class="admin__brand"><span class="cu">CU</span>PHOTO · {{ t('admin.brand').split('·').at(-1)?.trim() }}</NuxtLink>
       <nav class="admin__nav">
-        <NuxtLink :to="localePath('/admin')">{{ t('admin.albums') }}</NuxtLink>
+        <NuxtLink :to="localePath('/admin')">{{ t('admin.dashboard') }}</NuxtLink>
+        <NuxtLink :to="localePath('/admin/albums')">{{ t('admin.albums') }}</NuxtLink>
+        <NuxtLink :to="localePath('/admin/posts')">{{ t('admin.posts') }}</NuxtLink>
         <NuxtLink :to="localePath('/')" target="_blank">{{ t('admin.viewSite') }}</NuxtLink>
         <button class="admin__logout" @click="logout">{{ t('admin.logOut') }}{{ user ? ` (${(user as { name?: string }).name})` : '' }}</button>
       </nav>
@@ -46,5 +48,10 @@ async function logout() {
   padding: 0.45rem 0.9rem; cursor: pointer; transition: border-color 0.2s, color 0.2s;
 }
 .admin__logout:hover { border-color: var(--accent); color: var(--accent); }
-.admin__main { max-width: 1000px; margin: 0 auto; padding: 3rem 2rem 5rem; }
+.admin__main { padding: 0; }
+@media (max-width: 780px) {
+  .admin__bar { align-items: flex-start; flex-direction: column; gap: 1rem; }
+  .admin__nav { flex-wrap: wrap; gap: 0.75rem 1rem; }
+  .admin__main { padding: 2rem 1.25rem 4rem; }
+}
 </style>
