@@ -66,7 +66,7 @@ export default defineNuxtConfig({
       }
     },
     public: {
-      siteUrl: 'http://localhost:3000'
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === 'production' ? 'https://cuphotoclub.pages.dev' : 'http://localhost:3000')
     }
   },
 
