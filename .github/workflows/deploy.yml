@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Rebuild native modules
+        run: pnpm rebuild better-sqlite3
+
       - name: Build
         env:
           NITRO_PRESET: cloudflare-pages
