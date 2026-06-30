@@ -31,6 +31,9 @@ jobs:
       - name: Rebuild native modules
         run: pnpm rebuild better-sqlite3
 
+      - name: Verify better-sqlite3 native binding
+        run: node -e "require('better-sqlite3')(':memory:').close(); console.log('better-sqlite3 OK')"
+
       - name: Build
         env:
           NITRO_PRESET: cloudflare-pages
