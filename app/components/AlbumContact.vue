@@ -87,7 +87,7 @@ onUnmounted(() => {
           class="cell"
           :data-row-n="img.row"
           :data-cell-n="img.cell"
-          :class="{ 'is-admin-selected': selectedRow === img.row && selectedCell === img.cell }"
+          :class="{ 'is-admin-selected': selectedRow === img.row && (selectedCell === img.cell || selectedCell === undefined) }"
           @click="show(i)"
         >
           <span class="cell__num">{{ pad(i + 1) }}</span>

@@ -33,7 +33,9 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 <template>
   <div>
-    <div id="progress" :style="{ width: progress + '%' }" />
+    <div id="progress-track">
+      <div id="progress" :style="{ width: progress + '%' }" />
+    </div>
     <SiteNav v-if="localizedSite" :links="localizedSite.nav.links" :light="navLight" />
     <main>
       <slot />

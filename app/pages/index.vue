@@ -1,4 +1,5 @@
 <script setup lang="ts">
+definePageMeta({ layout: 'site' })
 import { defaultSite } from '~/utils/defaultSite'
 
 // ── Data layer: albums + blog posts come from the same SQLite-backed APIs used
@@ -118,8 +119,6 @@ useHead({
     <HistorySection :history="localizedSite.history" />
 
     <AboutSection :about="localizedSite.about" />
-
-    <SiteFooter :footer="localizedSite.footer" />
   </div>
 </template>
 

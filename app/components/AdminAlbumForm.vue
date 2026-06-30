@@ -44,6 +44,12 @@ const selectedCell = ref<number | null>(null)
 const dockHidden = ref(true)
 const activeDock = ref<'content' | 'cell'>('cell')
 const editorEl = ref<HTMLElement | null>(null)
+const canvasEl = ref<HTMLElement | null>(null)
+const TRAY_MIN_WIDTH = 280
+const TRAY_MAX_WIDTH = 460
+const TRAY_DEFAULT_WIDTH = 340
+const trayWidth = ref(TRAY_DEFAULT_WIDTH)
+const isResizingTray = ref(false)
 
 // Drag state
 const draggingFromPalette = ref<{ type: CellType, span: CellSpan } | null>(null)
@@ -76,6 +82,56 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
 }
 onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload))
 onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload))
+
+function clampTrayWidth(width: number) {
+  if (typeof window === 'undefined') return Math.min(TRAY_MAX_WIDTH, Math.max(TRAY_MIN_WIDTH, width))
+  const viewportMax = Math.min(TRAY_MAX_WIDTH, Math.floor(window.innerWidth * 0.42))
+  return Math.min(viewportMax, Math.max(TRAY_MIN_WIDTH, width))
+}
+
+function onTrayResizeMove(e: PointerEvent) {
+  if (!isResizingTray.value) return
+  trayWidth.value = clampTrayWidth(e.clientX)
+}
+
+function stopTrayResize() {
+  if (!isResizingTray.value) return
+  isResizingTray.value = false
+  window.removeEventListener('pointermove', onTrayResizeMove)
+  window.removeEventListener('pointerup', stopTrayResize)
+  window.removeEventListener('pointercancel', stopTrayResize)
+}
+
+function startTrayResize(e: PointerEvent) {
+  e.preventDefault()
+  isResizingTray.value = true
+  window.addEventListener('pointermove', onTrayResizeMove)
+  window.addEventListener('pointerup', stopTrayResize)
+  window.addEventListener('pointercancel', stopTrayResize)
+}
+
+function onTrayResizeKeydown(e: KeyboardEvent) {
+  const step = e.shiftKey ? 40 : 16
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    trayWidth.value = clampTrayWidth(trayWidth.value - step)
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    trayWidth.value = clampTrayWidth(trayWidth.value + step)
+  } else if (e.key === 'Home') {
+    e.preventDefault()
+    trayWidth.value = clampTrayWidth(TRAY_MIN_WIDTH)
+  } else if (e.key === 'End') {
+    e.preventDefault()
+    trayWidth.value = clampTrayWidth(TRAY_MAX_WIDTH)
+  }
+}
+
+onMounted(() => {
+  trayWidth.value = clampTrayWidth(Math.round(window.innerWidth * 0.24))
+})
+
+onUnmounted(stopTrayResize)
 
 // ARIA live region
 const dockAnnouncement = ref('')
@@ -178,6 +234,24 @@ function selectCell(ri: number, ci: number) {
   selectedCell.value = ci
   activeDock.value = 'cell'
   dockHidden.value = false
+  scrollPreviewToRow(ri, ci)
+}
+
+function scrollPreviewToRow(ri: number, ci?: number) {
+  nextTick(() => {
+    const cellEl = ci !== undefined
+      ? canvasEl.value?.querySelector(`[data-row-n="${ri}"][data-cell-n="${ci}"]`) as HTMLElement | null
+      : null
+    const rowEl = canvasEl.value?.querySelector(`[data-row-n="${ri}"]`) as HTMLElement | null
+    ;(cellEl ?? rowEl)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+}
+
+function selectRow(ri: number) {
+  selectedRow.value = ri
+  selectedCell.value = null
+  dockHidden.value = true
+  scrollPreviewToRow(ri)
 }
 
 function addCellFromPalette(type: CellType, span: CellSpan) {
@@ -426,7 +500,13 @@ const isEssay = computed(() => form.style === 'essay')
 </script>
 
 <template>
-  <form ref="editorEl" class="editor" @submit.prevent="onSubmit">
+  <form
+    ref="editorEl"
+    class="editor"
+    :class="{ 'is-resizing-tray': isResizingTray }"
+    :style="{ '--tray-width': `${trayWidth}px` }"
+    @submit.prevent="onSubmit"
+  >
     <div class="sr-only" aria-live="assertive" aria-atomic="true">{{ dockAnnouncement }}</div>
 
     <!-- LEFT TRAY -->
@@ -564,6 +644,7 @@ const isEssay = computed(() => form.style === 'essay')
             }"
             @dragover.prevent.stop="onRowDragOver(ri)"
             @drop.prevent.stop="onRowDrop(ri)"
+            @click="selectRow(ri)"
           >
             <!-- Row header -->
             <div
@@ -626,8 +707,25 @@ const isEssay = computed(() => form.style === 'essay')
       </div>
     </aside>
 
+    <button
+      type="button"
+      class="tray-resize-handle"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize editor tray"
+      :aria-valuemin="TRAY_MIN_WIDTH"
+      :aria-valuemax="TRAY_MAX_WIDTH"
+      :aria-valuenow="trayWidth"
+      title="Resize editor tray"
+      @pointerdown="startTrayResize"
+      @keydown="onTrayResizeKeydown"
+    >
+      <span aria-hidden="true" />
+    </button>
+
     <!-- RIGHT CANVAS -->
     <section
+      ref="canvasEl"
       class="canvas"
       :class="{ 'canvas--drop': draggingFromPalette !== null }"
       @click.capture="onCanvasClick"
@@ -746,20 +844,28 @@ const isEssay = computed(() => form.style === 'essay')
 
 /* ─── Root layout ─── */
 .editor {
+  --tray-width: clamp(280px, 24vw, 380px);
   display: flex;
   align-items: flex-start;
   min-height: calc(100vh - 3.5rem);
   background: var(--body-bg);
 }
+.editor.is-resizing-tray {
+  cursor: ew-resize;
+  user-select: none;
+}
+.editor.is-resizing-tray :deep(*) { cursor: ew-resize !important; }
 
 /* ─── Left tray ─── */
 .tray {
-  width: 230px;
+  width: var(--tray-width);
+  min-width: 280px;
+  max-width: min(460px, 42vw);
   flex-shrink: 0;
   position: sticky;
   top: 3.5rem;
   height: calc(100vh - 3.5rem);
-  overflow-y: auto;
+  overflow: auto;
   scrollbar-width: none;
   border-right: 1px solid var(--subtle);
   display: flex;
@@ -768,16 +874,97 @@ const isEssay = computed(() => form.style === 'essay')
 }
 .tray::-webkit-scrollbar { display: none; }
 
+.tray-resize-handle {
+  align-self: flex-start;
+  position: sticky;
+  top: calc(50vh + 1.75rem);
+  z-index: 45;
+  width: 1rem;
+  height: 3.75rem;
+  margin-left: -0.5rem;
+  margin-right: -0.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: ew-resize;
+  flex: 0 0 1rem;
+  touch-action: none;
+}
+.tray-resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.72rem;
+  height: 2.65rem;
+  transform: translate(-50%, -50%);
+  background: color-mix(in srgb, var(--body-bg) 90%, white);
+  border: 1px solid color-mix(in srgb, var(--muted) 38%, transparent);
+  border-radius: 999px;
+  box-shadow: 0 0.25rem 0.8rem rgba(26, 25, 24, 0.08);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease, background 0.16s ease;
+}
+.tray-resize-handle span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.24rem;
+  height: 1.35rem;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  border: 0;
+  background:
+    linear-gradient(var(--muted), var(--muted)) left center / 1px 100% no-repeat,
+    linear-gradient(var(--muted), var(--muted)) right center / 1px 100% no-repeat;
+  opacity: 1;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+.tray-resize-handle:hover,
+.tray-resize-handle:focus-visible,
+.editor.is-resizing-tray .tray-resize-handle {
+  background: transparent;
+}
+.tray-resize-handle:hover::before,
+.tray-resize-handle:focus-visible::before,
+.editor.is-resizing-tray .tray-resize-handle::before {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--body-bg) 84%, white);
+  box-shadow: 0 0.35rem 1rem color-mix(in srgb, var(--accent) 16%, transparent);
+  transform: translate(-50%, -50%) scale(1.04);
+}
+.tray-resize-handle:hover span,
+.tray-resize-handle:focus-visible span,
+.editor.is-resizing-tray .tray-resize-handle span {
+  background:
+    linear-gradient(var(--accent), var(--accent)) left center / 1px 100% no-repeat,
+    linear-gradient(var(--accent), var(--accent)) right center / 1px 100% no-repeat;
+  transform: translate(-50%, -50%);
+}
+.tray-resize-handle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, white);
+  outline-offset: 3px;
+}
+
 .tray__topbar {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  justify-content: flex-end;
   padding: 0.65rem 0.75rem;
   border-bottom: 1px solid var(--subtle);
   background: var(--body-bg);
   position: sticky;
   top: 0;
   z-index: 2;
+}
+.tray__topbar .btn-ghost,
+.tray__topbar .btn-solid {
+  flex: 0 0 7.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.1rem;
+  text-align: center;
 }
 .tray__error {
   font-size: 0.56rem;
@@ -850,8 +1037,8 @@ const isEssay = computed(() => form.style === 'essay')
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.1rem 0;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
   min-height: 3rem;
   border: 1px dashed transparent;
   transition: border-color 0.15s;
@@ -864,33 +1051,38 @@ const isEssay = computed(() => form.style === 'essay')
 .row-item {
   border: 1px solid var(--subtle);
   background: var(--body-bg);
-  transition: border-color 0.15s;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
-.row-item.is-selected { border-color: var(--accent); }
+.row-item.is-selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--body-bg));
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
 .row-item.is-dragging { opacity: 0.4; }
 .row-item.drop-target { border-top: 2px solid var(--accent); }
 
 .row-item__head {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.35rem 0.4rem;
+  gap: 0.45rem;
+  padding: 0.55rem 0.6rem;
   border-bottom: 1px solid var(--subtle);
   cursor: grab;
   user-select: none;
 }
-.row-item__drag { color: var(--muted); font-size: 0.7rem; flex-shrink: 0; }
-.row-item__label { font-size: 0.46rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dark); flex: 1; }
-.row-item__usage { font-size: 0.42rem; letter-spacing: 0.06em; color: var(--muted); }
+.row-item__drag { color: var(--muted); font-size: 0.85rem; flex-shrink: 0; }
+.row-item__label { font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dark); flex: 1; }
+.row-item__usage { font-size: 0.5rem; letter-spacing: 0.06em; color: var(--muted); }
 .row-item__usage.full { color: var(--accent); }
 .row-item__del {
   flex-shrink: 0;
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   cursor: pointer;
-  padding: 0 0.1rem;
+  padding: 0 0.15rem;
   line-height: 1;
   opacity: 0;
   transition: opacity 0.15s, color 0.15s;
@@ -901,9 +1093,9 @@ const isEssay = computed(() => form.style === 'essay')
 .row-item__cells {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 0.15rem;
-  padding: 0.3rem 0.4rem;
-  min-height: 1.8rem;
+  gap: 0.25rem;
+  padding: 0.55rem 0.6rem;
+  min-height: 2.55rem;
   align-items: stretch;
 }
 .row-item__cells.mode-fixed {
@@ -916,7 +1108,7 @@ const isEssay = computed(() => form.style === 'essay')
   flex: 0 0 auto;
 }
 .row-item__empty {
-  font-size: 0.42rem;
+  font-size: 0.5rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -929,8 +1121,8 @@ const isEssay = computed(() => form.style === 'essay')
   grid-column: span var(--span);
   display: flex;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.2rem 0.3rem;
+  gap: 0.28rem;
+  padding: 0.38rem 0.45rem;
   border: 1px solid var(--subtle);
   background: #fff;
   cursor: pointer;
@@ -947,13 +1139,13 @@ const isEssay = computed(() => form.style === 'essay')
 .cell-chip--pad.is-selected   { border-color: var(--muted); border-style: solid; }
 .cell-chip.is-dragging { opacity: 0.4; }
 .cell-chip.drop-target { border-left: 2px solid var(--accent); }
-.cell-chip__label { font-size: 0.44rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.cell-chip__label { font-size: 0.52rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 .cell-chip--pad .cell-chip__label { color: var(--muted); }
 .cell-chip__del {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   cursor: pointer;
   padding: 0;
   line-height: 1;
@@ -1085,10 +1277,10 @@ const isEssay = computed(() => form.style === 'essay')
 /* ─── Floating dock ─── */
 .context-dock {
   position: fixed;
-  left: 50%;
+  left: calc(var(--tray-width) + ((100vw - var(--tray-width)) / 2));
   bottom: 0.75rem;
   transform: translateX(-50%);
-  width: min(860px, calc(100vw - 14rem));
+  width: min(860px, calc(100vw - var(--tray-width) - 2rem));
   z-index: 60;
   border: 1px solid rgba(255, 255, 255, 0.55);
   padding: 0.55rem 0.7rem;
@@ -1198,4 +1390,27 @@ const isEssay = computed(() => form.style === 'essay')
   font-family: var(--font-sans); font-size: 0.72rem; padding: 0.35rem 0.45rem; outline: none;
 }
 .tray .field :is(input, select):focus { border-color: var(--accent); }
+
+@media (max-width: 820px) {
+  .editor {
+    --tray-width: 100%;
+    display: block;
+  }
+  .tray {
+    position: relative;
+    top: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--subtle);
+  }
+  .tray-resize-handle { display: none; }
+  .context-dock {
+    left: 50%;
+    width: min(860px, calc(100vw - 1.5rem));
+  }
+}
 </style>

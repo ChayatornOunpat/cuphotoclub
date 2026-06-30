@@ -14,7 +14,10 @@ const visiblePosts = computed(() => {
   const rows = [...(posts.value ?? [])]
     .filter((post) => {
       if (!q) return true
-      return [post.title, post.tag, post.excerpt, post.body]
+      const blockText = (post.blocks ?? []).map((b: any) =>
+        b.content ?? b.question ?? b.answer ?? b.caption ?? ''
+      ).join(' ')
+      return [post.title, post.tag, post.excerpt, blockText]
         .some(value => String(value ?? '').toLowerCase().includes(q))
     })
 
@@ -43,7 +46,7 @@ useHead({ title: () => `${t('admin.posts')} - Admin` })
 </script>
 
 <template>
-  <div>
+  <div class="admin-wrap">
     <div class="page-head">
       <div>
         <NuxtLink :to="localePath('/admin')" class="back">{{ t('admin.dashboard') }}</NuxtLink>
@@ -118,7 +121,9 @@ useHead({ title: () => `${t('admin.posts')} - Admin` })
   </div>
 </template>
 
+
 <style scoped>
+.admin-wrap { max-width: 1120px; margin: 0 auto; padding: 3rem 2rem 5rem; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 2.5rem; gap: 1.5rem; }
 .page-head h1 { font-family: var(--font-serif); font-size: 2.5rem; font-weight: 200; margin-top: 0.5rem; }
 .back { display: inline-block; font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); text-decoration: none; }

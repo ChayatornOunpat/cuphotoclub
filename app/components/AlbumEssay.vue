@@ -70,7 +70,13 @@ function imgSizes(span: number): string {
 
     <!-- ESSAY FLOW — Lego grid -->
     <section class="essay">
-      <div v-for="(row, ri) in album.rows" :key="ri" class="lego-row" :data-row-n="ri">
+      <div
+        v-for="(row, ri) in album.rows"
+        :key="ri"
+        class="lego-row"
+        :class="{ 'is-admin-row-selected': selectedRow === ri }"
+        :data-row-n="ri"
+      >
         <template v-for="(cell, ci) in row.cells" :key="ci">
 
           <!-- IMAGE cell -->
@@ -173,6 +179,10 @@ function imgSizes(span: number): string {
   grid-template-columns: repeat(6, 1fr);
   gap: 1.5rem;
   margin-bottom: 4.5rem;
+}
+.lego-row.is-admin-row-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 0.85rem;
 }
 
 .cell { min-width: 0; }

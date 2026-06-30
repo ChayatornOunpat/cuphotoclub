@@ -63,7 +63,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
           :key="i"
           :data-row-n="img.row"
           :data-cell-n="img.cell"
-          :class="{ 'is-admin-selected': selectedRow === img.row && selectedCell === img.cell }"
+          :class="{ 'is-admin-selected': selectedRow === img.row && (selectedCell === img.cell || selectedCell === undefined) }"
         >
           <div class="frame">
             <span class="frame__num">{{ pad(i + 1) }}</span>
