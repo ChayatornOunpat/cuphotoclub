@@ -2,6 +2,10 @@ import { and, eq, like, or } from 'drizzle-orm'
 
 // Light public search across published albums, posts, and events.
 export default defineEventHandler(async (event) => {
+  if (!(await rateLimit(`search:${clientIp(event)}`, 30, 60 * 1000))) {
+    throw createError({ statusCode: 429, message: 'ค้นหาบ่อยเกินไป กรุณาลองใหม่' })
+  }
+
   const q = String(getQuery(event).q || '').trim()
   if (!q) return { query: '', albums: [], posts: [], events: [] }
   const term = `%${q}%`

@@ -1,4 +1,4 @@
 export default defineEventHandler(async (event) => {
   await requireUserSession(event)
-  return albumStore.list()
+  return await albumStore.list()
 })

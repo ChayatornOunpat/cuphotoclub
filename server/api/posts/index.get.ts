@@ -1,3 +1,3 @@
-export default defineEventHandler(() => {
-  return postStore.list()
+export default defineEventHandler(async () => {
+  return await postStore.list()
 })

@@ -1,5 +1,5 @@
+import { desc, eq, sql } from 'drizzle-orm'
 import type { Post, PostInput, PostBlock, HeroStyle } from '~~/shared/types'
-import { appDb } from './appDb'
 
 function slugify(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -52,41 +52,9 @@ const seed: Post[] = [
   }
 ]
 
-appDb.exec(`
-  CREATE TABLE IF NOT EXISTS posts (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    tag TEXT NOT NULL,
-    date TEXT NOT NULL,
-    published TEXT NOT NULL,
-    image TEXT NOT NULL,
-    excerpt TEXT NOT NULL,
-    body TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )
-`)
+type PostRow = typeof schema.contentPosts.$inferSelect
 
-// Additive migrations — safe to run repeatedly
-for (const col of [
-  `ALTER TABLE posts ADD COLUMN hero_style TEXT NOT NULL DEFAULT 'standard'`,
-  `ALTER TABLE posts ADD COLUMN author TEXT NOT NULL DEFAULT ''`,
-  `ALTER TABLE posts ADD COLUMN author_bio TEXT NOT NULL DEFAULT ''`,
-  `ALTER TABLE posts ADD COLUMN author_avatar TEXT NOT NULL DEFAULT ''`,
-]) {
-  try { appDb.exec(col) } catch {}
-}
-
-function parseBlocks(body: string): PostBlock[] {
-  try {
-    const parsed = JSON.parse(body)
-    if (Array.isArray(parsed)) return parsed as PostBlock[]
-  } catch {}
-  // Legacy plain-text body: wrap as a single text block
-  return [{ id: '1', type: 'text', content: String(body) }]
-}
-
-function rowToPost(row: any): Post {
+function rowToPost(row: PostRow): Post {
   return {
     id: row.id,
     title: row.title,
@@ -95,32 +63,17 @@ function rowToPost(row: any): Post {
     published: row.published,
     image: row.image,
     excerpt: row.excerpt,
-    heroStyle: (row.hero_style || 'standard') as HeroStyle,
+    heroStyle: (row.heroStyle || 'standard') as HeroStyle,
     author: row.author || undefined,
-    authorBio: row.author_bio || undefined,
-    authorAvatar: row.author_avatar || undefined,
-    blocks: parseBlocks(row.body),
+    authorBio: row.authorBio || undefined,
+    authorAvatar: row.authorAvatar || undefined,
+    blocks: (row.blocks ?? []) as PostBlock[]
   }
 }
 
-function writePost(post: Post) {
-  appDb.prepare(`
-    INSERT INTO posts (id, title, tag, date, published, image, excerpt, body, hero_style, author, author_bio, author_avatar, updated_at)
-    VALUES (@id, @title, @tag, @date, @published, @image, @excerpt, @body, @hero_style, @author, @author_bio, @author_avatar, CURRENT_TIMESTAMP)
-    ON CONFLICT(id) DO UPDATE SET
-      title = excluded.title,
-      tag = excluded.tag,
-      date = excluded.date,
-      published = excluded.published,
-      image = excluded.image,
-      excerpt = excluded.excerpt,
-      body = excluded.body,
-      hero_style = excluded.hero_style,
-      author = excluded.author,
-      author_bio = excluded.author_bio,
-      author_avatar = excluded.author_avatar,
-      updated_at = CURRENT_TIMESTAMP
-  `).run({
+async function writePost(post: Post): Promise<void> {
+  const now = new Date()
+  const values = {
     id: post.id,
     title: post.title,
     tag: post.tag,
@@ -128,61 +81,120 @@ function writePost(post: Post) {
     published: post.published,
     image: post.image,
     excerpt: post.excerpt,
-    body: JSON.stringify(post.blocks),
-    hero_style: post.heroStyle ?? 'standard',
+    blocks: post.blocks,
+    heroStyle: post.heroStyle ?? 'standard',
     author: post.author ?? '',
-    author_bio: post.authorBio ?? '',
-    author_avatar: post.authorAvatar ?? '',
-  })
+    authorBio: post.authorBio ?? '',
+    authorAvatar: post.authorAvatar ?? '',
+    updatedAt: now
+  }
+
+  await db
+    .insert(schema.contentPosts)
+    .values(values)
+    .onConflictDoUpdate({
+      target: schema.contentPosts.id,
+      set: {
+        title: values.title,
+        tag: values.tag,
+        date: values.date,
+        published: values.published,
+        image: values.image,
+        excerpt: values.excerpt,
+        blocks: values.blocks,
+        heroStyle: values.heroStyle,
+        author: values.author,
+        authorBio: values.authorBio,
+        authorAvatar: values.authorAvatar,
+        updatedAt: now
+      }
+    })
 }
 
-function seedIfEmpty() {
-  const count = appDb.prepare('SELECT COUNT(*) as count FROM posts').get().count
-  if (count > 0) return
+let seedPromise: Promise<void> | null = null
+function seedIfEmpty(): Promise<void> {
+  if (!seedPromise) {
+    seedPromise = (async () => {
+      const [{ count } = { count: 0 }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.contentPosts)
+      if (count > 0) return
 
-  const insertMany = appDb.transaction((posts: Post[]) => {
-    for (const post of posts) writePost(post)
-  })
-  insertMany(seed)
+      for (const post of seed) {
+        await db
+          .insert(schema.contentPosts)
+          .values({
+            id: post.id,
+            title: post.title,
+            tag: post.tag,
+            date: post.date,
+            published: post.published,
+            image: post.image,
+            excerpt: post.excerpt,
+            blocks: post.blocks,
+            heroStyle: post.heroStyle ?? 'standard',
+            author: post.author ?? '',
+            authorBio: post.authorBio ?? '',
+            authorAvatar: post.authorAvatar ?? ''
+          })
+          .onConflictDoNothing({ target: schema.contentPosts.id })
+      }
+    })().catch((err) => {
+      seedPromise = null
+      throw err
+    })
+  }
+  return seedPromise
 }
 
 export const postStore = {
-  list(): Post[] {
-    seedIfEmpty()
-    return appDb
-      .prepare('SELECT * FROM posts ORDER BY published DESC')
-      .all()
-      .map(rowToPost)
+  async list(): Promise<Post[]> {
+    await seedIfEmpty()
+    const rows = await db
+      .select()
+      .from(schema.contentPosts)
+      .orderBy(desc(schema.contentPosts.published))
+    return rows.map(rowToPost)
   },
 
-  get(id: string): Post | null {
-    seedIfEmpty()
-    const row = appDb.prepare('SELECT * FROM posts WHERE id = ?').get(id)
+  async get(id: string): Promise<Post | null> {
+    await seedIfEmpty()
+    const [row] = await db
+      .select()
+      .from(schema.contentPosts)
+      .where(eq(schema.contentPosts.id, id))
+      .limit(1)
     return row ? rowToPost(row) : null
   },
 
-  create(input: PostInput): Post {
-    seedIfEmpty()
+  async create(input: PostInput): Promise<Post> {
+    await seedIfEmpty()
     let id = slugify(input.title) || `post-${Date.now()}`
-    if (this.get(id)) id = `${id}-${Date.now().toString(36)}`
+    if (await this.get(id)) id = `${id}-${Date.now().toString(36)}`
 
     const post: Post = { ...input, id }
-    writePost(post)
+    await writePost(post)
     return post
   },
 
-  update(id: string, input: PostInput): Post | null {
-    seedIfEmpty()
-    if (!this.get(id)) return null
+  async update(id: string, input: PostInput): Promise<Post | null> {
+    await seedIfEmpty()
+    if (!(await this.get(id))) return null
 
     const post: Post = { ...input, id }
-    writePost(post)
+    await writePost(post)
     return post
   },
 
-  remove(id: string): boolean {
-    seedIfEmpty()
-    const result = appDb.prepare('DELETE FROM posts WHERE id = ?').run(id)
-    return result.changes > 0
+  async remove(id: string): Promise<boolean> {
+    await seedIfEmpty()
+    const [existing] = await db
+      .select({ id: schema.contentPosts.id })
+      .from(schema.contentPosts)
+      .where(eq(schema.contentPosts.id, id))
+      .limit(1)
+    if (!existing) return false
+    await db.delete(schema.contentPosts).where(eq(schema.contentPosts.id, id))
+    return true
   }
 }

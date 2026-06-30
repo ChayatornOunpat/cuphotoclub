@@ -1,3 +1,3 @@
 export default defineEventHandler(async () => {
-  return albumStore.list()
+  return await albumStore.list()
 })

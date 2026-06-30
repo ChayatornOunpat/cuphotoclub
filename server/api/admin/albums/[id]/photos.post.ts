@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const albumId = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(albumId)) throw createError({ statusCode: 400, message: 'รหัสไม่ถูกต้อง' })
 
-  const [album] = await db.select({ id: schema.albums.id }).from(schema.albums).where(eq(schema.albums.id, albumId)).limit(1)
+  const [album] = await db.select({ id: schema.albums.id, slug: schema.albums.slug }).from(schema.albums).where(eq(schema.albums.id, albumId)).limit(1)
   if (!album) throw createError({ statusCode: 404, message: 'ไม่พบอัลบั้ม' })
 
   const form = await readMultipartFormData(event)
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   const height = Number(form?.find(p => p.name === 'height')?.data?.toString()) || null
 
   const ext = (file.filename?.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
-  const key = `photos/${albumId}/${crypto.randomUUID()}.${ext}`
+  const key = `photos/${album.slug}/originals/${crypto.randomUUID()}.${ext}`
   await blob.put(key, file.data, { contentType: type })
 
   const [{ maxOrder }] = await db

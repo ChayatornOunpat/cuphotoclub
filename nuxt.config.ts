@@ -33,6 +33,13 @@ export default defineNuxtConfig({
     kv: true
   },
 
+  nitro: {
+    prerender: {
+      crawlLinks: false,
+      routes: []
+    }
+  },
+
   routeRules: {
     // Sensible security headers site-wide; long-cache the image route.
     '/**': {

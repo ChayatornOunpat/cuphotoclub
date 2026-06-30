@@ -1,5 +1,5 @@
+import { desc, eq, sql } from 'drizzle-orm'
 import type { Album, AlbumInput } from '~~/shared/types'
-import { appDb } from './appDb'
 import { readContentAlbums } from './contentAlbumFiles'
 
 function slugify(s: string): string {
@@ -10,47 +10,9 @@ function withoutOrderPrefix(s: string): string {
   return s.replace(/^\d+-/, '')
 }
 
-// Ensure app_meta table exists first so we can check schema version.
-appDb.exec(`
-  CREATE TABLE IF NOT EXISTS app_meta (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-  )
-`)
+type AlbumRow = typeof schema.contentAlbums.$inferSelect
 
-// Schema v3: replaced blocks_json with rows_json (Lego grid system).
-// Drop albums table on any schema older than v3 so it is recreated and re-seeded.
-const versionRow = appDb.prepare('SELECT value FROM app_meta WHERE key = ?').get('schema_version') as { value: string } | undefined
-const schemaVersion = versionRow ? Number(versionRow.value) : 0
-
-if (schemaVersion < 3) {
-  appDb.exec('DROP TABLE IF EXISTS albums')
-  appDb.prepare(`
-    INSERT INTO app_meta (key, value) VALUES ('schema_version', '3')
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value
-  `).run()
-  appDb.prepare(`DELETE FROM app_meta WHERE key = 'albums_seeded_from_content'`).run()
-}
-
-appDb.exec(`
-  CREATE TABLE IF NOT EXISTS albums (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    category TEXT NOT NULL,
-    date TEXT NOT NULL,
-    published TEXT NOT NULL,
-    location TEXT,
-    excerpt TEXT NOT NULL,
-    style TEXT NOT NULL,
-    placement TEXT NOT NULL,
-    cover_src TEXT NOT NULL DEFAULT '',
-    rows_json TEXT NOT NULL DEFAULT '[]',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  )
-`)
-
-function rowToAlbum(row: any): Album {
+function rowToAlbum(row: AlbumRow): Album {
   return {
     id: row.id,
     title: row.title,
@@ -61,96 +23,139 @@ function rowToAlbum(row: any): Album {
     excerpt: row.excerpt,
     style: row.style,
     placement: row.placement,
-    coverSrc: row.cover_src,
-    rows: JSON.parse(row.rows_json)
+    coverSrc: row.coverSrc,
+    rows: row.rows ?? []
   }
 }
 
-function writeAlbum(album: Album) {
-  appDb.prepare(`
-    INSERT INTO albums (
-      id, title, category, date, published, location, excerpt, style, placement, cover_src, rows_json, updated_at
-    )
-    VALUES (
-      @id, @title, @category, @date, @published, @location, @excerpt, @style, @placement, @coverSrc, @rowsJson, CURRENT_TIMESTAMP
-    )
-    ON CONFLICT(id) DO UPDATE SET
-      title = excluded.title,
-      category = excluded.category,
-      date = excluded.date,
-      published = excluded.published,
-      location = excluded.location,
-      excerpt = excluded.excerpt,
-      style = excluded.style,
-      placement = excluded.placement,
-      cover_src = excluded.cover_src,
-      rows_json = excluded.rows_json,
-      updated_at = CURRENT_TIMESTAMP
-  `).run({
-    ...album,
+async function writeAlbum(album: Album): Promise<void> {
+  const now = new Date()
+  const values = {
+    id: album.id,
+    title: album.title,
+    category: album.category,
+    date: album.date,
+    published: album.published,
     location: album.location ?? null,
-    rowsJson: JSON.stringify(album.rows)
-  })
+    excerpt: album.excerpt,
+    style: album.style,
+    placement: album.placement,
+    coverSrc: album.coverSrc,
+    rows: album.rows,
+    updatedAt: now
+  }
+
+  await db
+    .insert(schema.contentAlbums)
+    .values(values)
+    .onConflictDoUpdate({
+      target: schema.contentAlbums.id,
+      set: {
+        title: values.title,
+        category: values.category,
+        date: values.date,
+        published: values.published,
+        location: values.location,
+        excerpt: values.excerpt,
+        style: values.style,
+        placement: values.placement,
+        coverSrc: values.coverSrc,
+        rows: values.rows,
+        updatedAt: now
+      }
+    })
 }
 
-function seedFromContentOnce() {
-  const count = (appDb.prepare('SELECT COUNT(*) as count FROM albums').get() as { count: number }).count
-  const seeded = appDb.prepare('SELECT value FROM app_meta WHERE key = ?').get('albums_seeded_from_content')
-  if (count > 0 && seeded) return
+// Seed content albums once. NuxtHub's DB has no app_meta table, so we treat a
+// non-empty content_albums table as "already seeded" and only insert albums
+// that don't yet exist (idempotent).
+let seedPromise: Promise<void> | null = null
+function seedFromContentOnce(): Promise<void> {
+  if (!seedPromise) {
+    seedPromise = (async () => {
+      const [{ count } = { count: 0 }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.contentAlbums)
+      if (count > 0) return
 
-  const insertMany = appDb.transaction((albums: Album[]) => {
-    const exists = appDb.prepare('SELECT id FROM albums WHERE id = ?')
-    for (const album of albums) {
-      if (!exists.get(album.id)) writeAlbum(album)
-    }
-    appDb.prepare(`
-      INSERT INTO app_meta (key, value)
-      VALUES ('albums_seeded_from_content', CURRENT_TIMESTAMP)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value
-    `).run()
-  })
-  insertMany(readContentAlbums())
+      for (const album of readContentAlbums()) {
+        await db
+          .insert(schema.contentAlbums)
+          .values({
+            id: album.id,
+            title: album.title,
+            category: album.category,
+            date: album.date,
+            published: album.published,
+            location: album.location ?? null,
+            excerpt: album.excerpt,
+            style: album.style,
+            placement: album.placement,
+            coverSrc: album.coverSrc,
+            rows: album.rows
+          })
+          .onConflictDoNothing({ target: schema.contentAlbums.id })
+      }
+    })().catch((err) => {
+      // Allow a later call to retry if seeding failed.
+      seedPromise = null
+      throw err
+    })
+  }
+  return seedPromise
 }
 
 export const albumStore = {
-  list(): Album[] {
-    seedFromContentOnce()
-    return appDb
-      .prepare('SELECT * FROM albums ORDER BY published DESC')
-      .all()
-      .map(rowToAlbum)
+  async list(): Promise<Album[]> {
+    await seedFromContentOnce()
+    const rows = await db
+      .select()
+      .from(schema.contentAlbums)
+      .orderBy(desc(schema.contentAlbums.published))
+    return rows.map(rowToAlbum)
   },
 
-  get(id: string): Album | null {
-    seedFromContentOnce()
-    const exact = appDb.prepare('SELECT * FROM albums WHERE id = ?').get(id)
+  async get(id: string): Promise<Album | null> {
+    await seedFromContentOnce()
+    const [exact] = await db
+      .select()
+      .from(schema.contentAlbums)
+      .where(eq(schema.contentAlbums.id, id))
+      .limit(1)
     if (exact) return rowToAlbum(exact)
 
-    return this.list().find(album => withoutOrderPrefix(album.id) === id) ?? null
+    const all = await this.list()
+    return all.find(album => withoutOrderPrefix(album.id) === id) ?? null
   },
 
-  create(input: AlbumInput): Album {
-    seedFromContentOnce()
+  async create(input: AlbumInput): Promise<Album> {
+    await seedFromContentOnce()
     let id = slugify(input.title) || `album-${Date.now()}`
-    if (this.get(id)) id = `${id}-${Date.now().toString(36)}`
+    if (await this.get(id)) id = `${id}-${Date.now().toString(36)}`
 
     const album: Album = { ...input, id }
-    writeAlbum(album)
+    await writeAlbum(album)
     return album
   },
 
-  update(id: string, input: AlbumInput): Album | null {
-    seedFromContentOnce()
-    if (!this.get(id)) return null
+  async update(id: string, input: AlbumInput): Promise<Album | null> {
+    await seedFromContentOnce()
+    if (!(await this.get(id))) return null
 
     const album: Album = { ...input, id }
-    writeAlbum(album)
+    await writeAlbum(album)
     return album
   },
 
-  remove(id: string): boolean {
-    seedFromContentOnce()
-    const result = appDb.prepare('DELETE FROM albums WHERE id = ?').run(id)
-    return (result as { changes: number }).changes > 0
+  async remove(id: string): Promise<boolean> {
+    await seedFromContentOnce()
+    const [existing] = await db
+      .select({ id: schema.contentAlbums.id })
+      .from(schema.contentAlbums)
+      .where(eq(schema.contentAlbums.id, id))
+      .limit(1)
+    if (!existing) return false
+    await db.delete(schema.contentAlbums).where(eq(schema.contentAlbums.id, id))
+    return true
   }
 }

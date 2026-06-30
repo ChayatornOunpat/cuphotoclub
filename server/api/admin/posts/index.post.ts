@@ -8,5 +8,5 @@ export default defineEventHandler(async (event) => {
   if (error) throw createError({ statusCode: 400, statusMessage: error })
   if (!body.published) body.published = new Date().toISOString().slice(0, 10)
 
-  return postStore.create(body)
+  return await postStore.create(body)
 })

@@ -1,4 +1,8 @@
 export default defineEventHandler(async (event) => {
+  if (!(await rateLimit(`login:${clientIp(event)}`, 10, 10 * 60 * 1000))) {
+    throw createError({ statusCode: 429, statusMessage: 'Too many login attempts, try again later' })
+  }
+
   const { password } = await readBody<{ password?: string }>(event)
   const { adminPassword } = useRuntimeConfig()
 

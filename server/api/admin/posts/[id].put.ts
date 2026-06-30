@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   if (error) throw createError({ statusCode: 400, statusMessage: error })
   if (!body.published) body.published = new Date().toISOString().slice(0, 10)
 
-  const updated = postStore.update(id, body)
+  const updated = await postStore.update(id, body)
   if (!updated) throw createError({ statusCode: 404, statusMessage: 'Post not found' })
   return updated
 })

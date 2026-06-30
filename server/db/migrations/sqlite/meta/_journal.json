@@ -8,6 +8,20 @@
       "when": 1781981005133,
       "tag": "0000_cynical_impossible_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1751299200000,
+      "tag": "0001_add_members",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782814187595,
+      "tag": "0002_lush_alex_wilder",
+      "breakpoints": true
     }
   ]
 }

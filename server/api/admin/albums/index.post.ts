@@ -9,5 +9,5 @@ export default defineEventHandler(async (event) => {
 
   if (!body.published) body.published = new Date().toISOString().slice(0, 10)
 
-  return albumStore.create(body)
+  return await albumStore.create(body)
 })
