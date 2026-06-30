@@ -4,6 +4,8 @@
     "home": "Home",
     "albums": "Albums",
     "blog": "Blog",
+    "activities": "Activities",
+    "members": "Members",
     "history": "History",
     "about": "About",
     "join": "Join"
@@ -120,6 +122,16 @@
   "posts": {
     "backToHome": "← CU Photo Club"
   },
+  "members": {
+    "kicker": "CU Photo Club · Members",
+    "title": "The People",
+    "titleEm": "Behind the Lens",
+    "lead": "The staff and members who make up CU Photo.",
+    "staff": "Staff",
+    "year": "Year {n}",
+    "unspecified": "Unspecified Year",
+    "empty": "No members yet."
+  },
   "admin": {
     "brand": "CU PHOTO · Admin",
     "dashboard": "Dashboard",
@@ -134,6 +146,9 @@
     "password": "Password",
     "signingIn": "Signing in…",
     "signIn": "Sign in",
+    "membersTitle": "Members",
+    "memberWork": "Club members, staff, and contact details",
+    "manageMembers": "Manage members",
     "newAlbum": "+ New album",
     "newPost": "+ New post",
     "editAlbum": "Edit album",

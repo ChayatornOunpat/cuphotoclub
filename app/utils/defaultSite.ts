@@ -4,7 +4,8 @@ export const defaultSite = {
       { label: 'Home', to: '/' },
       { label: 'Albums', to: '/albums' },
       { label: 'Blog', to: '/#stories' },
-      { label: 'History', to: '/#history' },
+      { label: 'Activities', to: '/activities' },
+      { label: 'Members', to: '/members' },
       { label: 'About', to: '/#about' },
       { label: 'Join', to: '/#about', join: true }
     ]

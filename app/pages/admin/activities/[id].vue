@@ -139,7 +139,7 @@ async function remove() {
         <div class="rounded-lg border border-line bg-white p-5">
           <h3 class="text-sm font-semibold text-ink">รูปปก</h3>
           <div class="mt-3">
-            <AdminCoverUploader v-model="form.coverR2Key" prefix="covers/events" />
+            <AdminCoverUploader v-model="form.coverR2Key" prefix="events/covers" />
           </div>
         </div>
 

@@ -10,11 +10,6 @@
     "db:generate": "nuxt prepare && drizzle-kit generate --config .nuxt/hub/db/drizzle.config.ts",
     "postinstall": "nuxt prepare"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3"
-    ]
-  },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
     "@libsql/client": "^0.17.4",
@@ -25,7 +20,6 @@
     "@nuxt/image": "2.0.0",
     "@nuxthub/core": "0.10.7",
     "@nuxtjs/i18n": "^10.4.0",
-    "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
     "eslint": "^10.5.0",
     "marked": "^18.0.5",

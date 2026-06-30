@@ -4,6 +4,8 @@
     "home": "หน้าแรก",
     "albums": "อัลบั้ม",
     "blog": "บทความ",
+    "activities": "กิจกรรม",
+    "members": "สมาชิก",
     "history": "ประวัติ",
     "about": "เกี่ยวกับ",
     "join": "เข้าร่วม"
@@ -120,6 +122,16 @@
   "posts": {
     "backToHome": "← CU Photo Club"
   },
+  "members": {
+    "kicker": "CU Photo Club · สมาชิก",
+    "title": "คนที่อยู่",
+    "titleEm": "เบื้องหลังเลนส์",
+    "lead": "เจ้าหน้าที่และสมาชิกที่ร่วมกันสร้างชมรมถ่ายภาพแห่งนี้",
+    "staff": "เจ้าหน้าที่",
+    "year": "ปี {n}",
+    "unspecified": "ไม่ระบุชั้นปี",
+    "empty": "ยังไม่มีข้อมูลสมาชิก"
+  },
   "admin": {
     "brand": "CU PHOTO · ผู้ดูแล",
     "dashboard": "แดชบอร์ด",
@@ -134,6 +146,9 @@
     "password": "รหัสผ่าน",
     "signingIn": "กำลังเข้าสู่ระบบ…",
     "signIn": "เข้าสู่ระบบ",
+    "membersTitle": "สมาชิก",
+    "memberWork": "สมาชิก เจ้าหน้าที่ และข้อมูลการติดต่อ",
+    "manageMembers": "จัดการสมาชิก",
     "newAlbum": "+ อัลบั้มใหม่",
     "newPost": "+ บทความใหม่",
     "editAlbum": "แก้ไขอัลบั้ม",

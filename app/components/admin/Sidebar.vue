@@ -10,6 +10,7 @@ const items = computed<NavItem[]>(() => [
   { to: '/admin/galleries', label: 'แกลเลอรี', icon: 'heroicons:photo' },
   { to: '/admin/blog', label: 'บทความ', icon: 'heroicons:document-text' },
   { to: '/admin/activities', label: 'กิจกรรม', icon: 'heroicons:calendar-days' },
+  { to: '/admin/members', label: 'สมาชิก', icon: 'heroicons:user-group' },
   { to: '/admin/about', label: 'เกี่ยวกับเรา', icon: 'heroicons:identification' },
   { to: '/admin/messages', label: 'ข้อความติดต่อ', icon: 'heroicons:inbox' },
   ...(canManage.value
