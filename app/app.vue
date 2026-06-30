@@ -1,6 +1,11 @@
 <script setup lang="ts">
+const { locale } = useI18n()
+
 useHead({
   titleTemplate: title => (title ? `${title} · CU Photo Club` : 'CU Photo Club'),
+  htmlAttrs: {
+    lang: () => locale.value
+  },
   link: [{ rel: 'icon', href: '/favicon.ico' }]
 })
 
@@ -14,6 +19,7 @@ useSeoMeta({
 <template>
   <div>
     <NuxtLoadingIndicator color="#ec4899" />
+    <NuxtRouteAnnouncer />
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>

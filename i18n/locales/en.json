@@ -1,0 +1,256 @@
+{
+  "nav": {
+    "logo": "CU PHOTO CLUB",
+    "home": "Home",
+    "albums": "Albums",
+    "blog": "Blog",
+    "history": "History",
+    "about": "About",
+    "join": "Join"
+  },
+  "common": {
+    "album": "Album",
+    "post": "Post",
+    "frames": "Frames",
+    "frame": "Frame",
+    "collections": "Collections",
+    "latest": "Latest",
+    "viewAlbum": "View Album →",
+    "readEssay": "Read Essay →",
+    "all": "All",
+    "noResults": "No albums in this category yet.",
+    "close": "Close"
+  },
+  "home": {
+    "featuredWork": "Featured Work",
+    "latest": "Latest",
+    "ourHistory": "Our History",
+    "aboutUs": "About Us"
+  },
+  "site": {
+    "hero": {
+      "kicker": "Chulalongkorn University · ",
+      "kickerAccent": "Est. 1967",
+      "title": [
+        { "text": "Through" },
+        { "text": "the lens", "em": true },
+        { "text": "we see" }
+      ],
+      "lead": "The official photography club of Chulalongkorn University — 3rd Floor, Chulachakrabongse Building, Phaya Thai Road, Wang Mai, Pathum Wan, Bangkok 10330.",
+      "meta": [
+        "Photography · Community",
+        "Bangkok, Thailand"
+      ]
+    },
+    "history": {
+      "eyebrow": "Our History",
+      "quote": "Every photograph we make is a letter to the future.",
+      "body": [
+        "Founded in 1967 by a small group of Chulalongkorn University students with borrowed cameras and a shared obsession with the image, the CU Photo Club has grown into one of Thailand's most respected student photography organisations.",
+        "Over five decades, we have documented student life, cultural shifts, and the evolving cityscape of Bangkok — building an archive that is both personal record and historical testimony."
+      ],
+      "sinceText": [
+        "Year founded",
+        "Bangkok, Thailand"
+      ]
+    },
+    "about": {
+      "eyebrow": "About Us",
+      "heading": [
+        { "text": "A community" },
+        { "text": "that " },
+        { "text": "sees", "em": true }
+      ],
+      "body": "CU Photo Club is open to all students of Chulalongkorn University regardless of experience level. We run workshops, Photo Camp, 1 Day Trip photo outings, annual exhibitions, and maintain an active archive of visual work from across the decades. If you have curiosity and a camera, you belong here.",
+      "ctaLabel": "Join the Club"
+    },
+    "footer": {
+      "tagline": "Official photography club of\nChulalongkorn University, Bangkok, Thailand",
+      "columns": [
+        {
+          "title": "Navigate",
+          "links": [
+            { "label": "Albums", "to": "/albums" },
+            { "label": "Blog", "to": "/#stories" },
+            { "label": "History", "to": "/#history" },
+            { "label": "About", "to": "/#about" },
+            { "label": "Join", "to": "/#about" },
+            { "label": "Contact", "to": "#" }
+          ]
+        },
+        {
+          "title": "Follow",
+          "links": [
+            { "label": "Instagram", "to": "https://www.instagram.com/cuphotoclub/" },
+            { "label": "Facebook", "to": "https://www.facebook.com/cuphoto" },
+            { "label": "YouTube", "to": "#" }
+          ]
+        }
+      ],
+      "copyright": "© 2025 CU Photo Club, Chulalongkorn University",
+      "location": "Bangkok, Thailand"
+    }
+  },
+  "albums": {
+    "pageTitle": "Albums & collections",
+    "pageKicker": "CU Photo Club · The Archive",
+    "pageLead": "Every album is a complete body of work — a morning, a place, a single roll of an idea pursued to its end. Browse the collections our members have made.",
+    "theArchive": "The Archive",
+    "sequencedBy": "Sequenced by date, newest first",
+    "collections": "Collections",
+    "frames": "Frames",
+    "latest": "Latest",
+    "album": "Album",
+    "noAlbums": "No albums in this category yet.",
+    "viewAlbum": "View Album →",
+    "coverBack": "← The Archive",
+    "allAlbums": "← All Albums",
+    "albumKicker": "Album · {category}",
+    "metaFrames": "{count} Frames",
+    "framesInThisSet": "{count} Frames in this set",
+    "framesInThisSetLabel": "Frames in this set",
+    "clickToEnlarge": "Click any frame to enlarge",
+    "close": "Close ✕",
+    "scrollSet": "Scroll the set →",
+    "category": "Category",
+    "date": "Date",
+    "location": "Location",
+    "stickyBreadcrumb": "Albums"
+  },
+  "posts": {
+    "backToHome": "← CU Photo Club"
+  },
+  "admin": {
+    "brand": "CU PHOTO · Admin",
+    "dashboard": "Dashboard",
+    "dashboardLead": "Manage the club archive from one place. Albums, posts, and future site content each live in their own focused workspace.",
+    "albums": "Albums",
+    "posts": "Posts",
+    "galleryWork": "Gallery sets, placements, styles, and images",
+    "editorialWriting": "Essays, interviews, workshop notes, and announcements",
+    "viewSite": "View site ↗",
+    "logOut": "Log out",
+    "loginTitle": "Sign in",
+    "password": "Password",
+    "signingIn": "Signing in…",
+    "signIn": "Sign in",
+    "newAlbum": "+ New album",
+    "newPost": "+ New post",
+    "editAlbum": "Edit album",
+    "editPost": "Edit post",
+    "createAlbum": "Create album",
+    "createPost": "Create post",
+    "preview": "Preview",
+    "search": "Search",
+    "searchAlbums": "Search albums by title, category, style...",
+    "searchPosts": "Search posts by title, tag, body...",
+    "sortBy": "Sort by",
+    "sortNewest": "Newest",
+    "sortOldest": "Oldest",
+    "sortTitle": "Title A-Z",
+    "sortCategory": "Category",
+    "sortTag": "Tag",
+    "viewMode": "View mode",
+    "viewList": "List",
+    "viewCards": "Cards",
+    "showingCount": "Showing {shown} of {total}",
+    "saveChanges": "Save changes",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "delete": "Delete",
+    "edit": "Edit",
+    "tableTitle": "Title",
+    "tableCategory": "Category",
+    "tableTag": "Tag",
+    "tableStyle": "Style",
+    "tablePlacement": "Placement",
+    "tableFrames": "Frames",
+    "tableDate": "Date",
+    "noAlbums": "No albums yet.",
+    "noPosts": "No posts yet.",
+    "noMatches": "No matching content found.",
+    "createFirst": "Create the first one →",
+    "createFirstPost": "Write the first one →",
+    "albumCount": "{count} album",
+    "albumCountOther": "{count} albums",
+    "postCount": "{count} post",
+    "postCountOther": "{count} posts",
+    "deleteConfirm": "Delete \"{title}\"? This cannot be undone.",
+    "deleteFailed": "Delete failed",
+    "saveFailed": "Save failed",
+    "loginFailed": "Login failed"
+  },
+  "adminForm": {
+    "title": "Title",
+    "titlePlaceholder": "Dawn at Lumphini",
+    "category": "Category",
+    "categoryPlaceholder": "Street",
+    "location": "Location",
+    "locationOptional": "(optional)",
+    "locationPlaceholder": "Lumphini Park",
+    "dateDisplay": "Date (display)",
+    "datePlaceholder": "April 2025",
+    "publishedSort": "Published (sort date)",
+    "style": "Style",
+    "styleEssay": "Essay",
+    "styleSticky": "Sticky",
+    "styleContact": "Contact sheet",
+    "placement": "Placement",
+    "placementGallery": "Gallery",
+    "placementBlog": "Blog",
+    "placementBoth": "Both",
+    "excerpt": "Excerpt",
+    "excerptPlaceholder": "A short description of the set…",
+    "images": "Images",
+    "coverHint": "· cover = the selected radio",
+    "addImage": "+ Add image",
+    "imageUrlPlaceholder": "https://example.com/photo.jpg",
+    "imageUrlHint": "jpg, png, or webp · direct link",
+    "captionPlaceholder": "Caption (optional)",
+    "setAsCover": "Set as cover",
+    "cover": "cover",
+    "styleEssayDesc": "Full bleed · narrative flow",
+    "styleStickyDesc": "Fixed layout · tight grid",
+    "styleContactDesc": "Dense grid · filmstrip"
+  },
+  "adminPostForm": {
+    "titlePlaceholder": "The Architecture of Light",
+    "tag": "Tag",
+    "tagPlaceholder": "Essay",
+    "image": "Hero image",
+    "imagePlaceholder": "https://… image URL",
+    "excerptPlaceholder": "A short standfirst for the story…",
+    "body": "Body",
+    "bodyPlaceholder": "Write the post body. Separate paragraphs with a blank line."
+  },
+  "adminEditor": {
+    "addCover": "Add or select a cover image",
+    "addImage": "Add image URL",
+    "addFrame": "+ Add frame",
+    "layout": "Layout",
+    "frameSequence": "Frame sequence",
+    "dragFramesHint": "Drag frames here or directly in the page preview to rearrange the album order.",
+    "selectedFrame": "Selected frame",
+    "setCover": "Set cover",
+    "addAfter": "Add after",
+    "addHero": "Add hero image",
+    "paragraphPlaceholder": "Click to write this paragraph...",
+    "storySettings": "Story settings",
+    "unsavedChanges": "You have unsaved changes. Leave the page?",
+    "frameRemovedUndo": "Frame {n} removed",
+    "undo": "Undo",
+    "validationMissing": "Required: {fields}",
+    "fieldTitle": "title",
+    "fieldCategory": "category",
+    "fieldDate": "date",
+    "fieldPublished": "published date",
+    "contentMode": "Content",
+    "frameMode": "Frame",
+    "contentModeAria": "Switched to content editing",
+    "frameModeAria": "Switched to frame editing",
+    "canvasHint": "Click any text or image in the preview to edit it",
+    "canvasHintDismiss": "Got it",
+    "saveShortcut": "⌘S"
+  }
+}

@@ -1,0 +1,256 @@
+{
+  "nav": {
+    "logo": "CU PHOTO CLUB",
+    "home": "หน้าแรก",
+    "albums": "อัลบั้ม",
+    "blog": "บทความ",
+    "history": "ประวัติ",
+    "about": "เกี่ยวกับ",
+    "join": "เข้าร่วม"
+  },
+  "common": {
+    "album": "อัลบั้ม",
+    "post": "บทความ",
+    "frames": "ภาพ",
+    "frame": "ภาพ",
+    "collections": "คอลเลกชัน",
+    "latest": "ล่าสุด",
+    "viewAlbum": "ดูอัลบั้ม →",
+    "readEssay": "อ่านบทความ →",
+    "all": "ทั้งหมด",
+    "noResults": "ยังไม่มีอัลบั้มในหมวดนี้",
+    "close": "ปิด"
+  },
+  "home": {
+    "featuredWork": "ผลงานประจำวัน",
+    "latest": "ล่าสุด",
+    "ourHistory": "ประวัติของเรา",
+    "aboutUs": "เกี่ยวกับเรา"
+  },
+  "site": {
+    "hero": {
+      "kicker": "จุฬาลงกรณ์มหาวิทยาลัย · ",
+      "kickerAccent": "ก่อตั้ง 1967",
+      "title": [
+        { "text": "มองโลก" },
+        { "text": "ผ่านเลนส์", "em": true },
+        { "text": "ไปด้วยกัน" }
+      ],
+      "lead": "ชมรมศิลปะการถ่ายภาพแห่งจุฬาลงกรณ์มหาวิทยาลัย — ชั้น 3 อาคารจุลจักรพงษ์ ถนนพญาไท แขวงวังใหม่ เขตปทุมวัน กรุงเทพฯ 10330",
+      "meta": [
+        "สมาคม · คนถ่ายภาพ",
+        "กรุงเทพมหานคร ประเทศไทย"
+      ]
+    },
+    "history": {
+      "eyebrow": "ประวัติของเรา",
+      "quote": "ภาพถ่ายทุกภาพที่เราสร้างคือจดหมายถึงอนาคต",
+      "body": [
+        "ก่อตั้งขึ้นในปี 1967 โดยนิสิตจุฬาลงกรณ์มหาวิทยาลัยกลุ่มเล็ก ๆ ที่มีกล้องยืมและความหลงใหลในภาพถ่ายร่วมกัน CU Photo Club เติบโตเป็นหนึ่งในชมรมนักศึกษาด้านภาพถ่ายที่ได้รับการยอมรับในประเทศไทย",
+        "ตลอดเวลากว่าห้าทศวรรษ เราบันทึกชีวิตนิสิต ความเปลี่ยนแปลงทางวัฒนธรรม และภูมิทัศน์เมืองกรุงเทพฯ ที่เติบโตไปพร้อมกัน จนกลายเป็นคลังภาพที่เป็นทั้งความทรงจำส่วนบุคคลและหลักฐานทางประวัติศาสตร์"
+      ],
+      "sinceText": [
+        "ปีที่ก่อตั้ง",
+        "กรุงเทพฯ ประเทศไทย"
+      ]
+    },
+    "about": {
+      "eyebrow": "เกี่ยวกับเรา",
+      "heading": [
+        { "text": "พื้นที่ของ" },
+        { "text": "คนรัก" },
+        { "text": "ภาพถ่าย", "em": true }
+      ],
+      "body": "CU Photo Club เปิดรับนิสิตจุฬาลงกรณ์มหาวิทยาลัยทุกคน ไม่ว่าจะมีประสบการณ์มาก่อนหรือไม่ เราจัดเวิร์กช็อป, Photo Camp, ทริปถ่ายภาพแบบ 1 Day Trip, นิทรรศการประจำปี และดูแลคลังผลงานภาพถ่ายจากหลายยุคสมัย หากคุณมีความอยากรู้อยากเห็นและมีกล้องสักตัว ที่นี่คือพื้นที่ของคุณ",
+      "ctaLabel": "เข้าร่วมชมรม"
+    },
+    "footer": {
+      "tagline": "ชมรมศิลปะการถ่ายภาพแห่ง\nจุฬาลงกรณ์มหาวิทยาลัย กรุงเทพฯ ประเทศไทย",
+      "columns": [
+        {
+          "title": "นำทาง",
+          "links": [
+            { "label": "อัลบั้ม", "to": "/albums" },
+            { "label": "บทความ", "to": "/#stories" },
+            { "label": "ประวัติ", "to": "/#history" },
+            { "label": "เกี่ยวกับ", "to": "/#about" },
+            { "label": "เข้าร่วม", "to": "/#about" },
+            { "label": "ติดต่อ", "to": "#" }
+          ]
+        },
+        {
+          "title": "ติดตาม",
+          "links": [
+            { "label": "Instagram", "to": "https://www.instagram.com/cuphotoclub/" },
+            { "label": "Facebook", "to": "https://www.facebook.com/cuphoto" },
+            { "label": "YouTube", "to": "#" }
+          ]
+        }
+      ],
+      "copyright": "© 2025 CU Photo Club, จุฬาลงกรณ์มหาวิทยาลัย",
+      "location": "กรุงเทพฯ ประเทศไทย"
+    }
+  },
+  "albums": {
+    "pageTitle": "อัลบั้มและคอลเลกชัน",
+    "pageKicker": "CU Photo Club · คลังภาพ",
+    "pageLead": "ทุกอัลบั้มคือชุดผลงานที่สมบูรณ์ — เช้าวันหนึ่ง สถานที่แห่งหนึ่ง ม้วนฟิล์มม้วนเดียวที่ไล่ตามความคิดจนถึงที่สุด สำรวจคอลเลกชันที่สมาชิกของเราสร้างขึ้น",
+    "theArchive": "คลังภาพ",
+    "sequencedBy": "เรียงตามวันที่ ล่าสุดก่อน",
+    "collections": "คอลเลกชัน",
+    "frames": "ภาพ",
+    "latest": "ล่าสุด",
+    "album": "อัลบั้ม",
+    "noAlbums": "ยังไม่มีอัลบั้มในหมวดนี้",
+    "viewAlbum": "ดูอัลบั้ม →",
+    "coverBack": "← คลังภาพ",
+    "allAlbums": "← อัลบั้มทั้งหมด",
+    "albumKicker": "อัลบั้ม · {category}",
+    "metaFrames": "{count} ภาพ",
+    "framesInThisSet": "{count} ภาพในชุดนี้",
+    "framesInThisSetLabel": "ภาพในชุดนี้",
+    "clickToEnlarge": "คลิกที่ภาพเพื่อดูขนาดใหญ่",
+    "close": "ปิด ✕",
+    "scrollSet": "เลื่อนดูชุดภาพ →",
+    "category": "หมวดหมู่",
+    "date": "วันที่",
+    "location": "สถานที่",
+    "stickyBreadcrumb": "อัลบั้ม"
+  },
+  "posts": {
+    "backToHome": "← CU Photo Club"
+  },
+  "admin": {
+    "brand": "CU PHOTO · ผู้ดูแล",
+    "dashboard": "แดชบอร์ด",
+    "dashboardLead": "จัดการคลังผลงานของชมรมจากที่เดียว อัลบั้ม บทความ และเนื้อหาอื่นจะแยกอยู่ในพื้นที่ทำงานของตัวเอง",
+    "albums": "อัลบั้ม",
+    "posts": "บทความ",
+    "galleryWork": "ชุดภาพ ตำแหน่งแสดงผล รูปแบบ และภาพทั้งหมด",
+    "editorialWriting": "เอสเสย์ บทสัมภาษณ์ บันทึกเวิร์กช็อป และประกาศ",
+    "viewSite": "ดูเว็บไซต์ ↗",
+    "logOut": "ออกจากระบบ",
+    "loginTitle": "เข้าสู่ระบบ",
+    "password": "รหัสผ่าน",
+    "signingIn": "กำลังเข้าสู่ระบบ…",
+    "signIn": "เข้าสู่ระบบ",
+    "newAlbum": "+ อัลบั้มใหม่",
+    "newPost": "+ บทความใหม่",
+    "editAlbum": "แก้ไขอัลบั้ม",
+    "editPost": "แก้ไขบทความ",
+    "createAlbum": "สร้างอัลบั้ม",
+    "createPost": "สร้างบทความ",
+    "preview": "พรีวิว",
+    "search": "ค้นหา",
+    "searchAlbums": "ค้นหาอัลบั้มจากชื่อ หมวดหมู่ หรือรูปแบบ",
+    "searchPosts": "ค้นหาบทความจากชื่อ แท็ก หรือเนื้อหา",
+    "sortBy": "เรียงตาม",
+    "sortNewest": "ใหม่ล่าสุด",
+    "sortOldest": "เก่าสุด",
+    "sortTitle": "ชื่อ A-Z",
+    "sortCategory": "หมวดหมู่",
+    "sortTag": "แท็ก",
+    "viewMode": "รูปแบบการแสดงผล",
+    "viewList": "รายการ",
+    "viewCards": "การ์ด",
+    "showingCount": "แสดง {shown} จาก {total}",
+    "saveChanges": "บันทึกการเปลี่ยนแปลง",
+    "cancel": "ยกเลิก",
+    "save": "บันทึก",
+    "saving": "กำลังบันทึก…",
+    "delete": "ลบ",
+    "edit": "แก้ไข",
+    "tableTitle": "ชื่อ",
+    "tableCategory": "หมวดหมู่",
+    "tableTag": "แท็ก",
+    "tableStyle": "รูปแบบ",
+    "tablePlacement": "ตำแหน่ง",
+    "tableFrames": "ภาพ",
+    "tableDate": "วันที่",
+    "noAlbums": "ยังไม่มีอัลบั้ม",
+    "noPosts": "ยังไม่มีบทความ",
+    "noMatches": "ไม่พบเนื้อหาที่ตรงกับการค้นหา",
+    "createFirst": "สร้างอัลบั้มแรก →",
+    "createFirstPost": "เขียนบทความแรก →",
+    "albumCount": "{count} อัลบั้ม",
+    "albumCountOther": "{count} อัลบั้ม",
+    "postCount": "{count} บทความ",
+    "postCountOther": "{count} บทความ",
+    "deleteConfirm": "ลบ \"{title}\" หรือไม่? การกระทำนี้ย้อนกลับไม่ได้",
+    "deleteFailed": "ลบไม่สำเร็จ",
+    "saveFailed": "บันทึกไม่สำเร็จ",
+    "loginFailed": "เข้าสู่ระบบไม่สำเร็จ"
+  },
+  "adminForm": {
+    "title": "ชื่อ",
+    "titlePlaceholder": "รุ่งสางที่ลุมพินี",
+    "category": "หมวดหมู่",
+    "categoryPlaceholder": "สตรีท",
+    "location": "สถานที่",
+    "locationOptional": "(ไม่บังคับ)",
+    "locationPlaceholder": "สวนลุมพินี",
+    "dateDisplay": "วันที่ (แสดง)",
+    "datePlaceholder": "เมษายน 2025",
+    "publishedSort": "วันที่เผยแพร่ (เรียงลำดับ)",
+    "style": "รูปแบบ",
+    "styleEssay": "เรียงความ",
+    "styleSticky": "ติดหนึบ",
+    "styleContact": "แผ่นสัมผัส",
+    "placement": "ตำแหน่ง",
+    "placementGallery": "แกลเลอรี",
+    "placementBlog": "บล็อก",
+    "placementBoth": "ทั้งสอง",
+    "excerpt": "คำอธิบายสั้น",
+    "excerptPlaceholder": "คำอธิบายสั้น ๆ ของชุดภาพนี้…",
+    "images": "ภาพ",
+    "coverHint": "· ภาพปก = เลือกปุ่มเรดิโอ",
+    "addImage": "+ เพิ่มภาพ",
+    "imageUrlPlaceholder": "https://example.com/photo.jpg",
+    "imageUrlHint": "jpg, png หรือ webp · ลิงก์ตรง",
+    "captionPlaceholder": "คำบรรยาย (ไม่บังคับ)",
+    "setAsCover": "ตั้งเป็นภาพปก",
+    "cover": "ภาพปก",
+    "styleEssayDesc": "เต็มจอ · เล่าเรื่องราว",
+    "styleStickyDesc": "เลย์เอาต์คงที่ · กริดชิด",
+    "styleContactDesc": "กริดหนาแน่น · แผ่นฟิล์ม"
+  },
+  "adminPostForm": {
+    "titlePlaceholder": "สถาปัตยกรรมของแสง",
+    "tag": "แท็ก",
+    "tagPlaceholder": "เอสเสย์",
+    "image": "ภาพหลัก",
+    "imagePlaceholder": "https://… URL ของภาพ",
+    "excerptPlaceholder": "คำโปรยสั้น ๆ ของบทความ…",
+    "body": "เนื้อหา",
+    "bodyPlaceholder": "เขียนเนื้อหาบทความ เว้นบรรทัดว่างเพื่อแยกย่อหน้า"
+  },
+  "adminEditor": {
+    "addCover": "เพิ่มหรือเลือกภาพปก",
+    "addImage": "เพิ่ม URL ภาพ",
+    "addFrame": "+ เพิ่มภาพ",
+    "layout": "เลย์เอาต์",
+    "frameSequence": "ลำดับภาพ",
+    "dragFramesHint": "ลากภาพตรงนี้หรือในพรีวิวหน้าเว็บเพื่อจัดลำดับอัลบั้มใหม่",
+    "selectedFrame": "ภาพที่เลือก",
+    "setCover": "ตั้งเป็นภาพปก",
+    "addAfter": "เพิ่มต่อจากนี้",
+    "addHero": "เพิ่มภาพหลัก",
+    "paragraphPlaceholder": "คลิกเพื่อเขียนย่อหน้านี้...",
+    "storySettings": "ตั้งค่าบทความ",
+    "unsavedChanges": "มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก ออกจากหน้านี้หรือไม่?",
+    "frameRemovedUndo": "ลบภาพที่ {n} แล้ว",
+    "undo": "เลิกทำ",
+    "validationMissing": "กรุณากรอก: {fields}",
+    "fieldTitle": "ชื่อ",
+    "fieldCategory": "หมวดหมู่",
+    "fieldDate": "วันที่",
+    "fieldPublished": "วันที่เผยแพร่",
+    "contentMode": "เนื้อหา",
+    "frameMode": "ภาพ",
+    "contentModeAria": "เปลี่ยนเป็นโหมดแก้ไขเนื้อหา",
+    "frameModeAria": "เปลี่ยนเป็นโหมดแก้ไขภาพ",
+    "canvasHint": "คลิกที่ข้อความหรือภาพในพรีวิวเพื่อแก้ไข",
+    "canvasHintDismiss": "เข้าใจแล้ว",
+    "saveShortcut": "⌘S"
+  }
+}

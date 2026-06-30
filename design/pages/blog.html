@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CU Photo Club — Blog</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,200;0,300;0,400;0,500;0,600;1,200;1,300;1,400;1,500;1,600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --hero-bg: #0C0C0A;
+      --body-bg: #F5F4F0;
+      --dark:    #1A1918;
+      --muted:   #7C7A72;
+      --subtle:  #E2DED8;
+      --paper:   #EEEAE2;
+      --accent:  #E8186E;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--body-bg);
+      color: var(--dark);
+      font-family: 'Inter', sans-serif;
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ─── PROGRESS BAR ────────────────────── */
+    #progress {
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 200;
+      width: 0%;
+      height: 2px;
+      background: var(--accent);
+      transition: width 0.1s linear;
+    }
+
+    /* ─── NAV ─────────────────────────────── */
+    nav {
+      position: fixed;
+      inset-block-start: 2px;
+      inset-inline: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem 3rem;
+      transition: background 0.4s ease;
+    }
+    nav.light {
+      background: rgba(245,244,240,0.93);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--subtle);
+    }
+    .logo {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-decoration: none;
+      line-height: 1;
+      color: #F5F4F0;
+      transition: color 0.4s ease;
+    }
+    nav.light .logo { color: var(--dark); }
+    .logo .cu { color: var(--accent); }
+
+    .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+    .nav-links a {
+      font-size: 0.58rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(245,244,240,0.55);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    nav.light .nav-links a { color: var(--muted); }
+    .nav-links a:hover,
+    nav.light .nav-links a:hover { color: var(--accent); }
+    .nav-links a.active { color: #F5F4F0; }
+    nav.light .nav-links a.active { color: var(--dark); }
+    .nav-links a.active::after {
+      content: '';
+      display: block;
+      height: 1px;
+      margin-top: 5px;
+      background: var(--accent);
+    }
+    .nav-links a.join { color: var(--accent) !important; }
+
+    /* ─── PAGE HEADER (dark) ──────────────── */
+    .page-head {
+      min-height: 58svh;
+      background: var(--hero-bg);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow: hidden;
+    }
+    .page-head__bg {
+      position: absolute;
+      inset: 0;
+      background: url('https://picsum.photos/seed/cublog/1920/1080') center 40% / cover no-repeat;
+      opacity: 0.45;
+      will-change: transform;
+    }
+    .page-head__bg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(12,12,10,0.6) 0%, rgba(12,12,10,0.15) 45%, rgba(12,12,10,0.9) 100%);
+    }
+    .page-head__body {
+      position: relative;
+      z-index: 2;
+      padding: 0 3rem 0;
+      max-width: 1380px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .page-head__kicker {
+      font-size: 0.56rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: rgba(245,244,240,0.5);
+      margin-bottom: 1.5rem;
+    }
+    .page-head__kicker span { color: var(--accent); }
+    .page-head__title {
+      font-family: 'Spectral', serif;
+      font-size: clamp(3.5rem, 8vw, 8.5rem);
+      font-weight: 200;
+      line-height: 0.9;
+      letter-spacing: -0.03em;
+      color: #F5F4F0;
+    }
+    .page-head__title em { font-style: italic; font-weight: 200; color: var(--accent); }
+    .page-head__foot {
+      position: relative;
+      z-index: 2;
+      margin-top: 3rem;
+      padding: 0 3rem 3rem;
+      max-width: 1380px;
+      margin-left: auto;
+      margin-right: auto;
+      width: 100%;
+    }
+    .page-head__lead {
+      font-size: 0.82rem;
+      color: rgba(245,244,240,0.5);
+      line-height: 1.85;
+      max-width: 500px;
+      font-weight: 300;
+    }
+
+    .cut-line { width: 100%; height: 2px; background: var(--accent); display: block; }
+
+    /* ─── SHARED ──────────────────────────── */
+    .section-pad { padding: 5rem 3rem 6rem; }
+    .wrap { max-width: 1380px; margin: 0 auto; }
+
+    .eyebrow {
+      font-size: 0.54rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .eyebrow .num { color: var(--accent); font-weight: 500; }
+
+    /* ─── CATEGORY FILTER ──────────────────── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin-bottom: 3.5rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--subtle);
+    }
+    .filter-bar__title {
+      font-family: 'Spectral', serif;
+      font-size: clamp(1.4rem, 2vw, 2rem);
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    .filter-bar__title em { font-style: italic; color: var(--accent); }
+    .filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem 1.6rem;
+      max-width: 640px;
+      justify-content: flex-end;
+    }
+    .filter button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 400;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0.35rem 0;
+      position: relative;
+      transition: color 0.2s;
+    }
+    .filter button:hover { color: var(--dark); }
+    .filter button sup {
+      font-size: 0.78em;
+      color: var(--subtle);
+      margin-left: 0.2em;
+      transition: color 0.2s;
+    }
+    .filter button:hover sup { color: var(--muted); }
+    .filter button.active { color: var(--accent); }
+    .filter button.active sup { color: var(--accent); }
+    .filter button.active::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: -2px;
+      height: 1px;
+      background: var(--accent);
+    }
+
+    /* ─── FEATURED POST (full-width essay) ─── */
+    .featured {
+      margin-bottom: 4.5rem;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      background: var(--hero-bg);
+      overflow: hidden;
+    }
+    .featured__img { position: relative; overflow: hidden; min-height: 420px; }
+    .featured__img img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transition: transform 0.8s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    .featured:hover .featured__img img { transform: scale(1.04); }
+    .featured__flag {
+      position: absolute;
+      top: 1.5rem; left: 1.5rem;
+      z-index: 2;
+      font-size: 0.5rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: #F5F4F0;
+      background: var(--accent);
+      padding: 0.5rem 0.85rem;
+    }
+    .featured__body {
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      color: #F5F4F0;
+    }
+    .featured__tag {
+      font-size: 0.54rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1.1rem;
+    }
+    .featured__title {
+      font-family: 'Spectral', serif;
+      font-size: clamp(2rem, 3.2vw, 3.2rem);
+      font-weight: 300;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      margin-bottom: 1.25rem;
+    }
+    .featured__title em { font-style: italic; }
+    .featured__excerpt {
+      font-size: 0.82rem;
+      color: rgba(245,244,240,0.52);
+      line-height: 1.85;
+      margin-bottom: 1.75rem;
+      max-width: 420px;
+    }
+    .featured__meta {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(245,244,240,0.45);
+      margin-bottom: 1.75rem;
+    }
+    .featured__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
+    .featured__read {
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent);
+      width: fit-content;
+      border-bottom: 1px solid rgba(232,24,110,0.35);
+      padding-bottom: 3px;
+      transition: border-color 0.2s;
+    }
+    .featured:hover .featured__read { border-color: var(--accent); }
+
+    /* ─── POST LIST (editorial) ────────────── */
+    .post-list { display: flex; flex-direction: column; gap: 0; }
+    .post-item {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      cursor: pointer;
+      border-bottom: 1px solid var(--subtle);
+      transition: background 0.25s;
+    }
+    .post-item:first-child { border-top: 1px solid var(--subtle); }
+    /* no bg change on hover */
+    .post-item__img {
+      overflow: hidden;
+      position: relative;
+      min-height: 280px;
+    }
+    .post-item__img img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    .post-item:hover .post-item__img img { transform: scale(1.05); }
+    .post-item__img .read-time {
+      position: absolute;
+      bottom: 1rem; left: 1rem;
+      z-index: 2;
+      font-size: 0.48rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #F5F4F0;
+      background: rgba(12,12,10,0.6);
+      backdrop-filter: blur(4px);
+      padding: 0.35rem 0.65rem;
+    }
+    .post-item__body {
+      padding: 3rem 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .post-item__tag {
+      font-size: 0.52rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+    .post-item__title {
+      font-family: 'Spectral', serif;
+      font-size: clamp(1.3rem, 2vw, 1.85rem);
+      font-weight: 400;
+      line-height: 1.2;
+      letter-spacing: -0.015em;
+      margin-bottom: 1rem;
+      transition: color 0.2s;
+    }
+    .post-item:hover .post-item__title { color: var(--accent); }
+    .post-item__excerpt {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.8;
+      margin-bottom: 1.25rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .post-item__meta {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.58rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-top: auto;
+    }
+    .post-item__meta .author {
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .post-item__meta .sep { width: 2px; height: 2px; border-radius: 50%; background: var(--subtle); }
+
+    /* Alternating layout: second post flips */
+    .post-item.flip {
+      direction: rtl;
+    }
+    .post-item.flip .post-item__body {
+      direction: ltr;
+    }
+    .post-item.flip .post-item__img .read-time {
+      left: auto; right: 1rem;
+    }
+
+    /* ─── PAGINATION ───────────────────────── */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-top: 4rem;
+      padding-top: 3rem;
+      border-top: 1px solid var(--subtle);
+    }
+    .pagination a {
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      text-decoration: none;
+      color: var(--muted);
+      padding: 0.5rem 0.85rem;
+      border: 1px solid var(--subtle);
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .pagination a:hover { border-color: var(--accent); color: var(--accent); }
+    .pagination a.active {
+      background: var(--dark);
+      color: #F5F4F0;
+      border-color: var(--dark);
+    }
+    .pagination a.active:hover { background: var(--accent); border-color: var(--accent); }
+
+    /* ─── SERIES / SIDEBAR SECTION ─────────── */
+    .series {
+      background: var(--paper);
+      border-top: 1px solid var(--subtle);
+      border-bottom: 1px solid var(--subtle);
+      padding: 5rem 3rem;
+    }
+    .series__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+    }
+    .series-card {
+      cursor: pointer;
+      padding: 2rem;
+      background: var(--body-bg);
+      border: 1px solid var(--subtle);
+      transition: border-color 0.25s;
+    }
+    .series-card:hover { border-color: var(--accent); }
+    .series-card__num {
+      font-family: 'Spectral', serif;
+      font-size: 2.6rem;
+      font-weight: 200;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 1rem;
+    }
+    .series-card__title {
+      font-family: 'Spectral', serif;
+      font-size: 1.2rem;
+      font-weight: 400;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.75rem;
+    }
+    .series-card__count {
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+    }
+
+    /* ─── FOOTER ──────────────────────────── */
+    footer {
+      background: var(--dark);
+      color: rgba(245,244,240,0.7);
+      padding: 3.5rem 3rem 2.5rem;
+    }
+    .footer__grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 3rem;
+      max-width: 1380px;
+      margin: 0 auto 3rem;
+    }
+    .footer__brand {
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-decoration: none;
+      color: #F5F4F0;
+      display: block;
+      margin-bottom: 0.85rem;
+    }
+    .footer__brand .cu { color: var(--accent); }
+    .footer__tagline { font-size: 0.7rem; color: rgba(245,244,240,0.38); line-height: 1.7; }
+    .footer__col h4 {
+      font-size: 0.5rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1.1rem;
+    }
+    .footer__col ul { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+    .footer__col a {
+      font-size: 0.74rem;
+      color: rgba(245,244,240,0.42);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer__col a:hover { color: #F5F4F0; }
+    .footer__bottom {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(245,244,240,0.1);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.58rem;
+      letter-spacing: 0.1em;
+      color: rgba(245,244,240,0.28);
+    }
+
+    /* ─── RESPONSIVE ──────────────────────── */
+    @media (max-width: 1000px) {
+      .featured { grid-template-columns: 1fr; }
+      .featured__img { min-height: 300px; }
+      .post-item { grid-template-columns: 1fr; }
+      .post-item.flip { direction: ltr; }
+      .post-item__img { min-height: 220px; }
+      .post-item__body { padding: 2rem 1.75rem; }
+      .series__grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 720px) {
+      nav { padding: 1.25rem 1.5rem; }
+      .nav-links { display: none; }
+      .section-pad { padding: 4rem 1.5rem 5rem; }
+      .page-head__body, .page-head__foot { padding-left: 1.5rem; padding-right: 1.5rem; }
+      .filter-bar { flex-direction: column; align-items: flex-start; }
+      .filter { justify-content: flex-start; }
+      .series__grid { grid-template-columns: 1fr; }
+      .newsletter__form { flex-direction: column; }
+      footer { padding: 2.5rem 1.5rem 2rem; }
+      .footer__grid { grid-template-columns: 1fr; gap: 2rem; }
+      .footer__bottom { flex-direction: column; gap: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="progress"></div>
+
+  <nav id="nav">
+    <a href="#" class="logo"><span class="cu">CU</span>PHOTOCLUB</a>
+    <ul class="nav-links">
+      <li><a href="#">Home</a></li>
+      <li><a href="#">Gallery</a></li>
+      <li><a href="#" class="active">Blog</a></li>
+      <li><a href="#">History</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#" class="join">Join</a></li>
+    </ul>
+  </nav>
+
+  <!-- PAGE HEADER: dark -->
+  <header class="page-head" id="head">
+    <div class="page-head__bg" id="parallax"></div>
+    <div class="page-head__body">
+      <p class="page-head__kicker">CU Photo Club · <span>Words &amp; Pictures</span></p>
+      <h1 class="page-head__title">Stories &amp; <em>essays</em></h1>
+    </div>
+    <div class="page-head__foot">
+      <p class="page-head__lead">
+        On craft, process, and the moments between frames — essays, interviews, and dispatches
+        from the CU Photo Club community.
+      </p>
+    </div>
+  </header>
+
+  <div class="cut-line"></div>
+
+  <!-- POSTS -->
+  <section class="section-pad">
+    <div class="wrap">
+
+      <!-- Category filter -->
+      <div class="filter-bar">
+        <h2 class="filter-bar__title">Latest <em>stories</em></h2>
+        <div class="filter" id="filter">
+          <button class="active" data-cat="all">All <sup>12</sup></button>
+          <button data-cat="Feature">Feature <sup>3</sup></button>
+          <button data-cat="Interview">Interview <sup>2</sup></button>
+          <button data-cat="Workshop">Workshop <sup>3</sup></button>
+          <button data-cat="Exhibition">Exhibition <sup>2</sup></button>
+          <button data-cat="Community">Community <sup>2</sup></button>
+        </div>
+      </div>
+
+      <!-- Featured post -->
+      <article class="featured post-item" data-cat="Feature">
+        <div class="featured__img">
+          <span class="featured__flag">New</span>
+          <img src="https://picsum.photos/seed/blogfeat/1200/900" alt="Featured">
+        </div>
+        <div class="featured__body">
+          <p class="featured__tag">Feature · Photography</p>
+          <h3 class="featured__title">The Art of <em>Waiting</em>: Finding the Frame in Stillness</h3>
+          <p class="featured__excerpt">
+            For our annual essay series, members reflect on the one skill no camera can teach:
+            patience. What emerges when you stop chasing the shot and let the shot come to you.
+          </p>
+          <div class="featured__meta">
+            <span>June 2025</span><span class="dot"></span><span>8 min read</span><span class="dot"></span><span>By Ananda K.</span>
+          </div>
+          <span class="featured__read">Read Essay →</span>
+        </div>
+      </article>
+
+      <!-- Post list -->
+      <div class="post-list" id="post-list">
+
+        <article class="post-item" data-cat="Interview">
+          <div class="post-item__img">
+            <img src="https://picsum.photos/seed/blog02/900/700" alt="Post">
+            <span class="read-time">12 min read</span>
+          </div>
+          <div class="post-item__body">
+            <p class="post-item__tag">Interview</p>
+            <h3 class="post-item__title">The Archive Keeper: A Conversation with Somchai P.</h3>
+            <p class="post-item__excerpt">
+              For thirty years, Somchai has maintained the club's physical archive — thousands of
+              prints, negatives, and contact sheets spanning five decades. We sat down to talk
+              about what it means to be a memory holder for a community.
+            </p>
+            <div class="post-item__meta">
+              <span class="author">Ananda K.</span>
+              <span class="sep"></span>
+              <span>May 2025</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item flip" data-cat="Workshop">
+          <div class="post-item__img">
+            <img src="https://picsum.photos/seed/blog03/900/700" alt="Post">
+            <span class="read-time">6 min read</span>
+          </div>
+          <div class="post-item__body">
+            <p class="post-item__tag">Workshop</p>
+            <h3 class="post-item__title">Cyanotype Diaries: Printing with Sunlight</h3>
+            <p class="post-item__excerpt">
+              A weekend workshop in alternative process photography brought members back to the
+              medium's most elemental ingredients: iron, water, and the Bangkok sun.
+            </p>
+            <div class="post-item__meta">
+              <span class="author">Pim W.</span>
+              <span class="sep"></span>
+              <span>May 2025</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item" data-cat="Exhibition">
+          <div class="post-item__img">
+            <img src="https://picsum.photos/seed/blog04/900/700" alt="Post">
+            <span class="read-time">10 min read</span>
+          </div>
+          <div class="post-item__body">
+            <p class="post-item__tag">Exhibition</p>
+            <h3 class="post-item__title">Fifty Frames: A Decade of Annual Exhibitions</h3>
+            <p class="post-item__excerpt">
+              As we prepare for our tenth annual exhibition, we trace the threads that connect
+              each generation's vision — from film to digital, from darkroom to screen.
+            </p>
+            <div class="post-item__meta">
+              <span class="author">Nat C.</span>
+              <span class="sep"></span>
+              <span>April 2025</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item flip" data-cat="Community">
+          <div class="post-item__img">
+            <img src="https://picsum.photos/seed/blog05/900/700" alt="Post">
+            <span class="read-time">5 min read</span>
+          </div>
+          <div class="post-item__body">
+            <p class="post-item__tag">Community</p>
+            <h3 class="post-item__title">New Members, New Eyes: The Annual Intake</h3>
+            <p class="post-item__excerpt">
+              Every year, we welcome a new cohort of photographers into the club. This year,
+              we invited them to share a single image and the story behind it.
+            </p>
+            <div class="post-item__meta">
+              <span class="author">Club Editors</span>
+              <span class="sep"></span>
+              <span>April 2025</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item" data-cat="Workshop">
+          <div class="post-item__img">
+            <img src="https://picsum.photos/seed/blog06/900/700" alt="Post">
+            <span class="read-time">7 min read</span>
+          </div>
+          <div class="post-item__body">
+            <p class="post-item__tag">Workshop</p>
+            <h3 class="post-item__title">Finding Stillness: Documentary Photography in Motion</h3>
+            <p class="post-item__excerpt">
+              How slowing down changes everything you think you know about making pictures.
+              Notes from our documentary photography intensive.
+            </p>
+            <div class="post-item__meta">
+              <span class="author">Krit T.</span>
+              <span class="sep"></span>
+              <span>March 2025</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="post-item flip" data-cat="Interview">
+          <div class="post-item__img">
+            <img src="https://picsum.photos/seed/blog07/900/700" alt="Post">
+            <span class="read-time">9 min read</span>
+          </div>
+          <div class="post-item__body">
+            <p class="post-item__tag">Interview</p>
+            <h3 class="post-item__title">Talking to the Street: Urban Photography with Mintra S.</h3>
+            <p class="post-item__excerpt">
+              Mintra has been photographing Bangkok's streets for eight years. She talks about
+              the ethics of street photography, building trust with strangers, and the one shot
+              that got away.
+            </p>
+            <div class="post-item__meta">
+              <span class="author">Ananda K.</span>
+              <span class="sep"></span>
+              <span>March 2025</span>
+            </div>
+          </div>
+        </article>
+
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <a href="#">← Previous</a>
+        <a href="#" class="active">1</a>
+        <a href="#">2</a>
+        <a href="#">3</a>
+        <a href="#">Next →</a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ONGOING SERIES -->
+  <section class="series">
+    <div class="wrap">
+      <div class="eyebrow"><span class="num">Series</span></div>
+      <div class="series__grid">
+        <div class="series-card">
+          <div class="series-card__num">01</div>
+          <h3 class="series-card__title">The Craft Essays</h3>
+          <p class="series-card__count">4 parts · Ongoing</p>
+        </div>
+        <div class="series-card">
+          <div class="series-card__num">02</div>
+          <h3 class="series-card__title">Archive Deep Dives</h3>
+          <p class="series-card__count">3 parts · Ongoing</p>
+        </div>
+        <div class="series-card">
+          <div class="series-card__num">03</div>
+          <h3 class="series-card__title">Member Spotlights</h3>
+          <p class="series-card__count">2 parts · Ongoing</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer__grid">
+      <div>
+        <a href="#" class="footer__brand"><span class="cu">CU</span>PHOTOCLUB</a>
+        <p class="footer__tagline">Official photography club of<br>Chulalongkorn University, Bangkok, Thailand</p>
+      </div>
+      <div class="footer__col">
+        <h4>Navigate</h4>
+        <ul>
+          <li><a href="#">Gallery</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">History</a></li>
+          <li><a href="#">About</a></li>
+          <li><a href="#">Join</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer__col">
+        <h4>Follow</h4>
+        <ul>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">Facebook</a></li>
+          <li><a href="#">YouTube</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span>© 2025 CU Photo Club, Chulalongkorn University</span>
+      <span>Bangkok, Thailand</span>
+    </div>
+  </footer>
+
+  <script>
+    const nav = document.getElementById('nav');
+    const head = document.getElementById('head');
+    const parallax = document.getElementById('parallax');
+    const progress = document.getElementById('progress');
+
+    window.addEventListener('scroll', () => {
+      const headBottom = head.getBoundingClientRect().bottom;
+      nav.classList.toggle('light', headBottom < 0);
+      parallax.style.transform = `translateY(${window.scrollY * 0.18}px)`;
+      const total = document.body.scrollHeight - window.innerHeight;
+      progress.style.width = (window.scrollY / total * 100) + '%';
+    }, { passive: true });
+
+    // Category filter
+    const filter = document.getElementById('filter');
+    const posts = Array.from(document.querySelectorAll('.post-item'));
+
+    filter.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      filter.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const cat = btn.dataset.cat;
+      posts.forEach(p => {
+        p.style.display = cat === 'all' || p.dataset.cat === cat ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>

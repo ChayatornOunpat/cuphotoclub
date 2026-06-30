@@ -1,61 +1,57 @@
 <script setup lang="ts">
-import { Dialog, DialogPanel, TransitionChild, TransitionRoot } from '@headlessui/vue'
+const { user, clear } = useUserSession()
+const { t } = useI18n()
+const localePath = useLocalePath()
 
-const mobileOpen = ref(false)
-const route = useRoute()
-watch(() => route.path, () => { mobileOpen.value = false })
+async function logout() {
+  await clear()
+  await navigateTo(localePath('/admin/login'))
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-paper-soft">
-    <!-- Mobile slide-over sidebar -->
-    <TransitionRoot :show="mobileOpen" as="template">
-      <Dialog class="relative z-50 lg:hidden" @close="mobileOpen = false">
-        <TransitionChild
-          as="template"
-          enter="transition-opacity ease-linear duration-200" enter-from="opacity-0" enter-to="opacity-100"
-          leave="transition-opacity ease-linear duration-150" leave-from="opacity-100" leave-to="opacity-0"
-        >
-          <div class="fixed inset-0 bg-ink/40" />
-        </TransitionChild>
-        <div class="fixed inset-0 flex">
-          <TransitionChild
-            as="template"
-            enter="transition ease-in-out duration-200 transform" enter-from="-translate-x-full" enter-to="translate-x-0"
-            leave="transition ease-in-out duration-150 transform" leave-from="translate-x-0" leave-to="-translate-x-full"
-          >
-            <DialogPanel class="relative flex w-72 max-w-[80%] flex-col bg-white py-4">
-              <div class="px-6 pb-4">
-                <NuxtLink to="/admin" class="text-lg font-semibold text-ink">{{ strings.brand }}</NuxtLink>
-                <p class="text-xs text-ink-soft">ระบบจัดการ</p>
-              </div>
-              <AdminSidebar />
-            </DialogPanel>
-          </TransitionChild>
-        </div>
-      </Dialog>
-    </TransitionRoot>
-
-    <!-- Desktop sidebar -->
-    <aside class="hidden border-r border-line bg-white py-4 lg:fixed lg:inset-y-0 lg:flex lg:w-72 lg:flex-col">
-      <div class="px-6 pb-4">
-        <NuxtLink to="/admin" class="text-lg font-semibold text-ink">{{ strings.brand }}</NuxtLink>
-        <p class="text-xs text-ink-soft">ระบบจัดการ</p>
-      </div>
-      <AdminSidebar />
-    </aside>
-
-    <div class="lg:pl-72">
-      <header class="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-line bg-white/80 px-4 backdrop-blur sm:px-6">
-        <button type="button" class="lg:hidden" aria-label="เปิดเมนู" @click="mobileOpen = true">
-          <Icon name="heroicons:bars-3" class="size-6 text-ink" />
-        </button>
-        <div class="flex-1" />
-        <AdminUserMenu />
-      </header>
-      <main class="px-4 py-6 sm:px-6 lg:px-8">
-        <slot />
-      </main>
-    </div>
+  <div class="admin">
+    <header class="admin__bar">
+      <NuxtLink :to="localePath('/admin')" class="admin__brand"><span class="cu">CU</span>PHOTO · {{ t('admin.brand').split('·').at(-1)?.trim() }}</NuxtLink>
+      <nav class="admin__nav">
+        <NuxtLink :to="localePath('/admin')">{{ t('admin.dashboard') }}</NuxtLink>
+        <NuxtLink :to="localePath('/admin/albums')">{{ t('admin.albums') }}</NuxtLink>
+        <NuxtLink :to="localePath('/admin/posts')">{{ t('admin.posts') }}</NuxtLink>
+        <NuxtLink :to="localePath('/')" target="_blank">{{ t('admin.viewSite') }}</NuxtLink>
+        <button class="admin__logout" @click="logout">{{ t('admin.logOut') }}{{ user ? ` (${(user as { name?: string }).name})` : '' }}</button>
+      </nav>
+    </header>
+    <main class="admin__main">
+      <slot />
+    </main>
   </div>
 </template>
+
+<style scoped>
+.admin { min-height: 100vh; background: var(--body-bg); }
+.admin__bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 2rem; background: var(--dark); color: #F5F4F0;
+  position: sticky; top: 0; z-index: 50;
+}
+.admin__brand { font-size: 0.8rem; font-weight: 500; letter-spacing: 0.16em; text-decoration: none; color: #F5F4F0; }
+.admin__brand .cu { color: var(--accent); }
+.admin__nav { display: flex; align-items: center; gap: 1.5rem; }
+.admin__nav a {
+  font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: rgba(245, 244, 240, 0.6); text-decoration: none; transition: color 0.2s;
+}
+.admin__nav a:hover { color: #F5F4F0; }
+.admin__logout {
+  font-family: var(--font-sans); font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase;
+  background: none; border: 1px solid rgba(245, 244, 240, 0.25); color: rgba(245, 244, 240, 0.7);
+  padding: 0.45rem 0.9rem; cursor: pointer; transition: border-color 0.2s, color 0.2s;
+}
+.admin__logout:hover { border-color: var(--accent); color: var(--accent); }
+.admin__main { padding: 0; }
+@media (max-width: 780px) {
+  .admin__bar { align-items: flex-start; flex-direction: column; gap: 1rem; }
+  .admin__nav { flex-wrap: wrap; gap: 0.75rem 1rem; }
+  .admin__main { padding: 2rem 1.25rem 4rem; }
+}
+</style>

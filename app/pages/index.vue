@@ -1,80 +1,135 @@
 <script setup lang="ts">
-interface HomeData {
-  albums: { id: number, slug: string, title: string, eventDate: string | null, photoCount: number, coverKey: string | null }[]
-  posts: { id: number, slug: string, title: string, excerpt: string | null, coverR2Key: string | null, publishedAt: string | null }[]
-  events: { id: number, slug: string, title: string, summary: string | null, coverR2Key: string | null, eventDate: string | null, location: string | null }[]
+import { defaultSite } from '~/utils/defaultSite'
+
+// ── Data layer: albums + blog posts come from the same SQLite-backed APIs used
+//    by admin. Sections below are just different views over this data.
+const site = ref(defaultSite)
+const { data: albums } = await useAsyncData('albums', async () => {
+  const adminAlbums = await $fetch('/api/albums').catch(() => [])
+  if (adminAlbums.length) return adminAlbums.map(album => ({ ...album, path: `/albums/${album.id}` }))
+  return []
+})
+const { data: posts } = await useAsyncData('posts', async () => {
+  const adminPosts = await $fetch('/api/posts').catch(() => [])
+  if (adminPosts.length) return adminPosts.map(post => ({ ...post, path: `/posts/${post.id}` }))
+  return []
+})
+const { t } = useI18n()
+const localizedPath = useLocalizedContentPath()
+const localizedSite = useLocalizedSite(site)
+
+function coverOf(album: NonNullable<typeof albums.value>[number]) {
+  return album.coverSrc || (album.rows ?? []).flatMap((r: any) => r.cells).find((c: any) => c.type === 'image' && c.src)?.src || ''
 }
 
-const { data } = await useFetch<HomeData>('/api/home')
-const { data: settings } = useSiteSettings()
+// ── Featured Work: FeaturedWork.vue lays out a randomised, rectangle-guaranteed
+//    wall from these albums. The randomness is driven by a seed that is created
+//    once on the server and serialised via useState, so the server and client
+//    renders are identical (no hydration mismatch). A fresh page load → new seed
+//    → new layout.
+const featuredSeed = useState('featured-seed', () => Math.floor(Math.random() * 2147483647))
 
-useSeoMeta({
-  title: 'หน้าแรก',
-  description: () => settings.value?.siteDescription || strings.home.heroSubtitle
+const featuredAlbums = computed(() =>
+  (albums.value ?? [])
+    .map(a => ({
+      title: a.title,
+      category: a.category,
+      cover: coverOf(a),
+      path: localizedPath(a.path)
+    }))
+    .filter(a => a.cover)
+)
+
+// ── Stories: albums + posts merged into one feed, newest first.
+const feed = computed(() => {
+  const albumItems = (albums.value ?? [])
+    .map(a => ({
+      kind: 'album' as const,
+      title: a.title,
+      tag: `${t('common.album')} · ${a.category}`,
+      date: a.date,
+      published: a.published,
+      image: coverOf(a),
+      excerpt: a.excerpt,
+      path: localizedPath(a.path)
+    }))
+    .filter(a => a.image)
+  const postItems = (posts.value ?? [])
+    .map(p => ({
+      kind: 'post' as const,
+      title: p.title,
+      tag: p.tag,
+      date: p.date,
+      published: p.published,
+      image: p.image,
+      excerpt: p.excerpt,
+      path: localizedPath(p.path)
+    }))
+    .filter(p => p.image)
+  return [...albumItems, ...postItems].sort((a, b) => b.published.localeCompare(a.published))
+})
+
+const leadStory = computed(() => feed.value[0] ?? null)
+const smallStories = computed(() => feed.value.slice(1, 5))
+
+// ── Scroll UI: reading-progress bar + nav dark→light handoff at the hero edge.
+const navLight = ref(false)
+const progress = ref(0)
+
+function onScroll() {
+  const total = document.body.scrollHeight - window.innerHeight
+  progress.value = total > 0 ? (window.scrollY / total) * 100 : 0
+  navLight.value = window.scrollY > window.innerHeight * 0.9
+}
+
+onMounted(() => {
+  onScroll()
+  window.addEventListener('scroll', onScroll, { passive: true })
+})
+onUnmounted(() => window.removeEventListener('scroll', onScroll))
+
+useHead({
+  title: () => `${t('nav.logo')} — Chulalongkorn University`,
+  meta: [
+    {
+      name: 'description',
+      content:
+        'The official photography club of Chulalongkorn University — documenting life, culture, and the human condition since 1967.'
+    }
+  ]
 })
 </script>
 
 <template>
-  <div>
-    <!-- Hero -->
-    <section class="mx-auto max-w-6xl px-4 py-20 sm:py-28">
-      <p class="text-sm font-medium uppercase tracking-widest text-accent">{{ strings.home.eyebrow }}</p>
-      <h1 class="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-ink sm:text-6xl">{{ strings.home.heroTitle }}</h1>
-      <p class="mt-6 max-w-xl text-lg text-ink-soft">{{ settings?.siteDescription || strings.home.heroSubtitle }}</p>
-      <div class="mt-8 flex flex-wrap gap-3">
-        <UiButton to="/galleries" size="lg">{{ strings.home.viewGalleries }}</UiButton>
-        <UiButton to="/about" size="lg" variant="secondary">{{ strings.nav.about }}</UiButton>
-      </div>
-    </section>
+  <div v-if="localizedSite">
+    <div id="progress" :style="{ width: progress + '%' }" />
 
-    <!-- Featured galleries -->
-    <section v-if="data?.albums.length" class="border-t border-line bg-paper-soft">
-      <div class="mx-auto max-w-6xl px-4 py-16">
-        <div class="flex items-end justify-between gap-4">
-          <h2 class="text-2xl font-bold tracking-tight text-ink">แกลเลอรีล่าสุด</h2>
-          <NuxtLink to="/galleries" class="text-sm font-medium text-accent hover:underline">ดูทั้งหมด →</NuxtLink>
-        </div>
-        <div class="mt-8 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-          <PublicAlbumCard v-for="album in data.albums" :key="album.id" :album="album" />
-        </div>
-      </div>
-    </section>
+    <SiteNav :links="localizedSite.nav.links" :light="navLight" />
 
-    <!-- Latest posts -->
-    <section v-if="data?.posts.length" class="border-t border-line">
-      <div class="mx-auto max-w-6xl px-4 py-16">
-        <div class="flex items-end justify-between gap-4">
-          <h2 class="text-2xl font-bold tracking-tight text-ink">บทความล่าสุด</h2>
-          <NuxtLink to="/blog" class="text-sm font-medium text-accent hover:underline">ดูทั้งหมด →</NuxtLink>
-        </div>
-        <div class="mt-8 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-          <PublicPostCard v-for="post in data.posts" :key="post.id" :post="post" />
-        </div>
-      </div>
-    </section>
+    <SiteHero :hero="localizedSite.hero" />
 
-    <!-- Recent events -->
-    <section v-if="data?.events.length" class="border-t border-line bg-paper-soft">
-      <div class="mx-auto max-w-6xl px-4 py-16">
-        <div class="flex items-end justify-between gap-4">
-          <h2 class="text-2xl font-bold tracking-tight text-ink">กิจกรรม</h2>
-          <NuxtLink to="/activities" class="text-sm font-medium text-accent hover:underline">ดูทั้งหมด →</NuxtLink>
-        </div>
-        <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <PublicEventCard v-for="ev in data.events" :key="ev.id" :event="ev" />
-        </div>
-      </div>
-    </section>
+    <!-- Signature pink line: dark → light transition -->
+    <div class="cut-line" />
 
-    <!-- Contact CTA -->
-    <section class="border-t border-line">
-      <div class="mx-auto flex max-w-6xl flex-col items-start gap-4 px-4 py-16 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 class="text-2xl font-bold tracking-tight text-ink">อยากร่วมกิจกรรมกับเรา?</h2>
-          <p class="mt-2 text-ink-soft">ติดต่อชมรมเพื่อสอบถามหรือเข้าร่วมเป็นสมาชิก</p>
-        </div>
-        <UiButton to="/contact" size="lg">{{ strings.nav.contact }}</UiButton>
-      </div>
-    </section>
+    <FeaturedWork :albums="featuredAlbums" :seed="featuredSeed" />
+
+    <StoriesSection :lead="leadStory" :items="smallStories" />
+
+    <HistorySection :history="localizedSite.history" />
+
+    <AboutSection :about="localizedSite.about" />
+
+    <SiteFooter :footer="localizedSite.footer" />
   </div>
 </template>
+
+<style scoped>
+#progress {
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 200;
+  height: 2px;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+</style>
