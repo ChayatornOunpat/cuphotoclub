@@ -16,6 +16,14 @@ const props = defineProps<{
   eager?: boolean
 }>()
 
+// R2 blob images are served by a server route, not from public/.
+// IPX can only HTTP-fetch them, so we prefix the origin so NuxtImg
+// treats the path as a remote URL (origin must be in image.domains).
+const { origin } = useRequestURL()
+const resolvedSrc = computed(() =>
+  props.src?.startsWith('/images/') ? `${origin}${props.src}` : props.src
+)
+
 const loaded = ref(false)
 const isEager = computed(() => props.eager === true)
 const done = computed(() => loaded.value || isEager.value)
@@ -23,7 +31,7 @@ const done = computed(() => loaded.value || isEager.value)
 
 <template>
   <NuxtImg
-    :src="props.src"
+    :src="resolvedSrc"
     :alt="props.alt ?? ''"
     :sizes="props.sizes"
     :width="props.width"

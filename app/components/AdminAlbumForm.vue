@@ -12,6 +12,7 @@ const props = defineProps<{
   busy?: boolean
   error?: string | null
   saved?: boolean
+  mediaPrefix?: string
 }>()
 const emit = defineEmits<{ submit: [value: AlbumInput] }>()
 const { t } = useI18n()
@@ -37,6 +38,10 @@ function blank(): AlbumInput {
 }
 
 const form = reactive<AlbumInput>(props.initial ? structuredClone(toRaw(props.initial)) : blank())
+const uploadedMediaKeys = ref<string[]>([])
+const mediaLoading = ref(false)
+const uploadModalOpen = ref(false)
+const imagePickerOpen = ref(false)
 
 // Editing state
 const selectedRow = ref<number | null>(null)
@@ -143,6 +148,85 @@ watch(activeDock, (val) => {
 // Error display
 const validationError = ref<string | null>(null)
 const displayError = computed(() => props.error ?? validationError.value)
+
+const mediaPrefix = computed(() => props.mediaPrefix || 'content-albums/drafts')
+
+function keyToSrc(key: string) {
+  return `/images/${key}`
+}
+
+function srcToKey(src?: string | null) {
+  if (!src) return null
+  return src.startsWith('/images/') ? src.slice('/images/'.length) : null
+}
+
+function collectAlbumImageSources() {
+  const sources = new Set<string>()
+  if (form.coverSrc) sources.add(form.coverSrc)
+  for (const row of form.rows) {
+    for (const cell of row.cells) {
+      if (cell.type === 'image' && cell.src) sources.add(cell.src)
+    }
+  }
+  return [...sources]
+}
+
+const mediaItems = computed(() => {
+  const items = new Map<string, { id: string, src: string, key: string | null }>()
+  for (const key of uploadedMediaKeys.value) {
+    const src = keyToSrc(key)
+    items.set(src, { id: key, src, key })
+  }
+  for (const src of collectAlbumImageSources()) {
+    const key = srcToKey(src)
+    items.set(src, { id: key ?? src, src, key })
+  }
+  return [...items.values()]
+})
+
+const hasMedia = computed(() => mediaItems.value.length > 0)
+
+function mergeMediaKeys(keys: string[]) {
+  uploadedMediaKeys.value = [...new Set([...uploadedMediaKeys.value, ...keys])]
+}
+
+async function loadMediaKeys() {
+  mediaLoading.value = true
+  try {
+    const result = await $fetch<{ keys: string[] }>('/api/admin/media', {
+      query: { prefix: mediaPrefix.value }
+    })
+    mergeMediaKeys(result.keys)
+  } catch {
+    // The selector can still work from the album's saved image references.
+  } finally {
+    mediaLoading.value = false
+  }
+}
+
+async function onMediaUploaded(keys: string[]) {
+  mergeMediaKeys(keys)
+  await loadMediaKeys()
+  uploadModalOpen.value = false
+}
+
+function selectCover(src: string) {
+  form.coverSrc = src
+}
+
+function selectImageForActiveCell(src: string) {
+  const cell = selectedCellData.value
+  if (cell?.type === 'image') {
+    cell.src = src
+    imagePickerOpen.value = false
+  }
+}
+
+onMounted(loadMediaKeys)
+watch(mediaPrefix, () => {
+  uploadedMediaKeys.value = []
+  void loadMediaKeys()
+})
 
 // Hint
 const hintDismissed = ref(
@@ -543,10 +627,18 @@ const isEssay = computed(() => form.style === 'essay')
           <label>{{ t('adminForm.publishedSort') }}</label>
           <input v-model="form.published" type="date">
         </div>
-        <div class="field">
-          <label>Cover URL <span class="opt">auto if empty</span></label>
-          <input v-model="form.coverSrc" type="text" placeholder="https://…">
-        </div>
+      </div>
+
+      <!-- Media -->
+      <div class="tray__section">
+        <p class="tray__label">
+          Photos
+          <span class="tray__count">{{ mediaItems.length }}</span>
+        </p>
+        <button type="button" class="upload-btn" @click="uploadModalOpen = true">
+          <Icon name="heroicons:arrow-up-tray" class="upload-btn__icon" />
+          <span>{{ hasMedia ? 'Manage Photos' : 'Upload Photos' }}</span>
+        </button>
       </div>
 
       <!-- Palette -->
@@ -778,8 +870,123 @@ const isEssay = computed(() => form.style === 'essay')
           <label>{{ t('adminForm.excerpt') }}</label>
           <textarea ref="excerptInput" v-model="form.excerpt" rows="2" :placeholder="t('adminForm.excerptPlaceholder')" @focus="activeField = 'excerpt'" />
         </div>
+        <div class="field field--cover">
+          <label>Cover <span class="opt">choose from uploaded photos</span></label>
+          <div class="cover-dock">
+            <button
+              v-if="form.coverSrc"
+              type="button"
+              class="cover-preview"
+              title="Clear cover"
+              @click="form.coverSrc = ''"
+            >
+              <img :src="form.coverSrc" alt="">
+              <span>Clear</span>
+            </button>
+            <p v-else class="media-empty">Cover uses the first image until you choose one.</p>
+
+            <div v-if="hasMedia" class="media-strip media-strip--cover" aria-label="Select cover photo">
+              <button
+                v-for="item in mediaItems"
+                :key="item.id"
+                type="button"
+                class="media-thumb"
+                :class="{ 'is-cover': form.coverSrc === item.src, 'is-active': form.coverSrc === item.src }"
+                title="Set as cover"
+                @click="selectCover(item.src)"
+              >
+                <img :src="item.src" alt="" loading="lazy">
+                <span v-if="form.coverSrc === item.src" class="media-badge">Cover</span>
+              </button>
+            </div>
+            <p v-else-if="mediaLoading" class="media-empty">Loading photos…</p>
+            <p v-else class="media-empty">Upload photos from the sidebar first.</p>
+          </div>
+        </div>
       </div>
     </section>
+
+    <!-- Photos modal: upload + gallery -->
+    <UiModal v-model="uploadModalOpen" title="Photos" size="lg" flush>
+      <div class="pm">
+
+        <!-- Upload zone -->
+        <div class="pm__section">
+          <AdminR2ImageUploader
+            v-model="uploadedMediaKeys"
+            :prefix="mediaPrefix"
+            :show-previews="false"
+            @uploaded="onMediaUploaded"
+          />
+        </div>
+
+        <!-- Gallery -->
+        <template v-if="hasMedia || mediaLoading">
+          <div class="pm__divider" />
+          <div class="pm__section pm__section--gallery">
+            <div class="pm__gallery-head">
+              <p class="pm__label">Uploaded ({{ mediaItems.length }})</p>
+              <p v-if="selectedCellData?.type === 'image'" class="pm__context pm__context--active">
+                Assigning to Row {{ (selectedRow ?? 0) + 1 }}, Cell {{ (selectedCell ?? 0) + 1 }}
+              </p>
+              <p v-else class="pm__context">Select an image cell on the canvas to assign a photo</p>
+            </div>
+            <p v-if="mediaLoading && !hasMedia" class="pm__empty">Loading…</p>
+            <div v-else class="pm__grid" aria-label="Uploaded photos">
+              <button
+                v-for="item in mediaItems"
+                :key="item.id"
+                type="button"
+                class="pm__thumb"
+                :class="{
+                  'is-cover': form.coverSrc === item.src,
+                  'is-active': selectedCellData?.type === 'image' && selectedCellData.src === item.src
+                }"
+                :disabled="selectedCellData?.type !== 'image'"
+                :title="selectedCellData?.type === 'image' ? 'Use for selected frame' : 'Select an image cell first'"
+                @click="selectImageForActiveCell(item.src)"
+              >
+                <img :src="item.src" alt="" loading="lazy">
+                <span v-if="form.coverSrc === item.src" class="pm__badge">Cover</span>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- Footer -->
+        <div class="pm__footer">
+          <button type="button" class="btn-ghost" @click="uploadModalOpen = false">Done</button>
+        </div>
+
+      </div>
+    </UiModal>
+
+    <!-- Image picker modal -->
+    <UiModal v-model="imagePickerOpen" title="Select Photo" size="xl" flush>
+      <div class="ip">
+        <div class="ip__grid" aria-label="Select a photo for this frame">
+          <button
+            v-for="item in mediaItems"
+            :key="item.id"
+            type="button"
+            class="ip__thumb"
+            :class="{ 'is-selected': selectedCellData?.type === 'image' && selectedCellData.src === item.src }"
+            @click="selectImageForActiveCell(item.src)"
+          >
+            <img :src="item.src" alt="" loading="lazy">
+            <div v-if="selectedCellData?.type === 'image' && selectedCellData.src === item.src" class="ip__check" aria-hidden="true">
+              <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
+                <polyline points="1,5 5,9 13,1" stroke="white" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter"/>
+              </svg>
+            </div>
+            <span v-if="form.coverSrc === item.src" class="ip__badge">Cover</span>
+          </button>
+        </div>
+        <div class="ip__footer">
+          <button type="button" class="btn-ghost" @click="imagePickerOpen = false">Cancel</button>
+        </div>
+      </div>
+    </UiModal>
 
     <!-- FLOATING DOCK — Cell editor -->
     <section
@@ -818,9 +1025,27 @@ const isEssay = computed(() => form.style === 'essay')
 
       <!-- Image cell fields -->
       <div v-if="selectedCellData?.type === 'image'" class="dock-fields image-fields">
-        <div class="field">
-          <label>Image URL</label>
-          <input v-model="selectedCellData.src" type="text" :placeholder="t('adminForm.imageUrlPlaceholder')">
+        <div class="field image-select-field">
+          <label>Photo</label>
+          <div class="ip-trigger">
+            <div v-if="selectedCellData.src" class="ip-trigger__preview">
+              <img :src="selectedCellData.src" alt="">
+              <button type="button" class="ip-trigger__clear" title="Clear photo" @click="selectedCellData.src = ''">
+                <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
+                  <line x1="1" y1="1" x2="8" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="square"/>
+                  <line x1="8" y1="1" x2="1" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="square"/>
+                </svg>
+              </button>
+            </div>
+            <p v-if="!selectedCellData.src" class="media-empty ip-trigger__none">No photo chosen</p>
+            <button
+              v-if="hasMedia"
+              type="button"
+              class="btn-ghost ip-trigger__open"
+              @click="imagePickerOpen = true"
+            >{{ selectedCellData.src ? 'Change' : 'Choose Photo' }}</button>
+            <p v-else class="media-empty">Upload photos from the sidebar first.</p>
+          </div>
         </div>
         <div class="field">
           <label>Caption <span class="opt">optional</span></label>
@@ -1031,6 +1256,334 @@ const isEssay = computed(() => form.style === 'essay')
 .palette__chip--image .chip__span { color: var(--accent); }
 .palette__chip--text  .chip__span { color: #6b7fd4; }
 .palette__chip--pad   .chip__span { color: var(--muted); }
+
+/* Media */
+.upload-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.52rem 0.75rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 0.46rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.upload-btn:hover { background: color-mix(in srgb, var(--accent) 11%, transparent); }
+.upload-btn__icon { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
+
+/* Photos modal */
+.pm { display: flex; flex-direction: column; }
+
+.pm__section { padding: 0.9rem; }
+.pm__section--gallery {
+  background: color-mix(in srgb, var(--body-bg) 55%, white);
+}
+
+.pm__divider { height: 1px; background: var(--subtle); }
+
+.pm__gallery-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.65rem;
+}
+
+.pm__label {
+  font-size: 0.46rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.pm__context {
+  font-size: 0.56rem;
+  color: var(--muted);
+  text-align: right;
+}
+.pm__context--active {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.pm__grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
+}
+
+.pm__thumb {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--subtle);
+  background: var(--paper);
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.pm__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pm__thumb:hover,
+.pm__thumb.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.pm__thumb:disabled { cursor: default; opacity: 0.5; }
+.pm__thumb:disabled:hover { border-color: var(--subtle); box-shadow: none; }
+.pm__thumb.is-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 2px var(--accent);
+  pointer-events: none;
+}
+.pm__badge {
+  position: absolute;
+  left: 0.25rem;
+  top: 0.25rem;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.14rem 0.36rem;
+  font-size: 0.46rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pm__empty {
+  font-size: 0.58rem;
+  color: var(--muted);
+}
+
+.pm__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.75rem 0.9rem;
+  border-top: 1px solid var(--subtle);
+}
+
+.media-label {
+  margin: 0.65rem 0 0.35rem;
+  font-size: 0.44rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cover-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  padding: 0;
+  cursor: pointer;
+}
+.cover-preview img,
+.media-thumb img,
+.selected-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cover-preview span {
+  position: absolute;
+  right: 0.35rem;
+  top: 0.35rem;
+  background: rgba(245, 244, 240, 0.9);
+  color: #b0243c;
+  padding: 0.18rem 0.38rem;
+  font-size: 0.48rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.media-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.32rem;
+  max-height: 5.4rem;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+.media-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  padding: 0;
+  cursor: pointer;
+}
+.media-thumb:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+.media-thumb:hover,
+.media-thumb.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.media-thumb:disabled:hover {
+  border-color: var(--subtle);
+  box-shadow: none;
+}
+.media-thumb.is-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 2px var(--accent);
+  pointer-events: none;
+}
+.media-badge {
+  position: absolute;
+  left: 0.2rem;
+  top: 0.2rem;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.12rem 0.28rem;
+  font-size: 0.42rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.media-empty {
+  font-size: 0.54rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.selected-photo {
+  display: grid;
+  grid-template-columns: 5.2rem 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.selected-photo img {
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--subtle);
+}
+
+/* Image pick trigger (in block dock) */
+.ip-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.6rem;
+}
+.ip-trigger__preview {
+  position: relative;
+  width: 4rem;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border: 1px solid var(--subtle);
+  background: var(--paper);
+  flex-shrink: 0;
+}
+.ip-trigger__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ip-trigger__clear {
+  position: absolute;
+  top: 0.18rem;
+  right: 0.18rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 244, 240, 0.88);
+  border: none;
+  cursor: pointer;
+  color: #b0243c;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ip-trigger__preview:hover .ip-trigger__clear { opacity: 1; }
+.ip-trigger__none { flex: 1; font-style: italic; }
+.ip-trigger__open { flex-shrink: 0; }
+
+/* Image picker modal grid */
+.ip { display: flex; flex-direction: column; }
+
+.ip__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 3px;
+  padding: 0.6rem;
+  max-height: calc(100vh - 14rem);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--subtle) transparent;
+}
+.ip__grid::-webkit-scrollbar { width: 5px; }
+.ip__grid::-webkit-scrollbar-track { background: transparent; }
+.ip__grid::-webkit-scrollbar-thumb { background: var(--subtle); }
+
+.ip__thumb {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: var(--paper);
+  padding: 0;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.12s;
+}
+.ip__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.15s;
+}
+.ip__thumb:hover img { opacity: 0.88; }
+.ip__thumb.is-selected { border-color: var(--accent); }
+.ip__thumb.is-selected img { opacity: 1; }
+
+.ip__check {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ip__badge {
+  position: absolute;
+  bottom: 0.3rem;
+  left: 0.3rem;
+  background: rgba(26, 25, 24, 0.72);
+  color: #fff;
+  padding: 0.12rem 0.36rem;
+  font-family: var(--font-sans);
+  font-size: 0.42rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ip__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.65rem 0.9rem;
+  border-top: 1px solid var(--subtle);
+  flex-shrink: 0;
+}
 
 /* Row list */
 .row-list {
@@ -1298,6 +1851,7 @@ const isEssay = computed(() => form.style === 'essay')
   align-items: end;
 }
 .content-dock .field--excerpt { grid-column: 1 / -1; }
+.content-dock .field--cover { grid-column: 1 / -1; }
 .content-dock .field.active label { color: var(--accent); }
 .content-dock .field.active textarea { max-height: 8rem; resize: none; }
 
@@ -1350,6 +1904,19 @@ const isEssay = computed(() => form.style === 'essay')
 .span-btn.disabled:hover { border-color: var(--subtle); color: var(--muted); }
 
 .image-fields { grid-template-columns: 1fr 1fr; }
+.cover-dock {
+  display: grid;
+  grid-template-columns: minmax(9rem, 13rem) 1fr;
+  gap: 0.55rem;
+  align-items: start;
+}
+.cover-dock .cover-preview {
+  margin: 0;
+}
+.media-strip--cover {
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  max-height: 4.2rem;
+}
 
 /* Fields shared */
 .dock-fields { display: grid; gap: 0.5rem; }
@@ -1411,6 +1978,9 @@ const isEssay = computed(() => form.style === 'essay')
   .context-dock {
     left: 50%;
     width: min(860px, calc(100vw - 1.5rem));
+  }
+  .cover-dock {
+    grid-template-columns: 1fr;
   }
 }
 </style>

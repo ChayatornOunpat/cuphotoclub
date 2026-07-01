@@ -1,8 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join, parse } from 'node:path'
 import type { Album, AlbumCell, AlbumRow, AlbumStyle, CellSpan, Placement } from '~~/shared/types'
-
-const albumDir = join(process.cwd(), 'content', 'albums')
 
 function stripQuotes(value: string) {
   return value.trim().replace(/^['"]|['"]$/g, '')
@@ -35,6 +31,10 @@ function readInlineObject(line: string): Record<string, string> {
     if (key && raw) acc[key] = stripQuotes(raw)
     return acc
   }, {})
+}
+
+function filenameToId(filename: string) {
+  return (filename.split('/').pop() ?? filename).replace(/\.md$/i, '')
 }
 
 // Convert a flat images array + coverIndex into AlbumRows using the legacy recipe.
@@ -109,7 +109,7 @@ function parseAlbumMarkdown(filename: string, source: string): Album | null {
   const { rows, coverSrc } = imagesToRows(data.images, Number(data.coverIndex) || 0)
 
   return {
-    id: parse(filename).name,
+    id: filenameToId(filename),
     title: String(data.title),
     category: String(data.category),
     date: String(data.date),
@@ -123,18 +123,17 @@ function parseAlbumMarkdown(filename: string, source: string): Album | null {
   }
 }
 
-export function readContentAlbums(): Album[] {
-  const files = (() => {
-    try {
-      return readdirSync(albumDir)
-    } catch {
-      return []
-    }
-  })()
-
-  const albums = files
-    .filter(file => file.endsWith('.md'))
-    .map(file => parseAlbumMarkdown(file, readFileSync(join(albumDir, file), 'utf8')))
+export async function readContentAlbums(): Promise<Album[]> {
+  const albumAssets = useStorage('assets:content-albums')
+  const files = await albumAssets.getKeys()
+  const albums = await Promise.all(
+    files
+      .filter(file => file.endsWith('.md'))
+      .map(async (file) => {
+        const source = await albumAssets.getItem<string>(file)
+        return source ? parseAlbumMarkdown(file, source) : null
+      })
+  )
 
   return albums
     .filter((album): album is Album => Boolean(album))

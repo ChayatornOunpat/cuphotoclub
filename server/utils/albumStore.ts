@@ -77,8 +77,10 @@ function seedFromContentOnce(): Promise<void> {
         .select({ count: sql<number>`count(*)` })
         .from(schema.contentAlbums)
       if (count > 0) return
+      if (realDataOnly()) return
 
-      for (const album of readContentAlbums()) {
+      const contentAlbums = await readContentAlbums()
+      for (const album of contentAlbums) {
         await db
           .insert(schema.contentAlbums)
           .values({
@@ -112,7 +114,8 @@ export const albumStore = {
       .select()
       .from(schema.contentAlbums)
       .orderBy(desc(schema.contentAlbums.published))
-    return rows.map(rowToAlbum)
+    const albums = rows.map(rowToAlbum)
+    return realDataOnly() ? albums.filter(album => !containsMockMedia(album)) : albums
   },
 
   async get(id: string): Promise<Album | null> {
@@ -122,7 +125,10 @@ export const albumStore = {
       .from(schema.contentAlbums)
       .where(eq(schema.contentAlbums.id, id))
       .limit(1)
-    if (exact) return rowToAlbum(exact)
+    if (exact) {
+      const album = rowToAlbum(exact)
+      return realDataOnly() && containsMockMedia(album) ? null : album
+    }
 
     const all = await this.list()
     return all.find(album => withoutOrderPrefix(album.id) === id) ?? null

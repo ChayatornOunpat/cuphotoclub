@@ -6,6 +6,7 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
 const id = route.params.id as string
+const mediaPrefix = `content-albums/${id}`
 
 const { data: album } = await useFetch(`/api/admin/albums/${id}`)
 if (!album.value) throw createError({ statusCode: 404, statusMessage: 'Album not found', fatal: true })
@@ -32,5 +33,5 @@ useHead({ title: () => `Edit ${album.value?.title} — Admin` })
 </script>
 
 <template>
-  <AdminAlbumForm v-if="album" :initial="album" :submit-label="t('admin.saveChanges')" :busy="busy" :error="saveError" :saved="saved" @submit="save" />
+  <AdminAlbumForm v-if="album" :initial="album" :media-prefix="mediaPrefix" :submit-label="t('admin.saveChanges')" :busy="busy" :error="saveError" :saved="saved" @submit="save" />
 </template>

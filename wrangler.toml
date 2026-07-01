@@ -8,11 +8,14 @@ binding = "DB"
 database_name = "cuphotoclub-db"
 database_id = "dba9417d-8338-4592-b030-6e7e1952e0dc"
 migrations_dir = "server/db/migrations/sqlite"
+remote = true
 
 [[kv_namespaces]]
 binding = "KV"
 id = "ef64435cbd844ce1ae71fb7fd5c5fa0f"
+remote = true
 
 [[r2_buckets]]
 binding = "BLOB"
 bucket_name = "cuphotoclub-blob"
+remote = true

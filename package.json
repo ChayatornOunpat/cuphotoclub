@@ -6,6 +6,7 @@
     "build": "nuxt build --preset=cloudflare-pages",
     "build:node": "nuxt build",
     "dev": "nuxt dev",
+    "online": "node ./scripts/online.mjs",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "db:generate": "nuxt prepare && drizzle-kit generate --config .nuxt/hub/db/drizzle.config.ts",

@@ -7,6 +7,7 @@ const localePath = useLocalePath()
 const busy = ref(false)
 const saveError = ref<string | null>(null)
 const saved = ref(false)
+const draftMediaPrefix = useState('draft-album-media-prefix', () => `content-albums/drafts/${crypto.randomUUID()}`)
 
 async function save(value: AlbumInput) {
   busy.value = true
@@ -26,5 +27,5 @@ useHead({ title: () => `${t('admin.newAlbum')} — Admin` })
 </script>
 
 <template>
-  <AdminAlbumForm :submit-label="t('admin.createAlbum')" :busy="busy" :error="saveError" :saved="saved" @submit="save" />
+  <AdminAlbumForm :media-prefix="draftMediaPrefix" :submit-label="t('admin.createAlbum')" :busy="busy" :error="saveError" :saved="saved" @submit="save" />
 </template>

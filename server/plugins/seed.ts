@@ -3,6 +3,7 @@
 // `db` and `schema` are auto-imported by @nuxthub/core.
 export default defineNitroPlugin(() => {
   if (!import.meta.dev) return
+  if (realDataOnly()) return
 
   // Runs at startup; retry briefly in case NuxtHub's dev migrations haven't applied yet.
   void (async () => {

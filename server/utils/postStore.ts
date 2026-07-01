@@ -119,6 +119,7 @@ function seedIfEmpty(): Promise<void> {
         .select({ count: sql<number>`count(*)` })
         .from(schema.contentPosts)
       if (count > 0) return
+      if (realDataOnly()) return
 
       for (const post of seed) {
         await db
@@ -154,7 +155,8 @@ export const postStore = {
       .select()
       .from(schema.contentPosts)
       .orderBy(desc(schema.contentPosts.published))
-    return rows.map(rowToPost)
+    const posts = rows.map(rowToPost)
+    return realDataOnly() ? posts.filter(post => !containsMockMedia(post)) : posts
   },
 
   async get(id: string): Promise<Post | null> {
@@ -164,7 +166,9 @@ export const postStore = {
       .from(schema.contentPosts)
       .where(eq(schema.contentPosts.id, id))
       .limit(1)
-    return row ? rowToPost(row) : null
+    if (!row) return null
+    const post = rowToPost(row)
+    return realDataOnly() && containsMockMedia(post) ? null : post
   },
 
   async create(input: PostInput): Promise<Post> {

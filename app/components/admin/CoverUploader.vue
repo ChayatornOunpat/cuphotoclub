@@ -2,25 +2,15 @@
 const props = defineProps<{ prefix?: string, aspect?: string }>()
 const model = defineModel<string | null>()
 
-const input = ref<HTMLInputElement>()
-const uploading = ref(false)
-
-async function onPick(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  uploading.value = true
-  try {
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('prefix', props.prefix || 'covers')
-    const { key } = await $fetch<{ key: string }>('/api/admin/upload', { method: 'POST', body: fd })
-    model.value = key
-  } catch (e) {
-    alert((e as { data?: { message?: string } })?.data?.message || 'อัปโหลดไม่สำเร็จ')
-  } finally {
-    uploading.value = false
-    if (input.value) input.value.value = ''
+const uploadedKeys = computed<string[]>({
+  get: () => model.value ? [model.value] : [],
+  set: value => {
+    model.value = value[0] ?? null
   }
+})
+
+function onUploaded(keys: string[]) {
+  model.value = keys[0] ?? model.value ?? null
 }
 </script>
 
@@ -32,20 +22,14 @@ async function onPick(e: Event) {
         <Icon name="heroicons:trash" class="size-4" />
       </button>
     </div>
-    <button
+    <AdminR2ImageUploader
       v-else
-      type="button"
-      class="flex w-full flex-col items-center justify-center rounded-md border-2 border-dashed border-line bg-paper-soft text-ink-soft hover:border-accent disabled:opacity-50"
-      :class="aspect || 'aspect-[16/9]'"
-      :disabled="uploading"
-      @click="input?.click()"
-    >
-      <UiSpinner v-if="uploading" />
-      <template v-else>
-        <Icon name="heroicons:photo" class="size-8" />
-        <span class="mt-2 text-sm">อัปโหลดรูปปก</span>
-      </template>
-    </button>
-    <input ref="input" type="file" accept="image/*" class="hidden" @change="onPick">
+      v-model="uploadedKeys"
+      :prefix="prefix || 'covers'"
+      :multiple="false"
+      :max-files="1"
+      :dropzone-class="aspect || 'aspect-[16/9]'"
+      @uploaded="onUploaded"
+    />
   </div>
 </template>

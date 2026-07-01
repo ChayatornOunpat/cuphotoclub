@@ -34,6 +34,9 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    serverAssets: [
+      { baseName: 'content-albums', dir: '../content/albums' }
+    ],
     prerender: {
       crawlLinks: false,
       routes: []
@@ -66,6 +69,7 @@ export default defineNuxtConfig({
       }
     },
     public: {
+      realDataOnly: process.env.NUXT_PUBLIC_REAL_DATA_ONLY === 'true' || process.env.NUXT_REAL_DATA_ONLY === 'true',
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === 'production' ? 'https://cuphotoclub.pages.dev' : 'http://localhost:3000')
     }
   },
@@ -101,9 +105,10 @@ export default defineNuxtConfig({
     ]
   },
 
-  // Placeholder imagery is served from picsum during design; swap for NuxtHub blob later.
+  // picsum: design placeholders. localhost / pages.dev: R2 blob images are served
+  // via a server route (/images/**), not from public/, so IPX must HTTP-fetch them.
   image: {
-    domains: ['picsum.photos']
+    domains: ['picsum.photos', 'localhost', 'cuphotoclub.pages.dev'],
   },
 
   icon: {
