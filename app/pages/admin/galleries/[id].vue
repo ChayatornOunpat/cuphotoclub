@@ -75,16 +75,6 @@ async function saveDetails() {
   }
 }
 
-// ---- photos ----
-async function setCover(photo: Photo) {
-  try {
-    await $fetch(`/api/admin/albums/${id}`, { method: 'PATCH', body: { coverPhotoId: photo.id } })
-    await refresh()
-  } catch (e) {
-    alert(errMsg(e, 'ตั้งรูปปกไม่สำเร็จ'))
-  }
-}
-
 const editingPhoto = ref<Photo | null>(null)
 const photoForm = reactive({ caption: '', photographer: '', alt: '' })
 const savingPhoto = ref(false)
@@ -199,7 +189,6 @@ async function deleteAlbum() {
             :key="p.id"
             :photo="p"
             :is-cover="album.coverPhotoId === p.id"
-            @set-cover="setCover(p)"
             @edit="openPhoto(p)"
             @remove="removingPhoto = p"
           />

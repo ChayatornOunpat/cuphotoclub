@@ -15,7 +15,7 @@ async function save(value: AlbumInput) {
   try {
     const album = await $fetch('/api/admin/albums', { method: 'POST', body: value })
     saved.value = true
-    await navigateTo(localePath(`/albums/${album.id}`))
+    await navigateTo(localePath(value.visibility === 'draft' ? `/admin/albums/${album.id}` : `/albums/${album.id}`))
   } catch (e) {
     saveError.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || t('admin.saveFailed')
   } finally {

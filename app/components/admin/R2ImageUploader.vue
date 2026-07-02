@@ -24,6 +24,7 @@ const dragOver = ref(false)
 const total = ref(0)
 const done = ref(0)
 const errorCount = ref(0)
+const pendingQueue = ref<File[]>([])
 
 const COMPRESS_MAX_DIM = 3040
 const COMPRESS_QUALITY = 0.90
@@ -58,44 +59,63 @@ function chooseFiles() {
 }
 
 async function upload(files: File[]) {
-  const slotsLeft = props.maxFiles ? Math.max(props.maxFiles - model.value.length, 0) : files.length
-  const images = files
-    .filter(file => file.type.startsWith('image/'))
-    .slice(0, props.multiple ? slotsLeft : 1)
-
+  const images = files.filter(file => file.type.startsWith('image/'))
   if (!images.length) return
+
+  // While an upload is already running, queue and update the counter
+  if (uploading.value) {
+    pendingQueue.value.push(...images)
+    total.value += images.length
+    return
+  }
 
   uploading.value = true
   errorCount.value = 0
-  total.value = images.length
-  done.value = 0
 
-  const uploadedKeys: string[] = []
-  for (const file of images) {
-    const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
-    const fd = new FormData()
-    fd.append('file', toUpload)
-    fd.append('prefix', props.prefix)
+  let batch = images
+  const allUploadedKeys: string[] = []
 
-    try {
-      const { key } = await $fetch<{ key: string }>('/api/admin/upload', {
-        method: 'POST',
-        body: fd
-      })
-      uploadedKeys.push(key)
-    } catch {
-      errorCount.value++
-    } finally {
-      done.value++
+  while (batch.length) {
+    const slotsLeft = props.maxFiles ? Math.max(props.maxFiles - model.value.length, 0) : batch.length
+    const toProcess = batch.slice(0, props.multiple ? slotsLeft : 1)
+
+    if (!toProcess.length) { pendingQueue.value = []; break }
+
+    total.value += toProcess.length
+
+    for (const file of toProcess) {
+      const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
+      const fd = new FormData()
+      fd.append('file', toUpload)
+      fd.append('prefix', props.prefix)
+
+      try {
+        const { key } = await $fetch<{ key: string }>('/api/admin/upload', {
+          method: 'POST',
+          body: fd
+        })
+        allUploadedKeys.push(key)
+      } catch {
+        errorCount.value++
+      } finally {
+        done.value++
+      }
     }
+
+    if (!props.multiple) break
+
+    // Drain anything queued while this batch was running
+    batch = pendingQueue.value.splice(0)
   }
 
-  if (uploadedKeys.length) {
-    model.value = props.multiple ? [...model.value, ...uploadedKeys] : uploadedKeys.slice(0, 1)
-    emit('uploaded', uploadedKeys)
+  if (allUploadedKeys.length) {
+    model.value = props.multiple ? [...model.value, ...allUploadedKeys] : allUploadedKeys.slice(0, 1)
+    emit('uploaded', allUploadedKeys)
   }
 
   uploading.value = false
+  total.value = 0
+  done.value = 0
   if (fileInput.value) fileInput.value.value = ''
 }
 

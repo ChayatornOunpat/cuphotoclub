@@ -1,4 +1,4 @@
-import type { Album, AlbumCell, AlbumRow, AlbumStyle, CellSpan, Placement } from '~~/shared/types'
+import type { Album, AlbumCell, AlbumRow, AlbumStyle, CellSpan, ContentStatus, Placement } from '~~/shared/types'
 
 function stripQuotes(value: string) {
   return value.trim().replace(/^['"]|['"]$/g, '')
@@ -114,6 +114,7 @@ function parseAlbumMarkdown(filename: string, source: string): Album | null {
     category: String(data.category),
     date: String(data.date),
     published: String(data.published),
+    visibility: (data.visibility as ContentStatus | undefined) ?? 'public',
     location: data.location ? String(data.location) : undefined,
     excerpt: String(data.excerpt),
     style: (data.style as AlbumStyle | undefined) ?? 'essay',

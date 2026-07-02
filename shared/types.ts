@@ -1,7 +1,7 @@
 // Shared types used by both the Nuxt app (client) and the Nitro server.
 
 export type Role = 'owner' | 'admin' | 'editor'
-export type ContentStatus = 'draft' | 'published'
+export type ContentStatus = 'draft' | 'link-only' | 'public'
 
 export const ROLES: Role[] = ['owner', 'admin', 'editor']
 
@@ -12,6 +12,8 @@ export function canManageUsers(role: Role): boolean {
 
 export type CellSpan = 2 | 3 | 4 | 6
 export type CellType = 'image' | 'text' | 'pad'
+export type TextAlign = 'left' | 'center' | 'right'
+export type TextFont = 'serif' | 'sans'
 
 export interface AlbumCell {
   type: CellType
@@ -19,6 +21,8 @@ export interface AlbumCell {
   src?: string       // image cells
   caption?: string   // image cells
   content?: string   // text cells
+  align?: TextAlign  // text cells; undefined = inherit album default
+  font?: TextFont    // text cells; undefined = inherit album default
 }
 
 export interface AlbumRow {
@@ -32,14 +36,16 @@ export interface Album {
   id: string
   title: string
   category: string
-  date: string // human display, e.g. "March 2025"
+  date: string // ISO date (YYYY-MM-DD) shown on the album
   published: string // ISO date (sorting)
+  visibility: ContentStatus // draft = admin only, link-only = direct URL, public = listed
   location?: string
   excerpt: string
   style: AlbumStyle
   placement: Placement
   coverSrc: string       // URL of the cover/hero image
   rows: AlbumRow[]       // ordered content rows
+  textDefaults?: { align?: TextAlign, font?: TextFont }
 }
 
 /** Fields the admin supplies when creating/updating (no id). */
@@ -84,6 +90,7 @@ export interface Post {
   tag: string
   date: string
   published: string
+  visibility: ContentStatus
   image: string
   excerpt: string
   heroStyle?: HeroStyle

@@ -1,6 +1,16 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+@theme {
+  --color-accent:      #E8186E;
+  --color-accent-soft: color-mix(in srgb, #E8186E 12%, white);
+  --color-ink:         #1A1918;
+  --color-ink-soft:    #7C7A72;
+  --color-line:        #E2DED8;
+  --color-paper:       #EEEAE2;
+  --color-paper-soft:  #F0EDE6;
+}
+
 /* ─── CU Photo Club — global tokens & shared utilities ───────────────────
    Section-specific styles live in their components (scoped). Anything shared
    across sections (tokens, type, .wrap, .eyebrow, .section-pad) lives here. */
@@ -21,7 +31,7 @@
   --font-latin-serif: 'Spectral', serif;
 }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: hidden; }
 
 html:lang(th) {
   --font-serif: 'Noto Serif Thai', serif;
@@ -35,7 +45,6 @@ body {
   font-weight: 300;
   font-kerning: normal;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
 }
 
 html:lang(th) body {

@@ -9,6 +9,24 @@ const query = ref('')
 const sortBy = ref('newest')
 const viewMode = ref<'list' | 'cards'>('list')
 
+function visibilityLabel(value?: string) {
+  if (value === 'draft') return 'Draft'
+  if (value === 'link-only') return 'Link only'
+  return 'Public'
+}
+
+function visibilityClass(value?: string) {
+  return {
+    'pill--draft': value === 'draft',
+    'pill--link': value === 'link-only',
+    'pill--public': !value || value === 'public'
+  }
+}
+
+function previewPath(post: NonNullable<typeof posts.value>[number]) {
+  return post.visibility === 'draft' ? `/admin/posts/${post.id}/preview` : `/posts/${post.id}`
+}
+
 const visiblePosts = computed(() => {
   const q = query.value.trim().toLowerCase()
   const rows = [...(posts.value ?? [])]
@@ -80,15 +98,16 @@ useHead({ title: () => `${t('admin.posts')} - Admin` })
 
     <table v-if="posts && posts.length && visiblePosts.length && viewMode === 'list'" class="tbl">
       <thead>
-        <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableTag') }}</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
+        <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableTag') }}</th><th>Visibility</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
       </thead>
       <tbody>
         <tr v-for="p in visiblePosts" :key="p.id">
           <td class="t-title">{{ p.title }}</td>
           <td><span class="pill">{{ p.tag }}</span></td>
+          <td><span class="pill" :class="visibilityClass(p.visibility)">{{ visibilityLabel(p.visibility) }}</span></td>
           <td class="t-muted">{{ p.date }}</td>
           <td class="t-actions">
-            <NuxtLink :to="localePath(`/posts/${p.id}`)" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
+            <NuxtLink :to="localePath(previewPath(p))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
             <NuxtLink :to="localePath(`/admin/posts/${p.id}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
             <button class="link link--del" :disabled="deleting === p.id" @click="del(p.id, p.title)">
               {{ deleting === p.id ? '...' : t('admin.delete') }}
@@ -105,8 +124,11 @@ useHead({ title: () => `${t('admin.posts')} - Admin` })
           <p class="card__meta">{{ p.tag }} · {{ p.date }}</p>
           <h2>{{ p.title }}</h2>
           <p>{{ p.excerpt }}</p>
+          <div class="card__facts">
+            <span :class="visibilityClass(p.visibility)">{{ visibilityLabel(p.visibility) }}</span>
+          </div>
           <div class="card__actions">
-            <NuxtLink :to="localePath(`/posts/${p.id}`)" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
+            <NuxtLink :to="localePath(previewPath(p))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
             <NuxtLink :to="localePath(`/admin/posts/${p.id}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
             <button class="link link--del" :disabled="deleting === p.id" @click="del(p.id, p.title)">
               {{ deleting === p.id ? '...' : t('admin.delete') }}
@@ -147,6 +169,9 @@ useHead({ title: () => `${t('admin.posts')} - Admin` })
 .t-title { font-weight: 500; }
 .t-muted { color: var(--muted); }
 .pill { font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--subtle); padding: 0.2rem 0.5rem; }
+.pill--draft { color: #b0243c; }
+.pill--link { color: #6b7fd4; }
+.pill--public { color: var(--accent); }
 .t-actions { text-align: right; white-space: nowrap; }
 .link { font-family: var(--font-sans); font-size: 0.7rem; letter-spacing: 0.05em; background: none; border: none; cursor: pointer; color: var(--dark); text-decoration: none; margin-left: 1rem; transition: color 0.2s; }
 .link:hover { color: var(--accent); }
@@ -160,6 +185,11 @@ useHead({ title: () => `${t('admin.posts')} - Admin` })
 .card__meta { color: var(--accent); font-size: 0.56rem; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 0.45rem; }
 .card h2 { font-family: var(--font-serif); font-size: 1.35rem; line-height: 1.15; font-weight: 300; margin-bottom: 0.55rem; }
 .card__body > p:not(.card__meta) { color: var(--muted); font-size: 0.82rem; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.card__facts { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.8rem 0 0; }
+.card__facts span { border: 1px solid var(--subtle); color: var(--muted); font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.2rem 0.45rem; }
+.card__facts .pill--draft { color: #b0243c; }
+.card__facts .pill--link { color: #6b7fd4; }
+.card__facts .pill--public { color: var(--accent); }
 .card__actions { display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.9rem; }
 .card__actions .link { margin-left: 0; }
 @media (max-width: 760px) {

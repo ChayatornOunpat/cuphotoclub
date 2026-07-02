@@ -1,3 +1,4 @@
 export default defineEventHandler(async () => {
-  return await postStore.list()
+  const posts = await postStore.list()
+  return posts.filter(post => post.visibility === 'public')
 })

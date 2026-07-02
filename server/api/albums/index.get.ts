@@ -1,3 +1,4 @@
 export default defineEventHandler(async () => {
-  return await albumStore.list()
+  const albums = await albumStore.list()
+  return albums.filter(album => album.visibility === 'public')
 })

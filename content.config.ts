@@ -22,6 +22,7 @@ export default defineContentConfig({
         category: z.string(),
         date: z.string(), // human display, e.g. "March 2025"
         published: z.string(), // ISO date — drives Stories ordering
+        visibility: z.enum(['draft', 'link-only', 'public']).default('public'),
         excerpt: z.string(),
         location: z.string().optional(),
         // Display style chosen by the admin (set-and-forget). See album style components.
@@ -51,6 +52,7 @@ export default defineContentConfig({
         tag: z.string(),
         date: z.string(),
         published: z.string(),
+        visibility: z.enum(['draft', 'link-only', 'public']).default('public'),
         image: z.string(),
         excerpt: z.string()
       })

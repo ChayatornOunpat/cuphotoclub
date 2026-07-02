@@ -9,12 +9,30 @@ const query = ref('')
 const sortBy = ref('newest')
 const viewMode = ref<'list' | 'cards'>('list')
 
+function visibilityLabel(value?: string) {
+  if (value === 'draft') return 'Draft'
+  if (value === 'link-only') return 'Link only'
+  return 'Public'
+}
+
+function visibilityClass(value?: string) {
+  return {
+    'pill--draft': value === 'draft',
+    'pill--link': value === 'link-only',
+    'pill--public': !value || value === 'public'
+  }
+}
+
+function previewPath(album: NonNullable<typeof albums.value>[number]) {
+  return album.visibility === 'draft' ? `/admin/albums/${album.id}/preview` : `/albums/${album.id}`
+}
+
 const visibleAlbums = computed(() => {
   const q = query.value.trim().toLowerCase()
   const rows = [...(albums.value ?? [])]
     .filter((album) => {
       if (!q) return true
-      return [album.title, album.category, album.location, album.excerpt, album.style, album.placement]
+      return [album.title, album.category, album.location, album.excerpt, album.style]
         .some(value => String(value ?? '').toLowerCase().includes(q))
     })
 
@@ -86,18 +104,18 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 
     <table v-if="albums && albums.length && visibleAlbums.length && viewMode === 'list'" class="tbl">
       <thead>
-        <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableCategory') }}</th><th>{{ t('admin.tableStyle') }}</th><th>{{ t('admin.tablePlacement') }}</th><th>{{ t('admin.tableFrames') }}</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
+        <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableCategory') }}</th><th>Visibility</th><th>{{ t('admin.tableStyle') }}</th><th>{{ t('admin.tableFrames') }}</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
       </thead>
       <tbody>
         <tr v-for="a in visibleAlbums" :key="a.id">
           <td class="t-title">{{ a.title }}</td>
           <td>{{ a.category }}</td>
+          <td><span class="pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span></td>
           <td><span class="pill">{{ a.style }}</span></td>
-          <td><span class="pill pill--muted">{{ a.placement }}</span></td>
           <td>{{ imageCount(a) }}</td>
           <td class="t-muted">{{ a.date }}</td>
           <td class="t-actions">
-            <NuxtLink :to="localePath(`/albums/${a.id}`)" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
+            <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
             <NuxtLink :to="localePath(`/admin/albums/${a.id}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
             <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title)">
               {{ deleting === a.id ? '...' : t('admin.delete') }}
@@ -115,12 +133,12 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           <h2>{{ a.title }}</h2>
           <p>{{ a.excerpt }}</p>
           <div class="card__facts">
+            <span :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span>
             <span>{{ imageCount(a) }} {{ t('common.frames') }}</span>
             <span>{{ a.style }}</span>
-            <span>{{ a.placement }}</span>
           </div>
           <div class="card__actions">
-            <NuxtLink :to="localePath(`/albums/${a.id}`)" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
+            <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
             <NuxtLink :to="localePath(`/admin/albums/${a.id}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
             <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title)">
               {{ deleting === a.id ? '...' : t('admin.delete') }}
@@ -162,6 +180,9 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 .t-muted { color: var(--muted); }
 .pill { font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--subtle); padding: 0.2rem 0.5rem; }
 .pill--muted { color: var(--muted); }
+.pill--draft { color: #b0243c; }
+.pill--link { color: #6b7fd4; }
+.pill--public { color: var(--accent); }
 .t-actions { text-align: right; white-space: nowrap; }
 .link { font-family: var(--font-sans); font-size: 0.7rem; letter-spacing: 0.05em; background: none; border: none; cursor: pointer; color: var(--dark); text-decoration: none; margin-left: 1rem; transition: color 0.2s; }
 .link:hover { color: var(--accent); }
@@ -177,6 +198,9 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 .card__body > p:not(.card__meta) { color: var(--muted); font-size: 0.82rem; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .card__facts { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.8rem 0 0.9rem; }
 .card__facts span { border: 1px solid var(--subtle); color: var(--muted); font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.2rem 0.45rem; }
+.card__facts .pill--draft { color: #b0243c; }
+.card__facts .pill--link { color: #6b7fd4; }
+.card__facts .pill--public { color: var(--accent); }
 .card__actions { display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.8rem; }
 .card__actions .link { margin-left: 0; }
 @media (max-width: 760px) {

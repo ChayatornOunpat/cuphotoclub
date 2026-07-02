@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PostInput, PostBlock, PostBlockType, HeroStyle } from '~~/shared/types'
+import type { PostInput, PostBlock, PostBlockType, ContentStatus, HeroStyle } from '~~/shared/types'
 
 const props = defineProps<{
   initial?: PostInput | null
@@ -60,9 +60,15 @@ const HERO_STYLES: { value: HeroStyle; label: string }[] = [
   { value: 'minimal-dark', label: 'Minimal Dark' },
 ]
 
+const VISIBILITY_OPTIONS: { value: ContentStatus, label: string, description: string }[] = [
+  { value: 'draft', label: 'Draft', description: 'Admin only. Hidden from the public site and direct links.' },
+  { value: 'link-only', label: 'Link only', description: 'Direct URL works, but it is hidden from lists and the homepage.' },
+  { value: 'public', label: 'Public', description: 'Shown on the site and available by direct link.' }
+]
+
 function blank(): PostInput {
   return {
-    title: '', tag: '', date: '', published: '', image: '', excerpt: '',
+    title: '', tag: '', date: '', published: '', visibility: 'draft', image: '', excerpt: '',
     heroStyle: 'standard', author: '', authorBio: '', authorAvatar: '',
     blocks: [makeBlock('text')],
   }
@@ -72,6 +78,7 @@ const form = reactive<PostInput>(
   props.initial ? structuredClone(toRaw(props.initial)) : blank()
 )
 
+form.visibility = form.visibility ?? 'public'
 if (!form.blocks?.length) form.blocks = [makeBlock('text')]
 
 watch(() => form.title, val => emit('update:title', val), { immediate: true })
@@ -291,6 +298,24 @@ function onSubmit() {
         <div class="field">
           <label>{{ t('adminForm.publishedSort') }}</label>
           <input v-model="form.published" type="date">
+        </div>
+        <div class="field field--span3 field--visibility">
+          <label>Visibility</label>
+          <div class="visibility-toggle" role="radiogroup" aria-label="Post visibility">
+            <button
+              v-for="option in VISIBILITY_OPTIONS"
+              :key="option.value"
+              type="button"
+              class="visibility-toggle__option"
+              :class="{ active: form.visibility === option.value }"
+              :aria-checked="form.visibility === option.value"
+              role="radio"
+              @click="form.visibility = option.value"
+            >
+              <span>{{ option.label }}</span>
+              <small>{{ option.description }}</small>
+            </button>
+          </div>
         </div>
         <div class="field field--span3">
           <label>{{ t('adminPostForm.excerptPlaceholder') }}</label>
@@ -698,6 +723,47 @@ function onSubmit() {
 .field select:focus,
 .field textarea:focus { border-color: var(--accent); }
 
+.visibility-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--subtle);
+  background: #fff;
+}
+.visibility-toggle__option {
+  min-width: 0;
+  border: 0;
+  border-left: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--muted);
+  padding: 0.72rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.visibility-toggle__option:first-child { border-left: 0; }
+.visibility-toggle__option span {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.visibility-toggle__option small {
+  display: block;
+  color: inherit;
+  font-family: var(--font-sans);
+  font-size: 0.56rem;
+  line-height: 1.45;
+}
+.visibility-toggle__option.active {
+  background: var(--dark);
+  color: rgba(245, 244, 240, 0.68);
+}
+.visibility-toggle__option.active span { color: var(--accent); }
+
 /* ─── Block canvas ───────────────────────────────────────────────────────── */
 .block-canvas { display: flex; flex-direction: column; }
 
@@ -1023,6 +1089,12 @@ function onSubmit() {
 @media (max-width: 620px) {
   .dock-fields { grid-template-columns: 1fr; }
   .field--span2, .field--span3 { grid-column: span 1; }
+  .visibility-toggle { grid-template-columns: 1fr; }
+  .visibility-toggle__option {
+    border-left: 0;
+    border-top: 1px solid var(--subtle);
+  }
+  .visibility-toggle__option:first-child { border-top: 0; }
   .block-row { grid-template-columns: 22px 1fr auto; }
   .block-row__badge { display: none; }
   .field-pair { grid-template-columns: 1fr; }

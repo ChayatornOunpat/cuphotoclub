@@ -6,7 +6,10 @@ useHead({
   htmlAttrs: {
     lang: () => locale.value
   },
-  link: [{ rel: 'icon', href: '/favicon.ico' }]
+  link: [
+    { rel: 'icon', type: 'image/jpeg', href: '/club-icon.jpg' },
+    { rel: 'apple-touch-icon', href: '/club-icon.jpg' }
+  ]
 })
 
 useSeoMeta({

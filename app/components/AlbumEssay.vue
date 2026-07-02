@@ -1,5 +1,13 @@
 <script setup lang="ts">
-interface AlbumCell { type: string, span: number, src?: string, caption?: string, content?: string }
+interface AlbumCell {
+  type: string
+  span: number
+  src?: string
+  caption?: string
+  content?: string
+  align?: 'left' | 'center' | 'right'
+  font?: 'serif' | 'sans'
+}
 interface AlbumRow { cells: AlbumCell[] }
 interface Album {
   title: string
@@ -9,6 +17,7 @@ interface Album {
   excerpt: string
   coverSrc: string
   rows: AlbumRow[]
+  textDefaults?: { align?: 'left' | 'center' | 'right', font?: 'serif' | 'sans' }
 }
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number, draggableCells?: boolean }>()
 const { t } = useI18n()
@@ -39,6 +48,12 @@ function imgSizes(span: number): string {
   if (span >= 4) return 'xs:100vw sm:100vw md:65vw lg:920px'
   if (span >= 3) return 'xs:100vw sm:50vw lg:690px'
   return 'xs:100vw sm:33vw lg:460px'
+}
+
+function textCellStyle(cell: AlbumCell) {
+  const align = cell.align ?? props.album.textDefaults?.align ?? 'left'
+  const font = cell.font ?? props.album.textDefaults?.font ?? 'serif'
+  return { textAlign: align, fontFamily: font === 'sans' ? 'var(--font-sans)' : 'var(--font-serif)' }
 }
 </script>
 
@@ -74,7 +89,6 @@ function imgSizes(span: number): string {
         v-for="(row, ri) in album.rows"
         :key="ri"
         class="lego-row"
-        :class="{ 'is-admin-row-selected': selectedRow === ri }"
         :data-row-n="ri"
       >
         <template v-for="(cell, ci) in row.cells" :key="ci">
@@ -108,7 +122,7 @@ function imgSizes(span: number): string {
             :draggable="draggableCells ? true : undefined"
             :class="{ 'is-admin-selected': selectedRow === ri && selectedCell === ci }"
           >
-            <p class="text-block">{{ cell.content }}</p>
+            <p class="text-block" :style="textCellStyle(cell)">{{ cell.content }}</p>
           </div>
 
           <!-- PAD cell — empty spacer -->
@@ -180,11 +194,6 @@ function imgSizes(span: number): string {
   gap: 1.5rem;
   margin-bottom: 4.5rem;
 }
-.lego-row.is-admin-row-selected {
-  outline: 2px solid var(--accent);
-  outline-offset: 0.85rem;
-}
-
 .cell { min-width: 0; }
 .cell--image { grid-column: span var(--span); }
 .cell--text { grid-column: span var(--span); display: flex; align-items: center; }

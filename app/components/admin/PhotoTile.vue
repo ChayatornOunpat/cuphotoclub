@@ -3,7 +3,7 @@ defineProps<{
   photo: { id: number, r2Key: string, caption: string | null, photographer: string | null }
   isCover?: boolean
 }>()
-defineEmits<{ setCover: [], edit: [], remove: [] }>()
+defineEmits<{ edit: [], remove: [] }>()
 </script>
 
 <template>
@@ -18,9 +18,6 @@ defineEmits<{ setCover: [], edit: [], remove: [] }>()
     </span>
 
     <div class="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-ink/70 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
-      <button type="button" title="ตั้งเป็นรูปปก" class="rounded bg-white/90 p-1.5 text-ink hover:bg-white" @click="$emit('setCover')">
-        <Icon name="heroicons:star" class="size-4" />
-      </button>
       <button type="button" title="แก้ไข" class="rounded bg-white/90 p-1.5 text-ink hover:bg-white" @click="$emit('edit')">
         <Icon name="heroicons:pencil-square" class="size-4" />
       </button>

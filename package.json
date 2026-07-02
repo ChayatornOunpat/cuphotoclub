@@ -6,6 +6,7 @@
     "build": "nuxt build --preset=cloudflare-pages",
     "build:node": "nuxt build",
     "dev": "nuxt dev",
+    "dev:real": "node ./scripts/dev-real.mjs",
     "online": "node ./scripts/online.mjs",
     "generate": "nuxt generate",
     "preview": "nuxt preview",

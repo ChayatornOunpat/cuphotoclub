@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeRouteLeave } from 'vue-router'
-import type { AlbumCell, AlbumRow, AlbumInput, CellType, CellSpan } from '~~/shared/types'
+import type { AlbumCell, AlbumRow, AlbumInput, CellType, CellSpan, ContentStatus, TextAlign, TextFont } from '~~/shared/types'
 import AlbumEssay from '~/components/AlbumEssay.vue'
 import AlbumSticky from '~/components/AlbumSticky.vue'
 import AlbumContact from '~/components/AlbumContact.vue'
@@ -17,10 +17,31 @@ const props = defineProps<{
 const emit = defineEmits<{ submit: [value: AlbumInput] }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
+const router = useRouter()
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
+
+function isISODate(value?: string | null) {
+  return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function normalizeInitialAlbum(input: AlbumInput): AlbumInput {
+  const album = structuredClone(toRaw(input))
+  if (!isISODate(album.date)) album.date = isISODate(album.published) ? album.published : ''
+  if (!isISODate(album.published)) album.published = album.date || todayISO()
+  album.visibility = album.visibility ?? 'public'
+  album.placement = 'gallery'
+  album.textDefaults = { align: 'left', font: 'serif', ...album.textDefaults }
+  return album
+}
+
+const VISIBILITY_OPTIONS: { value: ContentStatus, label: string, description: string }[] = [
+  { value: 'draft', label: 'Draft', description: 'Admin only. Hidden from the public site and direct links.' },
+  { value: 'link-only', label: 'Link only', description: 'Direct URL works, but it is hidden from album lists and the homepage.' },
+  { value: 'public', label: 'Public', description: 'Shown on the site and available by direct link.' }
+]
 
 function blank(): AlbumInput {
   return {
@@ -28,20 +49,22 @@ function blank(): AlbumInput {
     category: '',
     date: '',
     published: todayISO(),
+    visibility: 'draft',
     location: '',
     excerpt: '',
     style: 'essay',
     placement: 'gallery',
     coverSrc: '',
-    rows: []
+    rows: [],
+    textDefaults: { align: 'left', font: 'serif' }
   }
 }
 
-const form = reactive<AlbumInput>(props.initial ? structuredClone(toRaw(props.initial)) : blank())
+const form = reactive<AlbumInput>(props.initial ? normalizeInitialAlbum(props.initial) : blank())
 const uploadedMediaKeys = ref<string[]>([])
 const mediaLoading = ref(false)
-const uploadModalOpen = ref(false)
-const imagePickerOpen = ref(false)
+const photoManagerOpen = ref(false)
+const cellPickerOpen = ref(false)
 
 // Editing state
 const selectedRow = ref<number | null>(null)
@@ -74,16 +97,42 @@ const excerptInput = ref<HTMLTextAreaElement | null>(null)
 // Dirty tracking
 const dirty = ref(false)
 const initialized = ref(false)
+const unsavedLeaveOpen = ref(false)
+const pendingLeaveTo = ref<string | null>(null)
+const allowPendingLeave = ref(false)
 watch(form, () => { if (initialized.value) dirty.value = true }, { deep: true })
 onMounted(() => nextTick(() => { initialized.value = true }))
 watch(() => props.saved, (val) => { if (val) dirty.value = false })
 
-onBeforeRouteLeave(() => {
-  if (dirty.value) return window.confirm(t('adminEditor.unsavedChanges'))
+onBeforeRouteLeave((to) => {
+  if (!dirty.value || allowPendingLeave.value) return true
+  pendingLeaveTo.value = to.fullPath
+  unsavedLeaveOpen.value = true
+  return false
 })
 
+function cancelPendingLeave() {
+  pendingLeaveTo.value = null
+  unsavedLeaveOpen.value = false
+}
+
+async function discardAndLeave() {
+  const target = pendingLeaveTo.value
+  if (!target) {
+    cancelPendingLeave()
+    return
+  }
+  allowPendingLeave.value = true
+  dirty.value = false
+  unsavedLeaveOpen.value = false
+  pendingLeaveTo.value = null
+  await router.push(target)
+}
+
 function handleBeforeUnload(e: BeforeUnloadEvent) {
-  if (dirty.value) e.preventDefault()
+  if (!dirty.value) return
+  e.preventDefault()
+  e.returnValue = ''
 }
 onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload))
 onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload))
@@ -204,21 +253,21 @@ async function loadMediaKeys() {
   }
 }
 
-async function onMediaUploaded(keys: string[]) {
+function onPhotoManagerUpdated(keys: string[]) {
   mergeMediaKeys(keys)
-  await loadMediaKeys()
-  uploadModalOpen.value = false
 }
 
 function selectCover(src: string) {
   form.coverSrc = src
 }
 
-function selectImageForActiveCell(src: string) {
+function onCellPick(keys: string[]) {
   const cell = selectedCellData.value
-  if (cell?.type === 'image') {
-    cell.src = src
-    imagePickerOpen.value = false
+  if (cell?.type === 'image' && keys[0]) {
+    cell.src = keyToSrc(keys[0])
+    selectedRow.value = null
+    selectedCell.value = null
+    dockHidden.value = true
   }
 }
 
@@ -252,7 +301,8 @@ const previewAlbum = computed(() => ({
   date: form.date || t('adminForm.datePlaceholder'),
   location: form.location,
   excerpt: form.excerpt || t('adminForm.excerptPlaceholder'),
-  coverSrc: form.coverSrc || form.rows.flatMap(r => r.cells).find(c => c.type === 'image' && c.src)?.src || '',
+  coverSrc: form.coverSrc || form.rows.flatMap(r => r.cells).find(c => c.type === 'image' && c.src)?.src || PLACEHOLDER_IMG,
+  textDefaults: form.textDefaults,
   rows: form.rows.map((row, ri) => ({
     cells: row.cells.map((cell, ci) => {
       if (cell.type !== 'image') return cell
@@ -279,7 +329,24 @@ function addRow() {
   dockHidden.value = true
 }
 
+const pendingRowDelete = ref<number | null>(null)
+
 function removeRow(ri: number) {
+  const row = form.rows[ri]
+  if (row && row.cells.length > 0) {
+    pendingRowDelete.value = ri
+    return
+  }
+  performRemoveRow(ri)
+}
+
+function confirmRemoveRow() {
+  if (pendingRowDelete.value === null) return
+  performRemoveRow(pendingRowDelete.value)
+  pendingRowDelete.value = null
+}
+
+function performRemoveRow(ri: number) {
   form.rows.splice(ri, 1)
   if (selectedRow.value === ri) {
     selectedRow.value = null
@@ -350,16 +417,16 @@ function addCellFromPalette(type: CellType, span: CellSpan) {
   addCell(form.rows.length - 1, type, span)
 }
 
-function setCoverFromCell(ri: number, ci: number) {
-  const src = form.rows[ri]?.cells[ci]?.src
-  if (src) form.coverSrc = src
-}
-
 const selectedCellData = computed(() =>
   selectedRow.value !== null && selectedCell.value !== null
     ? form.rows[selectedRow.value]?.cells[selectedCell.value] ?? null
     : null
 )
+
+function clearCellSelection() {
+  selectedRow.value = null
+  selectedCell.value = null
+}
 
 function spanFits(s: CellSpan): boolean {
   if (!isEssay.value) return true
@@ -374,6 +441,26 @@ function spanFits(s: CellSpan): boolean {
 function setSpan(s: CellSpan) {
   const cell = selectedCellData.value
   if (cell && spanFits(s)) cell.span = s
+}
+
+function setCellAlign(value: TextAlign | 'auto') {
+  const cell = selectedCellData.value
+  if (cell) cell.align = value === 'auto' ? undefined : value
+}
+
+function setCellFont(value: TextFont | 'auto') {
+  const cell = selectedCellData.value
+  if (cell) cell.font = value === 'auto' ? undefined : value
+}
+
+function setDefaultAlign(value: TextAlign) {
+  if (!form.textDefaults) form.textDefaults = {}
+  form.textDefaults.align = value
+}
+
+function setDefaultFont(value: TextFont) {
+  if (!form.textDefaults) form.textDefaults = {}
+  form.textDefaults.font = value
 }
 
 // Row drag (reorder)
@@ -400,7 +487,12 @@ function onRowDrop(ri: number) {
   } else if (draggingFromPalette.value) {
     const { type, span } = draggingFromPalette.value
     const row = form.rows[ri]
-    if (row && (!isEssay.value || rowUsed(row) + span <= 6)) addCell(ri, type, span)
+    if (row && (!isEssay.value || rowUsed(row) + span <= 6)) {
+      addCell(ri, type, span)
+    } else if (!row) {
+      form.rows.push({ cells: [] })
+      addCell(form.rows.length - 1, type, span)
+    }
   }
   draggingRowIndex.value = null
   draggingFromPalette.value = null
@@ -545,6 +637,7 @@ function onCanvasClick(event: MouseEvent) {
     editContent('excerpt', excerptInput); return
   }
 
+  clearCellSelection()
   dockHidden.value = true
 }
 
@@ -558,6 +651,7 @@ function editContent(
   fieldName: typeof activeField.value,
   field: { value: HTMLInputElement | HTMLTextAreaElement | null }
 ) {
+  clearCellSelection()
   dockHidden.value = false
   activeDock.value = 'content'
   activeField.value = fieldName
@@ -576,11 +670,21 @@ function onSubmit() {
     validationError.value = t('adminEditor.validationMissing', { fields: missing.join(', ') })
     return
   }
-  emit('submit', structuredClone(toRaw(form)))
+  emit('submit', { ...structuredClone(toRaw(form)), placement: 'gallery' })
 }
 
 const SPANS: CellSpan[] = [2, 3, 4, 6]
 const isEssay = computed(() => form.style === 'essay')
+
+const ALIGN_OPTIONS: { value: TextAlign, key: string }[] = [
+  { value: 'left', key: 'adminForm.cellAlignLeft' },
+  { value: 'center', key: 'adminForm.cellAlignCenter' },
+  { value: 'right', key: 'adminForm.cellAlignRight' }
+]
+const FONT_OPTIONS: { value: TextFont, key: string }[] = [
+  { value: 'serif', key: 'adminForm.cellFontSerif' },
+  { value: 'sans', key: 'adminForm.cellFontSans' }
+]
 </script>
 
 <template>
@@ -616,16 +720,59 @@ const isEssay = computed(() => form.style === 'essay')
           </select>
         </div>
         <div class="field">
-          <label>{{ t('adminForm.placement') }}</label>
-          <select v-model="form.placement">
-            <option value="gallery">{{ t('adminForm.placementGallery') }}</option>
-            <option value="blog">{{ t('adminForm.placementBlog') }}</option>
-            <option value="both">{{ t('adminForm.placementBoth') }}</option>
-          </select>
-        </div>
-        <div class="field">
           <label>{{ t('adminForm.publishedSort') }}</label>
           <input v-model="form.published" type="date">
+        </div>
+        <div class="field field--visibility">
+          <label>Visibility</label>
+          <div class="visibility-toggle" role="radiogroup" aria-label="Album visibility">
+            <button
+              v-for="option in VISIBILITY_OPTIONS"
+              :key="option.value"
+              type="button"
+              class="visibility-toggle__option"
+              :class="{ active: form.visibility === option.value }"
+              :aria-checked="form.visibility === option.value"
+              role="radio"
+              @click="form.visibility = option.value"
+            >
+              <span>{{ option.label }}</span>
+              <small>{{ option.description }}</small>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Story settings — album-wide text defaults -->
+      <div v-if="isEssay" class="tray__section">
+        <p class="tray__label">{{ t('adminEditor.storySettings') }}</p>
+        <div class="field">
+          <label>{{ t('adminForm.cellAlign') }}</label>
+          <div class="align-selector">
+            <button
+              v-for="opt in ALIGN_OPTIONS"
+              :key="opt.value"
+              type="button"
+              class="align-btn"
+              :class="{ active: (form.textDefaults?.align ?? 'left') === opt.value }"
+              :title="t(opt.key)"
+              @click="setDefaultAlign(opt.value)"
+            >{{ t(opt.key) }}</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>{{ t('adminForm.cellFont') }}</label>
+          <div class="font-selector">
+            <button
+              v-for="opt in FONT_OPTIONS"
+              :key="opt.value"
+              type="button"
+              class="font-btn"
+              :class="{ active: (form.textDefaults?.font ?? 'serif') === opt.value }"
+              :title="t(opt.key)"
+              @click="setDefaultFont(opt.value)"
+            >{{ t(opt.key) }}</button>
+          </div>
         </div>
       </div>
 
@@ -635,7 +782,7 @@ const isEssay = computed(() => form.style === 'essay')
           Photos
           <span class="tray__count">{{ mediaItems.length }}</span>
         </p>
-        <button type="button" class="upload-btn" @click="uploadModalOpen = true">
+        <button type="button" class="upload-btn" @click="photoManagerOpen = true">
           <Icon name="heroicons:arrow-up-tray" class="upload-btn__icon" />
           <span>{{ hasMedia ? 'Manage Photos' : 'Upload Photos' }}</span>
         </button>
@@ -790,7 +937,11 @@ const isEssay = computed(() => form.style === 'essay')
             </div>
           </div>
 
-          <div v-if="form.rows.length === 0" class="row-list__empty">
+          <div
+            v-if="form.rows.length === 0"
+            class="row-list__empty"
+            :class="{ 'is-drop-target': draggingFromPalette !== null }"
+          >
             Click palette chips or drag here
           </div>
         </div>
@@ -833,10 +984,6 @@ const isEssay = computed(() => form.style === 'essay')
         </div>
       </Transition>
 
-      <div v-if="draggingFromPalette" class="canvas-drop-zone">
-        <span>Drop to add as new row</span>
-      </div>
-
       <component
         :is="styleComponent"
         :album="previewAlbum"
@@ -860,7 +1007,7 @@ const isEssay = computed(() => form.style === 'essay')
         </div>
         <div class="field" :class="{ active: activeField === 'date' }">
           <label>{{ t('adminForm.dateDisplay') }}</label>
-          <input ref="dateInput" v-model="form.date" type="text" :placeholder="t('adminForm.datePlaceholder')" @focus="activeField = 'date'">
+          <input ref="dateInput" v-model="form.date" type="date" @focus="activeField = 'date'">
         </div>
         <div class="field" :class="{ active: activeField === 'location' }">
           <label>{{ t('adminForm.location') }} <span class="opt">{{ t('adminForm.locationOptional') }}</span></label>
@@ -874,16 +1021,16 @@ const isEssay = computed(() => form.style === 'essay')
           <label>Cover <span class="opt">choose from uploaded photos</span></label>
           <div class="cover-dock">
             <button
-              v-if="form.coverSrc"
               type="button"
               class="cover-preview"
-              title="Clear cover"
+              :class="{ 'is-empty': !form.coverSrc }"
+              :title="form.coverSrc ? 'Clear cover' : 'No cover selected'"
+              :disabled="!form.coverSrc"
               @click="form.coverSrc = ''"
             >
-              <img :src="form.coverSrc" alt="">
-              <span>Clear</span>
+              <img :src="form.coverSrc || PLACEHOLDER_IMG" alt="">
+              <span>{{ form.coverSrc ? 'Clear' : 'No image selected' }}</span>
             </button>
-            <p v-else class="media-empty">Cover uses the first image until you choose one.</p>
 
             <div v-if="hasMedia" class="media-strip media-strip--cover" aria-label="Select cover photo">
               <button
@@ -906,85 +1053,43 @@ const isEssay = computed(() => form.style === 'essay')
       </div>
     </section>
 
-    <!-- Photos modal: upload + gallery -->
-    <UiModal v-model="uploadModalOpen" title="Photos" size="lg" flush>
-      <div class="pm">
+    <AdminPhotoManager
+      v-model="photoManagerOpen"
+      :prefix="mediaPrefix"
+      @updated="onPhotoManagerUpdated"
+    />
 
-        <!-- Upload zone -->
-        <div class="pm__section">
-          <AdminR2ImageUploader
-            v-model="uploadedMediaKeys"
-            :prefix="mediaPrefix"
-            :show-previews="false"
-            @uploaded="onMediaUploaded"
-          />
-        </div>
+    <AdminImagePickerModal
+      v-model="cellPickerOpen"
+      :prefix="mediaPrefix"
+      @select="onCellPick"
+    />
 
-        <!-- Gallery -->
-        <template v-if="hasMedia || mediaLoading">
-          <div class="pm__divider" />
-          <div class="pm__section pm__section--gallery">
-            <div class="pm__gallery-head">
-              <p class="pm__label">Uploaded ({{ mediaItems.length }})</p>
-              <p v-if="selectedCellData?.type === 'image'" class="pm__context pm__context--active">
-                Assigning to Row {{ (selectedRow ?? 0) + 1 }}, Cell {{ (selectedCell ?? 0) + 1 }}
-              </p>
-              <p v-else class="pm__context">Select an image cell on the canvas to assign a photo</p>
-            </div>
-            <p v-if="mediaLoading && !hasMedia" class="pm__empty">Loading…</p>
-            <div v-else class="pm__grid" aria-label="Uploaded photos">
-              <button
-                v-for="item in mediaItems"
-                :key="item.id"
-                type="button"
-                class="pm__thumb"
-                :class="{
-                  'is-cover': form.coverSrc === item.src,
-                  'is-active': selectedCellData?.type === 'image' && selectedCellData.src === item.src
-                }"
-                :disabled="selectedCellData?.type !== 'image'"
-                :title="selectedCellData?.type === 'image' ? 'Use for selected frame' : 'Select an image cell first'"
-                @click="selectImageForActiveCell(item.src)"
-              >
-                <img :src="item.src" alt="" loading="lazy">
-                <span v-if="form.coverSrc === item.src" class="pm__badge">Cover</span>
-              </button>
-            </div>
-          </div>
-        </template>
-
-        <!-- Footer -->
-        <div class="pm__footer">
-          <button type="button" class="btn-ghost" @click="uploadModalOpen = false">Done</button>
-        </div>
-
+    <UiModal
+      :model-value="pendingRowDelete !== null"
+      :title="t('adminEditor.removeRowTitle')"
+      @update:model-value="v => { if (!v) pendingRowDelete = null }"
+    >
+      <p class="row-delete-confirm__body">
+        {{ t('adminEditor.removeRowConfirm', { count: pendingRowDelete !== null ? (form.rows[pendingRowDelete]?.cells.length ?? 0) : 0 }) }}
+      </p>
+      <div class="row-delete-confirm__actions">
+        <UiButton variant="secondary" @click="pendingRowDelete = null">{{ t('admin.cancel') }}</UiButton>
+        <UiButton variant="danger" @click="confirmRemoveRow">{{ t('admin.delete') }}</UiButton>
       </div>
     </UiModal>
 
-    <!-- Image picker modal -->
-    <UiModal v-model="imagePickerOpen" title="Select Photo" size="xl" flush>
-      <div class="ip">
-        <div class="ip__grid" aria-label="Select a photo for this frame">
-          <button
-            v-for="item in mediaItems"
-            :key="item.id"
-            type="button"
-            class="ip__thumb"
-            :class="{ 'is-selected': selectedCellData?.type === 'image' && selectedCellData.src === item.src }"
-            @click="selectImageForActiveCell(item.src)"
-          >
-            <img :src="item.src" alt="" loading="lazy">
-            <div v-if="selectedCellData?.type === 'image' && selectedCellData.src === item.src" class="ip__check" aria-hidden="true">
-              <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
-                <polyline points="1,5 5,9 13,1" stroke="white" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter"/>
-              </svg>
-            </div>
-            <span v-if="form.coverSrc === item.src" class="ip__badge">Cover</span>
-          </button>
-        </div>
-        <div class="ip__footer">
-          <button type="button" class="btn-ghost" @click="imagePickerOpen = false">Cancel</button>
-        </div>
+    <UiModal
+      v-model="unsavedLeaveOpen"
+      :title="t('adminEditor.unsavedTitle')"
+      @update:model-value="v => { if (!v) cancelPendingLeave() }"
+    >
+      <p class="unsaved-leave__body">
+        {{ t('adminEditor.unsavedBody') }}
+      </p>
+      <div class="unsaved-leave__actions">
+        <UiButton variant="secondary" @click="cancelPendingLeave">{{ t('adminEditor.unsavedStay') }}</UiButton>
+        <UiButton variant="danger" @click="discardAndLeave">{{ t('adminEditor.unsavedDiscard') }}</UiButton>
       </div>
     </UiModal>
 
@@ -995,70 +1100,137 @@ const isEssay = computed(() => form.style === 'essay')
       aria-live="polite"
     >
       <div class="block-dock__head">
-        <h2>
-          Row {{ (selectedRow ?? 0) + 1 }}, Cell {{ (selectedCell ?? 0) + 1 }}
-          <span class="block-dock__type">{{ selectedCellData?.type }}</span>
-        </h2>
-        <div v-if="isEssay" class="span-selector">
-          <button
-            v-for="s in SPANS"
-            :key="s"
-            type="button"
-            class="span-btn"
-            :class="{ active: selectedCellData?.span === s, disabled: !spanFits(s) }"
-            :title="`Span ${s}`"
-            @click="setSpan(s)"
-          >{{ s }}</button>
+        <div class="block-dock__identity">
+          <p class="block-dock__eyebrow">
+            {{ selectedCellData?.type === 'text' ? t('adminForm.cellTypeText')
+              : selectedCellData?.type === 'pad' ? t('adminForm.cellTypePad')
+              : t('adminForm.cellTypeImage') }}
+          </p>
+          <h2>
+            {{ t('adminForm.cellLabel', { row: (selectedRow ?? 0) + 1, cell: (selectedCell ?? 0) + 1 }) }}
+          </h2>
         </div>
-        <div class="button-row">
-          <button
-            v-if="selectedCellData?.type === 'image'"
-            type="button"
-            class="btn-ghost"
-            @click="setCoverFromCell(selectedRow!, selectedCell!)"
-          >Set as Cover</button>
-          <button type="button" class="btn-ghost danger" @click="removeCell(selectedRow!, selectedCell!)">
-            {{ t('admin.delete') }}
-          </button>
-        </div>
+        <button
+          type="button"
+          class="block-dock__delete btn-ghost danger"
+          :title="t('admin.delete')"
+          @click="removeCell(selectedRow!, selectedCell!)"
+        >
+          <span>{{ t('admin.delete') }}</span>
+        </button>
       </div>
 
-      <!-- Image cell fields -->
-      <div v-if="selectedCellData?.type === 'image'" class="dock-fields image-fields">
-        <div class="field image-select-field">
-          <label>Photo</label>
-          <div class="ip-trigger">
-            <div v-if="selectedCellData.src" class="ip-trigger__preview">
+      <!-- Image cell properties -->
+      <div v-if="selectedCellData?.type === 'image'" class="cell-controls cell-controls--image">
+        <section v-if="isEssay" class="cell-control cell-control--width">
+          <p class="cell-control__label">{{ t('adminForm.cellWidth') }}</p>
+          <div class="span-selector">
+            <button
+              v-for="s in SPANS"
+              :key="s"
+              type="button"
+              class="span-btn"
+              :class="{ active: selectedCellData?.span === s, disabled: !spanFits(s) }"
+              :title="`Span ${s}`"
+              @click="setSpan(s)"
+            >{{ s }}</button>
+          </div>
+        </section>
+
+        <section class="cell-control cell-control--photo">
+          <p class="cell-control__label">{{ t('adminForm.cellPhoto') }}</p>
+          <div class="prop-photo">
+            <div v-if="selectedCellData.src" class="prop-thumb">
               <img :src="selectedCellData.src" alt="">
-              <button type="button" class="ip-trigger__clear" title="Clear photo" @click="selectedCellData.src = ''">
-                <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
-                  <line x1="1" y1="1" x2="8" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="square"/>
-                  <line x1="8" y1="1" x2="1" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="square"/>
-                </svg>
+              <button type="button" class="prop-thumb__clear" :title="t('adminForm.cellClearPhoto')" @click="selectedCellData.src = ''">
+                <span>{{ t('adminForm.cellClearPhoto') }}</span>
               </button>
             </div>
-            <p v-if="!selectedCellData.src" class="media-empty ip-trigger__none">No photo chosen</p>
             <button
-              v-if="hasMedia"
               type="button"
-              class="btn-ghost ip-trigger__open"
-              @click="imagePickerOpen = true"
-            >{{ selectedCellData.src ? 'Change' : 'Choose Photo' }}</button>
-            <p v-else class="media-empty">Upload photos from the sidebar first.</p>
+              class="prop-pick-btn"
+              @click="cellPickerOpen = true"
+            >{{ selectedCellData.src ? t('adminForm.cellChangePhoto') : t('adminForm.cellChoosePhoto') }}</button>
           </div>
-        </div>
-        <div class="field">
-          <label>Caption <span class="opt">optional</span></label>
-          <input v-model="selectedCellData.caption" type="text" :placeholder="t('adminForm.captionPlaceholder')">
-        </div>
+        </section>
+
+        <section class="cell-control cell-control--caption">
+          <label class="cell-control__label" for="cell-caption">
+            {{ t('adminForm.cellCaption') }}
+            <span class="opt">{{ t('adminForm.cellCaptionOptional') }}</span>
+          </label>
+          <input id="cell-caption" v-model="selectedCellData.caption" type="text" class="prop-input" :placeholder="t('adminForm.captionPlaceholder')">
+        </section>
       </div>
 
-      <!-- Text cell field -->
-      <div v-else-if="selectedCellData?.type === 'text'" class="dock-fields">
-        <div class="field field--text-content">
-          <label>Text Content</label>
-          <textarea v-model="selectedCellData.content" rows="3" placeholder="Write your paragraph…" />
-        </div>
+      <!-- Text cell properties -->
+      <div v-else-if="selectedCellData?.type === 'text'" class="cell-controls cell-controls--text">
+        <section class="cell-control cell-control--align">
+          <p class="cell-control__label">{{ t('adminForm.cellAlign') }}</p>
+          <div class="align-selector">
+            <button
+              type="button"
+              class="align-btn"
+              :class="{ active: !selectedCellData.align }"
+              :title="t('adminForm.cellAlignAuto')"
+              @click="setCellAlign('auto')"
+            >{{ t('adminForm.cellAlignAuto') }}</button>
+            <button
+              v-for="opt in ALIGN_OPTIONS"
+              :key="opt.value"
+              type="button"
+              class="align-btn"
+              :class="{ active: selectedCellData.align === opt.value }"
+              :title="t(opt.key)"
+              @click="setCellAlign(opt.value)"
+            >{{ t(opt.key) }}</button>
+          </div>
+        </section>
+
+        <section class="cell-control cell-control--font">
+          <p class="cell-control__label">{{ t('adminForm.cellFont') }}</p>
+          <div class="font-selector">
+            <button
+              type="button"
+              class="font-btn"
+              :class="{ active: !selectedCellData.font }"
+              :title="t('adminForm.cellFontAuto')"
+              @click="setCellFont('auto')"
+            >{{ t('adminForm.cellFontAuto') }}</button>
+            <button
+              v-for="opt in FONT_OPTIONS"
+              :key="opt.value"
+              type="button"
+              class="font-btn"
+              :class="{ active: selectedCellData.font === opt.value }"
+              :title="t(opt.key)"
+              @click="setCellFont(opt.value)"
+            >{{ t(opt.key) }}</button>
+          </div>
+        </section>
+
+        <section class="cell-control cell-control--text">
+          <label class="cell-control__label" for="cell-text">{{ t('adminForm.cellTextContent') }}</label>
+          <textarea id="cell-text" v-model="selectedCellData.content" class="prop-textarea" rows="3" :placeholder="t('adminForm.cellTextPlaceholder')" />
+        </section>
+      </div>
+
+      <!-- Pad (spacer) cell properties -->
+      <div v-else-if="selectedCellData?.type === 'pad'" class="cell-controls cell-controls--pad">
+        <section v-if="isEssay" class="cell-control cell-control--width">
+          <p class="cell-control__label">{{ t('adminForm.cellWidth') }}</p>
+          <div class="span-selector">
+            <button
+              v-for="s in SPANS"
+              :key="s"
+              type="button"
+              class="span-btn"
+              :class="{ active: selectedCellData?.span === s, disabled: !spanFits(s) }"
+              :title="`Span ${s}`"
+              @click="setSpan(s)"
+            >{{ s }}</button>
+          </div>
+        </section>
       </div>
     </section>
   </form>
@@ -1279,96 +1451,6 @@ const isEssay = computed(() => form.style === 'essay')
 .upload-btn:hover { background: color-mix(in srgb, var(--accent) 11%, transparent); }
 .upload-btn__icon { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
 
-/* Photos modal */
-.pm { display: flex; flex-direction: column; }
-
-.pm__section { padding: 0.9rem; }
-.pm__section--gallery {
-  background: color-mix(in srgb, var(--body-bg) 55%, white);
-}
-
-.pm__divider { height: 1px; background: var(--subtle); }
-
-.pm__gallery-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.65rem;
-}
-
-.pm__label {
-  font-size: 0.46rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--muted);
-  flex-shrink: 0;
-}
-
-.pm__context {
-  font-size: 0.56rem;
-  color: var(--muted);
-  text-align: right;
-}
-.pm__context--active {
-  color: var(--accent);
-  font-weight: 500;
-}
-
-.pm__grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0.4rem;
-}
-
-.pm__thumb {
-  position: relative;
-  aspect-ratio: 1;
-  overflow: hidden;
-  border: 1px solid var(--subtle);
-  background: var(--paper);
-  padding: 0;
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.pm__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.pm__thumb:hover,
-.pm__thumb.is-active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset;
-}
-.pm__thumb:disabled { cursor: default; opacity: 0.5; }
-.pm__thumb:disabled:hover { border-color: var(--subtle); box-shadow: none; }
-.pm__thumb.is-cover::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  box-shadow: inset 0 0 0 2px var(--accent);
-  pointer-events: none;
-}
-.pm__badge {
-  position: absolute;
-  left: 0.25rem;
-  top: 0.25rem;
-  background: var(--accent);
-  color: #fff;
-  padding: 0.14rem 0.36rem;
-  font-size: 0.46rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.pm__empty {
-  font-size: 0.58rem;
-  color: var(--muted);
-}
-
-.pm__footer {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0.75rem 0.9rem;
-  border-top: 1px solid var(--subtle);
-}
 
 .media-label {
   margin: 0.65rem 0 0.35rem;
@@ -1386,6 +1468,9 @@ const isEssay = computed(() => form.style === 'essay')
   background: #fff;
   padding: 0;
   cursor: pointer;
+}
+.cover-preview.is-empty {
+  cursor: default;
 }
 .cover-preview img,
 .media-thumb img,
@@ -1405,6 +1490,9 @@ const isEssay = computed(() => form.style === 'essay')
   font-size: 0.48rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+.cover-preview.is-empty span {
+  color: var(--muted);
 }
 .media-strip {
   display: grid;
@@ -1472,134 +1560,14 @@ const isEssay = computed(() => form.style === 'essay')
   border: 1px solid var(--subtle);
 }
 
-/* Image pick trigger (in block dock) */
-.ip-trigger {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 2.6rem;
-}
-.ip-trigger__preview {
-  position: relative;
-  width: 4rem;
-  aspect-ratio: 3 / 2;
-  overflow: hidden;
-  border: 1px solid var(--subtle);
-  background: var(--paper);
-  flex-shrink: 0;
-}
-.ip-trigger__preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.ip-trigger__clear {
-  position: absolute;
-  top: 0.18rem;
-  right: 0.18rem;
-  width: 1.1rem;
-  height: 1.1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(245, 244, 240, 0.88);
-  border: none;
-  cursor: pointer;
-  color: #b0243c;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.ip-trigger__preview:hover .ip-trigger__clear { opacity: 1; }
-.ip-trigger__none { flex: 1; font-style: italic; }
-.ip-trigger__open { flex-shrink: 0; }
-
-/* Image picker modal grid */
-.ip { display: flex; flex-direction: column; }
-
-.ip__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 3px;
-  padding: 0.6rem;
-  max-height: calc(100vh - 14rem);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--subtle) transparent;
-}
-.ip__grid::-webkit-scrollbar { width: 5px; }
-.ip__grid::-webkit-scrollbar-track { background: transparent; }
-.ip__grid::-webkit-scrollbar-thumb { background: var(--subtle); }
-
-.ip__thumb {
-  position: relative;
-  aspect-ratio: 3 / 2;
-  overflow: hidden;
-  background: var(--paper);
-  padding: 0;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: border-color 0.12s;
-}
-.ip__thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: opacity 0.15s;
-}
-.ip__thumb:hover img { opacity: 0.88; }
-.ip__thumb.is-selected { border-color: var(--accent); }
-.ip__thumb.is-selected img { opacity: 1; }
-
-.ip__check {
-  position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
-  width: 1.6rem;
-  height: 1.6rem;
-  background: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ip__badge {
-  position: absolute;
-  bottom: 0.3rem;
-  left: 0.3rem;
-  background: rgba(26, 25, 24, 0.72);
-  color: #fff;
-  padding: 0.12rem 0.36rem;
-  font-family: var(--font-sans);
-  font-size: 0.42rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.ip__footer {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0.65rem 0.9rem;
-  border-top: 1px solid var(--subtle);
-  flex-shrink: 0;
-}
 
 /* Row list */
 .row-list {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.15rem 0;
-  min-height: 3rem;
-  border: 1px dashed transparent;
-  transition: border-color 0.15s;
-  overflow-y: auto;
-  scrollbar-width: none;
 }
-.row-list::-webkit-scrollbar { display: none; }
-.row-list.drop-active { border-color: var(--accent); }
 
 .row-item {
   border: 1px solid var(--subtle);
@@ -1717,6 +1685,11 @@ const isEssay = computed(() => form.style === 'essay')
   text-align: center;
   padding: 1.5rem 0.5rem;
   border: 1px dashed var(--subtle);
+  transition: border-color 0.15s, color 0.15s;
+}
+.row-list__empty.is-drop-target {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .row-add-btn {
@@ -1774,25 +1747,6 @@ const isEssay = computed(() => form.style === 'essay')
 .canvas :deep(.meta__excerpt):hover {
   text-decoration: underline;
   text-underline-offset: 3px;
-}
-
-.canvas-drop-zone {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 3.5rem;
-  background: color-mix(in srgb, var(--accent) 12%, white);
-  border-top: 2px dashed var(--accent);
-  font-size: 0.58rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent);
-  pointer-events: none;
 }
 
 .canvas-hint {
@@ -1856,54 +1810,218 @@ const isEssay = computed(() => form.style === 'essay')
 .content-dock .field.active textarea { max-height: 8rem; resize: none; }
 
 /* Cell dock */
+.context-dock.block-dock {
+  width: min(980px, calc(100vw - var(--tray-width) - 2rem));
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--dark) 20%, var(--subtle));
+  background: color-mix(in srgb, var(--body-bg) 94%, #fff);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  box-shadow: 0 1rem 2.75rem rgba(26, 25, 24, 0.16);
+}
 .block-dock__head {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.5rem;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+  padding: 0.72rem 0.85rem;
+  border-bottom: 2px solid var(--accent);
+  background: var(--dark);
+  color: var(--body-bg);
+}
+.block-dock__identity {
+  min-width: 0;
+}
+.block-dock__eyebrow {
+  margin: 0 0 0.14rem;
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 0.46rem;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 .block-dock__head h2 {
+  margin: 0;
+  color: var(--body-bg);
   font-family: var(--font-serif);
-  font-size: 0.9rem;
+  font-size: clamp(1rem, 1.6vw, 1.32rem);
   font-weight: 300;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  line-height: 1.08;
+  min-width: 0;
 }
-.block-dock__type {
-  font-family: var(--font-sans);
-  font-size: 0.48rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent);
-  border: 1px solid var(--subtle);
-  padding: 0.15rem 0.4rem;
+.block-dock__delete.btn-ghost.danger {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  border-color: rgba(245, 244, 240, 0.28);
+  color: var(--body-bg);
+  padding: 0.42rem 0.58rem;
+}
+.block-dock__delete.btn-ghost.danger:hover {
+  border-color: #b0243c;
+  background: #b0243c;
+  color: #fff;
 }
 
-/* Span selector */
-.span-selector {
-  display: flex;
-  gap: 0.2rem;
+/* Cell controls */
+.cell-controls {
+  display: grid;
+  padding: 0;
 }
-.span-btn {
+.cell-controls--image {
+  grid-template-columns: minmax(8.5rem, 0.65fr) minmax(14rem, 1fr) minmax(16rem, 1.35fr);
+}
+.cell-controls--image:not(:has(.cell-control--width)) {
+  grid-template-columns: minmax(14rem, 0.75fr) minmax(18rem, 1.25fr);
+}
+.cell-controls--text {
+  grid-template-columns: minmax(10rem, 0.6fr) minmax(10rem, 0.6fr) minmax(16rem, 1.4fr);
+}
+.cell-controls--text .cell-control--text {
+  grid-column: 1 / -1;
+}
+.cell-controls--pad {
+  grid-template-columns: 1fr;
+}
+.cell-control {
+  min-width: 0;
+  padding: 0.78rem 0.85rem;
+  border-right: 1px solid var(--subtle);
+  display: grid;
+  align-content: start;
+  gap: 0.52rem;
+}
+.cell-control:last-child {
+  border-right: 0;
+}
+.cell-control__label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.34rem;
+  margin: 0;
+  font-size: 0.44rem;
+  letter-spacing: 0.15em;
+  line-height: 1.25;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.prop-photo {
+  display: flex;
+  align-items: center;
+  gap: 0.62rem;
+  min-width: 0;
+}
+.prop-thumb {
+  position: relative;
+  width: 3.8rem;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  flex-shrink: 0;
+}
+.prop-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.prop-thumb__clear {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  border: none;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 0.42rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.prop-thumb:hover .prop-thumb__clear { opacity: 1; }
+.prop-pick-btn {
+  background: none;
+  border: 1px solid var(--subtle);
+  font-family: var(--font-sans);
+  font-size: 0.46rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dark);
+  min-height: 2.15rem;
+  min-width: 8.4rem;
+  padding: 0.45rem 0.66rem;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  white-space: nowrap;
+}
+.prop-pick-btn:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, #fff);
+  color: var(--accent);
+}
+.prop-hint { font-size: 0.5rem; color: var(--muted); font-style: italic; }
+.prop-input {
+  width: 100%;
+  min-height: 2.3rem;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  padding: 0.48rem 0.58rem;
+  outline: none;
+}
+.prop-input:focus { border-color: var(--accent); }
+.prop-textarea {
+  width: 100%;
+  min-height: 5.6rem;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  padding: 0.52rem 0.6rem;
+  outline: none;
+  resize: vertical;
+  max-height: 8rem;
+}
+.prop-textarea:focus { border-color: var(--accent); }
+
+/* Span / align / font selectors */
+.span-selector, .align-selector, .font-selector {
+  display: flex;
+  gap: 0.25rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.span-btn, .align-btn, .font-btn {
+  display: grid;
+  place-items: center;
   border: 1px solid var(--subtle);
   background: #fff;
   color: var(--muted);
   font-family: var(--font-sans);
-  font-size: 0.52rem;
+  font-size: 0.56rem;
   letter-spacing: 0.08em;
-  padding: 0.3rem 0.5rem;
+  text-transform: uppercase;
+  padding: 0;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
   line-height: 1;
 }
-.span-btn:hover { border-color: var(--accent); color: var(--accent); }
-.span-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.span-btn { width: 2.15rem; height: 2.15rem; }
+.align-btn, .font-btn { height: 2.15rem; padding: 0 0.6rem; }
+.span-btn:hover, .align-btn:hover, .font-btn:hover { border-color: var(--accent); color: var(--accent); }
+.span-btn.active, .align-btn.active, .font-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .span-btn.disabled { opacity: 0.35; cursor: not-allowed; }
 .span-btn.disabled:hover { border-color: var(--subtle); color: var(--muted); }
 
-.image-fields { grid-template-columns: 1fr 1fr; }
 .cover-dock {
   display: grid;
   grid-template-columns: minmax(9rem, 13rem) 1fr;
@@ -1931,6 +2049,54 @@ const isEssay = computed(() => form.style === 'essay')
 .field--text-content textarea { max-height: 5rem; }
 .field :is(input, select, textarea):focus { border-color: var(--accent); }
 .opt { font-size: 0.4rem; color: var(--muted); letter-spacing: 0.06em; text-transform: none; }
+
+.field--visibility {
+  grid-column: 1 / -1;
+}
+.visibility-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--subtle);
+  background: #fff;
+}
+.visibility-toggle__option {
+  min-width: 0;
+  border: 0;
+  border-left: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--muted);
+  padding: 0.6rem 0.65rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.visibility-toggle__option:first-child {
+  border-left: 0;
+}
+.visibility-toggle__option span {
+  display: block;
+  margin-bottom: 0.28rem;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.visibility-toggle__option small {
+  display: block;
+  color: inherit;
+  font-family: var(--font-sans);
+  font-size: 0.54rem;
+  line-height: 1.45;
+}
+.visibility-toggle__option.active {
+  background: var(--dark);
+  color: rgba(245, 244, 240, 0.68);
+}
+.visibility-toggle__option.active span {
+  color: var(--accent);
+}
 
 /* Buttons */
 .button-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-left: auto; }
@@ -1982,5 +2148,53 @@ const isEssay = computed(() => form.style === 'essay')
   .cover-dock {
     grid-template-columns: 1fr;
   }
+  .visibility-toggle {
+    grid-template-columns: 1fr;
+  }
+  .visibility-toggle__option {
+    border-left: 0;
+    border-top: 1px solid var(--subtle);
+  }
+  .visibility-toggle__option:first-child {
+    border-top: 0;
+  }
+  .context-dock.block-dock {
+    width: min(860px, calc(100vw - 1.5rem));
+  }
+  .block-dock__head {
+    align-items: flex-start;
+  }
+  .cell-controls--image,
+  .cell-controls--image:not(:has(.cell-control--width)),
+  .cell-controls--text {
+    grid-template-columns: 1fr;
+  }
+  .cell-control {
+    border-right: 0;
+    border-bottom: 1px solid var(--subtle);
+  }
+  .cell-control:last-child {
+    border-bottom: 0;
+  }
+  .prop-photo {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+/* ─── Row delete confirm modal ─── */
+.row-delete-confirm__body,
+.unsaved-leave__body {
+  font-size: 0.68rem;
+  line-height: 1.55;
+  color: var(--dark);
+}
+.row-delete-confirm__actions,
+.unsaved-leave__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
 }
 </style>

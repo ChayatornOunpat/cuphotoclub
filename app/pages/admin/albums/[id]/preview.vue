@@ -35,7 +35,6 @@ useHead({ title: () => `${album.value?.title} - ${t('admin.preview')}` })
     <dl class="facts">
       <div><dt>{{ t('admin.tableDate') }}</dt><dd>{{ album.date }}</dd></div>
       <div><dt>{{ t('admin.tableStyle') }}</dt><dd>{{ album.style }}</dd></div>
-      <div><dt>{{ t('admin.tablePlacement') }}</dt><dd>{{ album.placement }}</dd></div>
       <div><dt>{{ t('admin.tableFrames') }}</dt><dd>{{ allImages.length }}</dd></div>
     </dl>
 
@@ -57,7 +56,7 @@ useHead({ title: () => `${album.value?.title} - ${t('admin.preview')}` })
 .head h1 { font-family: var(--font-serif); font-size: clamp(2.7rem, 6vw, 5rem); line-height: 1; font-weight: 200; margin-bottom: 1rem; }
 .head p:last-child { color: var(--muted); line-height: 1.8; }
 .cover { width: 100%; max-height: 620px; object-fit: cover; display: block; margin-bottom: 1.5rem; }
-.facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--subtle); margin-bottom: 3rem; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--subtle); margin-bottom: 3rem; }
 .facts div { background: var(--body-bg); padding: 1rem; }
 .facts dt { font-size: 0.52rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
 .facts dd { font-size: 0.9rem; }

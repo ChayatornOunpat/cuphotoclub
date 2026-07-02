@@ -3,10 +3,11 @@ definePageMeta({ layout: 'admin', middleware: 'auth' })
 
 const { t } = useI18n()
 const localePath = useLocalePath()
-const [{ data: albums }, { data: posts }, { data: members }] = await Promise.all([
+const [{ data: albums }, { data: posts }, { data: members }, { data: heroImages }] = await Promise.all([
   useFetch('/api/admin/albums'),
   useFetch('/api/admin/posts'),
-  useFetch('/api/admin/members')
+  useFetch('/api/admin/members'),
+  useFetch('/api/admin/hero-images')
 ])
 
 const sections = computed(() => [
@@ -36,6 +37,15 @@ const sections = computed(() => [
     to: localePath('/admin/members'),
     newTo: localePath('/admin/members'),
     quickLabel: t('admin.manageMembers')
+  },
+  {
+    key: 'heroImages',
+    title: t('admin.heroImagesTitle'),
+    count: heroImages.value?.images?.length ?? 0,
+    meta: t('admin.heroImagesMeta'),
+    to: localePath('/admin/hero-images'),
+    newTo: localePath('/admin/hero-images'),
+    quickLabel: t('admin.heroImagesTitle')
   }
 ])
 
@@ -77,7 +87,7 @@ useHead({ title: () => `${t('admin.dashboard')} - Admin` })
 .kicker { color: var(--accent); font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1rem; }
 .dash__head h1 { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 6.5rem); line-height: 0.95; font-weight: 200; margin-bottom: 1rem; }
 .dash__head p:last-child { color: var(--muted); line-height: 1.8; max-width: 560px; }
-.dash__tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--subtle); }
+.dash__tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--subtle); }
 .tab { display: grid; grid-template-columns: auto 1fr; gap: 1.25rem; padding: 1.5rem 0; color: var(--dark); text-decoration: none; border-bottom: 1px solid var(--subtle); transition: color 0.2s; }
 .tab:not(:first-child) { padding-left: 1.5rem; border-left: 1px solid var(--subtle); }
 .tab:not(:last-child) { padding-right: 1.5rem; }
@@ -94,5 +104,7 @@ useHead({ title: () => `${t('admin.dashboard')} - Admin` })
 }
 @media (min-width: 721px) and (max-width: 960px) {
   .dash__tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tab:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .tab:nth-child(n+3) { border-top: 1px solid var(--subtle); }
 }
 </style>

@@ -1,27 +1,61 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'site' })
 import { defaultSite } from '~/utils/defaultSite'
 
-// ── Data layer: albums + blog posts come from the same SQLite-backed APIs used
-//    by admin. Sections below are just different views over this data.
+definePageMeta({ layout: 'site' })
+
 const site = ref(defaultSite)
-const { data: albums } = await useAsyncData('albums', async () => {
-  const adminAlbums = await $fetch('/api/albums').catch(() => [])
-  if (adminAlbums.length) return adminAlbums.map(album => ({ ...album, path: `/albums/${album.id}` }))
-  return []
-})
-const { data: posts } = await useAsyncData('posts', async () => {
-  const adminPosts = await $fetch('/api/posts').catch(() => [])
-  if (adminPosts.length) return adminPosts.map(post => ({ ...post, path: `/posts/${post.id}` }))
-  return []
-})
 const { t } = useI18n()
 const localizedPath = useLocalizedContentPath()
 const localizedSite = useLocalizedSite(site)
 
-function coverOf(album: NonNullable<typeof albums.value>[number]) {
-  return album.coverSrc || (album.rows ?? []).flatMap((r: any) => r.cells).find((c: any) => c.type === 'image' && c.src)?.src || ''
+const { data: home } = await useAsyncData('home', async () => {
+  const data = await $fetch('/api/home').catch(() => ({ albums: [], posts: [], events: [] }))
+  if (data.albums.length || data.posts.length || data.events.length || !import.meta.dev) return data
+
+  const [legacyAlbums, legacyPosts] = await Promise.all([
+    $fetch<any[]>('/api/albums').catch(() => []),
+    $fetch<any[]>('/api/posts').catch(() => [])
+  ])
+
+  return {
+    albums: legacyAlbums.map(album => ({
+      id: 0,
+      slug: album.id,
+      title: album.title,
+      eventDate: album.published ?? album.date ?? null,
+      coverKey: album.coverSrc || (album.rows ?? []).flatMap((r: any) => r.cells).find((c: any) => c.type === 'image' && c.src)?.src || null,
+      photoCount: (album.rows ?? []).flatMap((r: any) => r.cells).filter((c: any) => c.type === 'image' && c.src).length
+    })),
+    posts: legacyPosts.map(post => ({
+      id: 0,
+      slug: post.id,
+      title: post.title,
+      excerpt: post.excerpt,
+      coverR2Key: post.image,
+      publishedAt: post.published ?? post.date ?? null
+    })),
+    events: []
+  }
+})
+
+function imageSrc(key: string | null | undefined) {
+  if (!key) return ''
+  return /^https?:\/\//.test(key) ? key : `/images/${key}`
 }
+
+// ── Hero background: randomise from the admin-managed image pool.
+//    useState pins the seed on the server so client hydration matches.
+const { data: heroImagesData } = await useAsyncData('hero-images', () =>
+  $fetch<{ images: string[] }>('/api/hero-images').catch(() => ({ images: [] }))
+)
+const heroImageSeed = useState('hero-image-seed', () => Math.floor(Math.random() * 2147483647))
+const heroWithImage = computed(() => {
+  const base = localizedSite.value?.hero
+  if (!base) return base
+  const imgs = heroImagesData.value?.images ?? []
+  if (!imgs.length) return base
+  return { ...base, image: `/images/${imgs[heroImageSeed.value % imgs.length]}` }
+})
 
 // ── Featured Work: FeaturedWork.vue lays out a randomised, rectangle-guaranteed
 //    wall from these albums. The randomness is driven by a seed that is created
@@ -31,43 +65,56 @@ function coverOf(album: NonNullable<typeof albums.value>[number]) {
 const featuredSeed = useState('featured-seed', () => Math.floor(Math.random() * 2147483647))
 
 const featuredAlbums = computed(() =>
-  (albums.value ?? [])
+  (home.value?.albums ?? [])
     .map(a => ({
       title: a.title,
-      category: a.category,
-      cover: coverOf(a),
-      path: localizedPath(a.path)
+      category: t('common.album'),
+      cover: imageSrc(a.coverKey),
+      path: localizedPath(`/galleries/${a.slug}`)
     }))
     .filter(a => a.cover)
 )
 
-// ── Stories: albums + posts merged into one feed, newest first.
+// ── Stories: albums, posts, and events merged into one feed, newest first.
 const feed = computed(() => {
-  const albumItems = (albums.value ?? [])
+  const albumItems = (home.value?.albums ?? [])
     .map(a => ({
       kind: 'album' as const,
       title: a.title,
-      tag: `${t('common.album')} · ${a.category}`,
-      date: a.date,
-      published: a.published,
-      image: coverOf(a),
-      excerpt: a.excerpt,
-      path: localizedPath(a.path)
+      tag: t('common.album'),
+      date: a.eventDate ?? '',
+      published: a.eventDate ?? '',
+      image: imageSrc(a.coverKey),
+      excerpt: t('albums.metaFrames', { count: a.photoCount }),
+      path: localizedPath(`/galleries/${a.slug}`)
     }))
     .filter(a => a.image)
-  const postItems = (posts.value ?? [])
+  const postItems = (home.value?.posts ?? [])
     .map(p => ({
       kind: 'post' as const,
       title: p.title,
-      tag: p.tag,
-      date: p.date,
-      published: p.published,
-      image: p.image,
-      excerpt: p.excerpt,
-      path: localizedPath(p.path)
+      tag: t('admin.posts'),
+      date: p.publishedAt ?? '',
+      published: p.publishedAt ?? '',
+      image: imageSrc(p.coverR2Key),
+      excerpt: p.excerpt ?? '',
+      path: localizedPath(`/blog/${p.slug}`)
     }))
     .filter(p => p.image)
-  return [...albumItems, ...postItems].sort((a, b) => b.published.localeCompare(a.published))
+  const eventItems = (home.value?.events ?? [])
+    .map(event => ({
+      kind: 'event' as const,
+      title: event.title,
+      tag: event.location ? `${t('nav.activities')} · ${event.location}` : t('nav.activities'),
+      date: event.eventDate ?? '',
+      published: event.eventDate ?? '',
+      image: imageSrc(event.coverR2Key),
+      excerpt: event.summary ?? '',
+      path: localizedPath(`/activities/${event.slug}`)
+    }))
+    .filter(event => event.image)
+
+  return [...albumItems, ...postItems, ...eventItems].sort((a, b) => b.published.localeCompare(a.published))
 })
 
 const leadStory = computed(() => feed.value[0] ?? null)
@@ -76,6 +123,8 @@ const smallStories = computed(() => feed.value.slice(1, 5))
 // ── Scroll UI: reading-progress bar + nav dark→light handoff at the hero edge.
 const navLight = ref(false)
 const progress = ref(0)
+const constructionNoticeOpen = ref(false)
+const constructionNoticeKey = 'cu-photo-construction-notice-dismissed'
 
 function onScroll() {
   const total = document.body.scrollHeight - window.innerHeight
@@ -83,8 +132,14 @@ function onScroll() {
   navLight.value = window.scrollY > window.innerHeight * 0.9
 }
 
+function dismissConstructionNotice() {
+  constructionNoticeOpen.value = false
+  if (import.meta.client) sessionStorage.setItem(constructionNoticeKey, '1')
+}
+
 onMounted(() => {
   onScroll()
+  constructionNoticeOpen.value = sessionStorage.getItem(constructionNoticeKey) !== '1'
   window.addEventListener('scroll', onScroll, { passive: true })
 })
 onUnmounted(() => window.removeEventListener('scroll', onScroll))
@@ -107,7 +162,7 @@ useHead({
 
     <SiteNav :links="localizedSite.nav.links" :light="navLight" />
 
-    <SiteHero :hero="localizedSite.hero" />
+    <SiteHero :hero="heroWithImage ?? localizedSite.hero" />
 
     <!-- Signature pink line: dark → light transition -->
     <div class="cut-line" />
@@ -119,6 +174,28 @@ useHead({
     <HistorySection :history="localizedSite.history" />
 
     <AboutSection :about="localizedSite.about" />
+
+    <Teleport to="body">
+      <div
+        v-if="constructionNoticeOpen"
+        class="construction-notice"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="construction-title"
+      >
+        <div class="construction-notice__backdrop" @click="dismissConstructionNotice" />
+        <section class="construction-notice__panel">
+          <p class="construction-notice__kicker">CU PHOTOCLUB / NOTICE</p>
+          <h2 id="construction-title">เว็บไซต์อยู่ระหว่างปรับปรุง</h2>
+          <p>
+            บางหน้าและข้อมูลอาจยังไม่สมบูรณ์ ขอบคุณที่แวะมาชมงานของชมรมระหว่างที่เราจัดวางเว็บไซต์ใหม่
+          </p>
+          <button type="button" class="construction-notice__button" @click="dismissConstructionNotice">
+            เข้าชมเว็บไซต์ต่อ
+          </button>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -130,5 +207,72 @@ useHead({
   height: 2px;
   background: var(--accent);
   transition: width 0.1s linear;
+}
+
+.construction-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.construction-notice__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 12, 10, 0.72);
+}
+
+.construction-notice__panel {
+  position: relative;
+  width: min(100%, 520px);
+  background: var(--body-bg);
+  color: var(--dark);
+  border-top: 2px solid var(--accent);
+  padding: clamp(1.5rem, 5vw, 2.4rem);
+  box-shadow: 0 1.5rem 4rem rgba(12, 12, 10, 0.34);
+}
+
+.construction-notice__kicker {
+  font-family: var(--font-latin-sans);
+  font-size: 0.54rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+
+.construction-notice h2 {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 300;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.construction-notice p:not(.construction-notice__kicker) {
+  margin-top: 1rem;
+  color: var(--muted);
+  line-height: 1.85;
+}
+
+.construction-notice__button {
+  margin-top: 1.5rem;
+  min-height: 2.65rem;
+  border: 1px solid var(--dark);
+  background: var(--dark);
+  color: #F5F4F0;
+  padding: 0.72rem 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.construction-notice__button:hover {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 </style>
