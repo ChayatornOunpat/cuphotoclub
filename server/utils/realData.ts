@@ -1,4 +1,6 @@
 export function realDataOnly() {
+  if (process.env.NUXT_REAL_DATA_ONLY === 'false' || process.env.NUXT_PUBLIC_REAL_DATA_ONLY === 'false') return false
+  if (process.env.NODE_ENV === 'production') return true
   return process.env.NUXT_REAL_DATA_ONLY === 'true'
     || process.env.NUXT_PUBLIC_REAL_DATA_ONLY === 'true'
 }

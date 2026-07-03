@@ -18,13 +18,13 @@ export const defaultSite = {
       { text: 'the lens', em: true },
       { text: 'we see' }
     ],
-    image: 'https://picsum.photos/seed/cuhc01/1920/1080',
+    image: '/club-icon.jpg',
     lead: 'The official photography club of Chulalongkorn University - documenting life, culture, and the human condition since 1967.',
     meta: ['Photography · Community', 'Bangkok, Thailand']
   },
   history: {
     eyebrow: 'Our History',
-    image: 'https://picsum.photos/seed/cuhc_arch/900/675',
+    image: '/club-icon.jpg',
     quote: 'Every photograph we make is a letter to the future.',
     body: [
       "Founded in 1967 by a small group of Chulalongkorn University students with borrowed cameras and a shared obsession with the image, the CU Photo Club has grown into one of Thailand's most respected student photography organisations.",
@@ -42,7 +42,7 @@ export const defaultSite = {
     ],
     body: 'CU Photo Club is open to all students of Chulalongkorn University regardless of experience level. We meet weekly, run workshops, hold annual exhibitions, and maintain an active archive of visual work from across the decades. If you have curiosity and a camera, you belong here.',
     cta: { label: 'Join the Club', to: '#' },
-    image: 'https://picsum.photos/seed/cuhc_about/900/675'
+    image: '/club-icon.jpg'
   },
   footer: {
     tagline: 'Official photography club of\nChulalongkorn University, Bangkok, Thailand',

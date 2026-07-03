@@ -69,7 +69,11 @@ export default defineNuxtConfig({
       }
     },
     public: {
-      realDataOnly: process.env.NUXT_PUBLIC_REAL_DATA_ONLY === 'true' || process.env.NUXT_REAL_DATA_ONLY === 'true',
+      realDataOnly: process.env.NUXT_PUBLIC_REAL_DATA_ONLY === 'false' || process.env.NUXT_REAL_DATA_ONLY === 'false'
+        ? false
+        : process.env.NODE_ENV === 'production'
+          || process.env.NUXT_PUBLIC_REAL_DATA_ONLY === 'true'
+          || process.env.NUXT_REAL_DATA_ONLY === 'true',
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === 'production' ? 'https://cuphotoclub.pages.dev' : 'http://localhost:3000')
     }
   },

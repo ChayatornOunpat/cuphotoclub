@@ -14,7 +14,7 @@ hero:
     - { text: 'Through' }
     - { text: 'the lens', em: true }
     - { text: 'we see' }
-  image: 'https://picsum.photos/seed/cuhc01/1920/1080'
+  image: '/club-icon.jpg'
   lead: >-
     The official photography club of Chulalongkorn University —
     documenting life, culture, and the human condition since 1967.
@@ -24,7 +24,7 @@ hero:
 
 history:
   eyebrow: Our History
-  image: 'https://picsum.photos/seed/cuhc_arch/900/675'
+  image: '/club-icon.jpg'
   quote: 'Every photograph we make is a letter to the future.'
   body:
     - >-
@@ -52,7 +52,7 @@ about:
     and maintain an active archive of visual work from across the decades.
     If you have curiosity and a camera, you belong here.
   cta: { label: 'Join the Club', to: '#' }
-  image: 'https://picsum.photos/seed/cuhc_about/900/675'
+  image: '/club-icon.jpg'
 
 footer:
   tagline: |-
