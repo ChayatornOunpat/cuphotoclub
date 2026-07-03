@@ -65,6 +65,7 @@ const uploadedMediaKeys = ref<string[]>([])
 const mediaLoading = ref(false)
 const photoManagerOpen = ref(false)
 const cellPickerOpen = ref(false)
+const bulkPickerOpen = ref(false)
 
 // Editing state
 const selectedRow = ref<number | null>(null)
@@ -220,6 +221,16 @@ function collectAlbumImageSources() {
   return [...sources]
 }
 
+function collectFrameImageSources() {
+  const sources = new Set<string>()
+  for (const row of form.rows) {
+    for (const cell of row.cells) {
+      if (cell.type === 'image' && cell.src) sources.add(cell.src)
+    }
+  }
+  return sources
+}
+
 const mediaItems = computed(() => {
   const items = new Map<string, { id: string, src: string, key: string | null }>()
   for (const key of uploadedMediaKeys.value) {
@@ -269,6 +280,64 @@ function onCellPick(keys: string[]) {
     selectedCell.value = null
     dockHidden.value = true
   }
+}
+
+const ESSAY_BULK_PATTERNS: CellSpan[][] = [
+  [6],
+  [3, 3],
+  [4, 2],
+  [2, 4],
+  [2, 2, 2]
+]
+
+function makeImageCell(src: string, span: CellSpan): AlbumCell {
+  return { type: 'image', span, src, caption: '' }
+}
+
+function appendAutoFrames(keys: string[]) {
+  const existingFrameSources = collectFrameImageSources()
+  const uniqueKeys = [...new Set(keys)]
+  const pending = uniqueKeys
+    .map(key => ({ key, src: keyToSrc(key) }))
+    .filter(item => !existingFrameSources.has(item.src))
+
+  if (!pending.length) return
+
+  mergeMediaKeys(pending.map(item => item.key))
+  if (!form.coverSrc) form.coverSrc = pending[0]!.src
+
+  const firstNewRow = form.rows.length
+
+  if (!isEssay.value) {
+    for (const item of pending) {
+      form.rows.push({ cells: [makeImageCell(item.src, 6)] })
+    }
+  } else {
+    let cursor = 0
+    let patternIndex = 0
+    while (cursor < pending.length) {
+      const pattern = ESSAY_BULK_PATTERNS[patternIndex % ESSAY_BULK_PATTERNS.length]!
+      const cells: AlbumCell[] = []
+      for (const span of pattern) {
+        const item = pending[cursor]
+        if (!item) break
+        cells.push(makeImageCell(item.src, span))
+        cursor++
+      }
+      form.rows.push({ cells })
+      patternIndex++
+    }
+  }
+
+  selectedRow.value = firstNewRow
+  selectedCell.value = 0
+  activeDock.value = 'cell'
+  dockHidden.value = false
+  scrollPreviewToRow(firstNewRow, 0)
+}
+
+function onBulkPick(keys: string[]) {
+  appendAutoFrames(keys)
 }
 
 onMounted(loadMediaKeys)
@@ -786,6 +855,15 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           <Icon name="heroicons:arrow-up-tray" class="upload-btn__icon" />
           <span>{{ hasMedia ? 'Manage Photos' : 'Upload Photos' }}</span>
         </button>
+        <button
+          type="button"
+          class="bulk-fill-btn"
+          @click="bulkPickerOpen = true"
+        >
+          <Icon name="heroicons:squares-plus" class="bulk-fill-btn__icon" />
+          <span>Auto-fill Frames</span>
+        </button>
+        <p class="media-empty media-empty--hint">Select many uploaded photos and build rows automatically.</p>
       </div>
 
       <!-- Palette -->
@@ -1063,6 +1141,14 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       v-model="cellPickerOpen"
       :prefix="mediaPrefix"
       @select="onCellPick"
+    />
+
+    <AdminImagePickerModal
+      v-model="bulkPickerOpen"
+      :prefix="mediaPrefix"
+      multiple
+      title="Auto-fill album frames"
+      @select="onBulkPick"
     />
 
     <UiModal
@@ -1451,6 +1537,28 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .upload-btn:hover { background: color-mix(in srgb, var(--accent) 11%, transparent); }
 .upload-btn__icon { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
 
+.bulk-fill-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.46rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.bulk-fill-btn:hover {
+  border-color: var(--dark);
+  background: color-mix(in srgb, var(--dark) 4%, transparent);
+}
+.bulk-fill-btn__icon { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
 
 .media-label {
   margin: 0.65rem 0 0.35rem;
@@ -1547,6 +1655,10 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   font-size: 0.54rem;
   line-height: 1.45;
   color: var(--muted);
+}
+.media-empty--hint {
+  margin-top: 0.45rem;
+  font-size: 0.5rem;
 }
 .selected-photo {
   display: grid;
