@@ -72,6 +72,7 @@ export const posts = sqliteTable('posts', {
     .default('draft'),
   publishedAt: integer('published_at', { mode: 'timestamp' }),
   authorId: integer('author_id').references(() => users.id),
+  updatedBy: integer('updated_by').references(() => users.id),
   createdAt,
   updatedAt
 })
@@ -174,6 +175,21 @@ export const contentPosts = sqliteTable('content_posts', {
   author: text('author').notNull().default(''),
   authorBio: text('author_bio').notNull().default(''),
   authorAvatar: text('author_avatar').notNull().default(''),
+  createdBy: integer('created_by').references(() => users.id),
+  updatedBy: integer('updated_by').references(() => users.id),
   createdAt,
   updatedAt
+})
+
+export const adminAuditLogs = sqliteTable('admin_audit_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  actorId: integer('actor_id'),
+  actorEmail: text('actor_email').notNull(),
+  actorName: text('actor_name'),
+  action: text('action').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  entityTitle: text('entity_title'),
+  metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default(sql`'{}'`),
+  createdAt
 })

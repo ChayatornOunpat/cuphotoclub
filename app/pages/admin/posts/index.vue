@@ -27,6 +27,10 @@ function previewPath(post: NonNullable<typeof posts.value>[number]) {
   return post.visibility === 'draft' ? `/admin/posts/${post.id}/preview` : `/posts/${post.id}`
 }
 
+function actorName(actor?: { name?: string | null, email?: string } | null) {
+  return actor?.name || actor?.email || 'Unknown'
+}
+
 const visiblePosts = computed(() => {
   const q = query.value.trim().toLowerCase()
   const rows = [...(posts.value ?? [])]
@@ -98,13 +102,15 @@ useHead({ title: () => `${t('admin.posts')} - Admin` })
 
     <table v-if="posts && posts.length && visiblePosts.length && viewMode === 'list'" class="tbl">
       <thead>
-        <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableTag') }}</th><th>Visibility</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
+        <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableTag') }}</th><th>Visibility</th><th>Created by</th><th>Last edited by</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
       </thead>
       <tbody>
         <tr v-for="p in visiblePosts" :key="p.id">
           <td class="t-title">{{ p.title }}</td>
           <td><span class="pill">{{ p.tag }}</span></td>
           <td><span class="pill" :class="visibilityClass(p.visibility)">{{ visibilityLabel(p.visibility) }}</span></td>
+          <td class="t-muted">{{ actorName(p.createdBy) }}</td>
+          <td class="t-muted">{{ actorName(p.updatedBy) }}</td>
           <td class="t-muted">{{ p.date }}</td>
           <td class="t-actions">
             <NuxtLink :to="localePath(previewPath(p))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
@@ -126,6 +132,8 @@ useHead({ title: () => `${t('admin.posts')} - Admin` })
           <p>{{ p.excerpt }}</p>
           <div class="card__facts">
             <span :class="visibilityClass(p.visibility)">{{ visibilityLabel(p.visibility) }}</span>
+            <span>Created by {{ actorName(p.createdBy) }}</span>
+            <span>Edited by {{ actorName(p.updatedBy) }}</span>
           </div>
           <div class="card__actions">
             <NuxtLink :to="localePath(previewPath(p))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>

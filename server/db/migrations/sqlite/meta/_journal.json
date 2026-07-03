@@ -29,6 +29,13 @@
       "when": 1782992400000,
       "tag": "0003_content_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1783069200000,
+      "tag": "0004_admin_audit",
+      "breakpoints": true
     }
   ]
 }

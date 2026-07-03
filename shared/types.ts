@@ -84,6 +84,12 @@ export type PostBlock =
 
 export type HeroStyle = 'standard' | 'dark-full' | 'split' | 'minimal-dark'
 
+export interface AdminAttribution {
+  id: number
+  email: string
+  name?: string | null
+}
+
 export interface Post {
   id: string
   title: string
@@ -97,6 +103,10 @@ export interface Post {
   author?: string
   authorBio?: string
   authorAvatar?: string
+  createdById?: number | null
+  updatedById?: number | null
+  createdBy?: AdminAttribution | null
+  updatedBy?: AdminAttribution | null
   blocks: PostBlock[]
 }
 

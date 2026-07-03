@@ -29,6 +29,17 @@ export default defineOAuthGoogleEventHandler({
       })
       .where(eq(schema.users.id, user.id))
 
+    await recordAdminAudit(
+      { id: user.id, email: user.email, name: user.name || (googleUser.name as string) || null },
+      {
+        action: 'login',
+        entityType: 'admin_user',
+        entityId: user.id,
+        entityTitle: user.email,
+        metadata: { method: 'google' }
+      }
+    )
+
     await setUserSession(event, {
       user: {
         id: user.id,

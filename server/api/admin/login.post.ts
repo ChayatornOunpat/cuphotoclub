@@ -25,6 +25,16 @@ export default defineEventHandler(async (event) => {
   if (!valid) throw invalid
 
   await db.update(schema.users).set({ lastLoginAt: new Date() }).where(eq(schema.users.id, user.id))
+  await recordAdminAudit(
+    { id: user.id, email: user.email, name: user.name },
+    {
+      action: 'login',
+      entityType: 'admin_user',
+      entityId: user.id,
+      entityTitle: user.email,
+      metadata: { method: 'password' }
+    }
+  )
 
   await setUserSession(event, {
     user: {

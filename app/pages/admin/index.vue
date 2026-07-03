@@ -9,6 +9,8 @@ const [{ data: albums }, { data: posts }, { data: members }, { data: heroImages 
   useFetch('/api/admin/members'),
   useFetch('/api/admin/hero-images')
 ])
+const { user } = useUserSession()
+const canManage = computed(() => user.value?.role === 'owner' || user.value?.role === 'admin')
 
 const sections = computed(() => [
   {
@@ -46,7 +48,29 @@ const sections = computed(() => [
     to: localePath('/admin/hero-images'),
     newTo: localePath('/admin/hero-images'),
     quickLabel: t('admin.heroImagesTitle')
-  }
+  },
+  ...(canManage.value
+    ? [
+        {
+          key: 'users',
+          title: 'IAM',
+          count: 0,
+          meta: 'Admin accounts, roles, and access.',
+          to: localePath('/admin/users'),
+          newTo: localePath('/admin/users'),
+          quickLabel: 'Manage IAM'
+        },
+        {
+          key: 'logs',
+          title: 'Logs',
+          count: 0,
+          meta: 'Audit trail of admin changes.',
+          to: localePath('/admin/logs'),
+          newTo: localePath('/admin/logs'),
+          quickLabel: 'View Logs'
+        }
+      ]
+    : [])
 ])
 
 useHead({ title: () => `${t('admin.dashboard')} - Admin` })
@@ -87,7 +111,7 @@ useHead({ title: () => `${t('admin.dashboard')} - Admin` })
 .kicker { color: var(--accent); font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1rem; }
 .dash__head h1 { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 6.5rem); line-height: 0.95; font-weight: 200; margin-bottom: 1rem; }
 .dash__head p:last-child { color: var(--muted); line-height: 1.8; max-width: 560px; }
-.dash__tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--subtle); }
+.dash__tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); border-top: 1px solid var(--subtle); }
 .tab { display: grid; grid-template-columns: auto 1fr; gap: 1.25rem; padding: 1.5rem 0; color: var(--dark); text-decoration: none; border-bottom: 1px solid var(--subtle); transition: color 0.2s; }
 .tab:not(:first-child) { padding-left: 1.5rem; border-left: 1px solid var(--subtle); }
 .tab:not(:last-child) { padding-right: 1.5rem; }
@@ -103,7 +127,6 @@ useHead({ title: () => `${t('admin.dashboard')} - Admin` })
   .tab:nth-child(n) { padding-left: 0; padding-right: 0; border-left: 0; }
 }
 @media (min-width: 721px) and (max-width: 960px) {
-  .dash__tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tab:nth-child(odd) { padding-left: 0; border-left: 0; }
   .tab:nth-child(n+3) { border-top: 1px solid var(--subtle); }
 }

@@ -35,6 +35,17 @@ export default defineEventHandler(async (event) => {
     .values({ email, name: data.name ?? null, role: data.role, passwordHash, active: true })
     .returning()
 
+  await recordAdminAudit(actor, {
+    action: 'create',
+    entityType: 'admin_user',
+    entityId: created.id,
+    entityTitle: created.email,
+    metadata: {
+      role: created.role,
+      hasPassword: Boolean(passwordHash)
+    }
+  })
+
   const { passwordHash: _ph, googleSub: _gs, ...safe } = created
   return { ...safe, hasPassword: Boolean(passwordHash), googleLinked: false }
 })

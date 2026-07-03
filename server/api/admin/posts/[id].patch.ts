@@ -12,7 +12,7 @@ const bodySchema = z.object({
 })
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const actor = await requireAdmin(event)
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id)) throw createError({ statusCode: 400, message: 'รหัสไม่ถูกต้อง' })
 
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   const [post] = await db.select().from(schema.posts).where(eq(schema.posts.id, id)).limit(1)
   if (!post) throw createError({ statusCode: 404, message: 'ไม่พบบทความ' })
 
-  const updates: Record<string, unknown> = { updatedAt: new Date() }
+  const updates: Record<string, unknown> = { updatedAt: new Date(), updatedBy: actor.id }
   if (data.title !== undefined) updates.title = data.title
   if (data.excerpt !== undefined) updates.excerpt = data.excerpt
   if (data.body !== undefined) updates.body = data.body
@@ -42,5 +42,16 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.update(schema.posts).set(updates).where(eq(schema.posts.id, id))
+  await recordAdminAudit(actor, {
+    action: 'update',
+    entityType: 'legacy_post',
+    entityId: id,
+    entityTitle: data.title ?? post.title,
+    metadata: {
+      changed: Object.keys(updates).filter(key => key !== 'updatedAt'),
+      previousStatus: post.status,
+      nextStatus: data.status ?? post.status
+    }
+  })
   return { ok: true }
 })

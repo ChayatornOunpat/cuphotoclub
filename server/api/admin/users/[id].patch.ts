@@ -45,6 +45,19 @@ export default defineEventHandler(async (event) => {
 
   if (Object.keys(updates).length) {
     await db.update(schema.users).set(updates).where(eq(schema.users.id, id))
+    await recordAdminAudit(actor, {
+      action: 'update',
+      entityType: 'admin_user',
+      entityId: target.id,
+      entityTitle: target.email,
+      metadata: {
+        changed: Object.keys(updates).map(key => key === 'passwordHash' ? 'password' : key),
+        previousRole: target.role,
+        nextRole: data.role ?? target.role,
+        previousActive: target.active,
+        nextActive: data.active ?? target.active
+      }
+    })
   }
   return { ok: true }
 })

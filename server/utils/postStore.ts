@@ -1,5 +1,5 @@
-import { desc, eq, sql } from 'drizzle-orm'
-import type { Post, PostInput, PostBlock, HeroStyle } from '~~/shared/types'
+import { desc, eq, inArray, sql } from 'drizzle-orm'
+import type { AdminAttribution, Post, PostInput, PostBlock, HeroStyle } from '~~/shared/types'
 
 function slugify(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -57,7 +57,7 @@ const seed: Post[] = [
 
 type PostRow = typeof schema.contentPosts.$inferSelect
 
-function rowToPost(row: PostRow): Post {
+function rowToPost(row: PostRow, users = new Map<number, AdminAttribution>()): Post {
   return {
     id: row.id,
     title: row.title,
@@ -71,13 +71,32 @@ function rowToPost(row: PostRow): Post {
     author: row.author || undefined,
     authorBio: row.authorBio || undefined,
     authorAvatar: row.authorAvatar || undefined,
+    createdById: row.createdBy ?? null,
+    updatedById: row.updatedBy ?? null,
+    createdBy: row.createdBy ? users.get(row.createdBy) ?? null : null,
+    updatedBy: row.updatedBy ? users.get(row.updatedBy) ?? null : null,
     blocks: (row.blocks ?? []) as PostBlock[]
   }
 }
 
-async function writePost(post: Post): Promise<void> {
-  const now = new Date()
-  const values = {
+async function loadUserMap(rows: PostRow[]) {
+  const ids = [...new Set(rows.flatMap(row => [row.createdBy, row.updatedBy]).filter((id): id is number => typeof id === 'number'))]
+  if (!ids.length) return new Map<number, AdminAttribution>()
+
+  const users = await db
+    .select({
+      id: schema.users.id,
+      email: schema.users.email,
+      name: schema.users.name
+    })
+    .from(schema.users)
+    .where(inArray(schema.users.id, ids))
+
+  return new Map(users.map(user => [user.id, user]))
+}
+
+function postValues(post: PostInput & { id: string }) {
+  return {
     id: post.id,
     title: post.title,
     tag: post.tag,
@@ -90,13 +109,22 @@ async function writePost(post: Post): Promise<void> {
     heroStyle: post.heroStyle ?? 'standard',
     author: post.author ?? '',
     authorBio: post.authorBio ?? '',
-    authorAvatar: post.authorAvatar ?? '',
-    updatedAt: now
+    authorAvatar: post.authorAvatar ?? ''
   }
+}
+
+async function insertPost(post: PostInput & { id: string }, actorId?: number | null): Promise<void> {
+  const now = new Date()
+  const values = postValues(post)
 
   await db
     .insert(schema.contentPosts)
-    .values(values)
+    .values({
+      ...values,
+      createdBy: actorId ?? null,
+      updatedBy: actorId ?? null,
+      updatedAt: now
+    })
     .onConflictDoUpdate({
       target: schema.contentPosts.id,
       set: {
@@ -112,9 +140,35 @@ async function writePost(post: Post): Promise<void> {
         author: values.author,
         authorBio: values.authorBio,
         authorAvatar: values.authorAvatar,
+        updatedBy: actorId ?? null,
         updatedAt: now
       }
     })
+}
+
+async function updatePost(id: string, input: PostInput, actorId?: number | null): Promise<void> {
+  const now = new Date()
+  const values = postValues({ ...input, id })
+
+  await db
+    .update(schema.contentPosts)
+    .set({
+      title: values.title,
+      tag: values.tag,
+      date: values.date,
+      published: values.published,
+      visibility: values.visibility,
+      image: values.image,
+      excerpt: values.excerpt,
+      blocks: values.blocks,
+      heroStyle: values.heroStyle,
+      author: values.author,
+      authorBio: values.authorBio,
+      authorAvatar: values.authorAvatar,
+      updatedBy: actorId ?? null,
+      updatedAt: now
+    })
+    .where(eq(schema.contentPosts.id, id))
 }
 
 let seedPromise: Promise<void> | null = null
@@ -162,7 +216,8 @@ export const postStore = {
       .select()
       .from(schema.contentPosts)
       .orderBy(desc(schema.contentPosts.published))
-    const posts = rows.map(rowToPost)
+    const userMap = await loadUserMap(rows)
+    const posts = rows.map(row => rowToPost(row, userMap))
     return realDataOnly() ? posts.filter(post => !containsMockMedia(post)) : posts
   },
 
@@ -174,27 +229,28 @@ export const postStore = {
       .where(eq(schema.contentPosts.id, id))
       .limit(1)
     if (!row) return null
-    const post = rowToPost(row)
+    const userMap = await loadUserMap([row])
+    const post = rowToPost(row, userMap)
     return realDataOnly() && containsMockMedia(post) ? null : post
   },
 
-  async create(input: PostInput): Promise<Post> {
+  async create(input: PostInput, actorId?: number | null): Promise<Post> {
     await seedIfEmpty()
     let id = slugify(input.title) || `post-${Date.now()}`
     if (await this.get(id)) id = `${id}-${Date.now().toString(36)}`
 
     const post: Post = { ...input, id }
-    await writePost(post)
-    return post
+    await insertPost(post, actorId)
+    return await this.get(id) ?? post
   },
 
-  async update(id: string, input: PostInput): Promise<Post | null> {
+  async update(id: string, input: PostInput, actorId?: number | null): Promise<Post | null> {
     await seedIfEmpty()
     if (!(await this.get(id))) return null
 
     const post: Post = { ...input, id }
-    await writePost(post)
-    return post
+    await updatePost(id, input, actorId)
+    return await this.get(id) ?? post
   },
 
   async remove(id: string): Promise<boolean> {

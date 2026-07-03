@@ -21,5 +21,15 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.delete(schema.users).where(eq(schema.users.id, id))
+  await recordAdminAudit(actor, {
+    action: 'delete',
+    entityType: 'admin_user',
+    entityId: target.id,
+    entityTitle: target.email,
+    metadata: {
+      role: target.role,
+      active: target.active
+    }
+  })
   return { ok: true }
 })

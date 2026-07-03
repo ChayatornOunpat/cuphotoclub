@@ -1,7 +1,7 @@
 import type { PostInput } from '~~/shared/types'
 
 export default defineEventHandler(async (event) => {
-  await requireUserSession(event)
+  const { user } = await requireUserSession(event)
   const body = await readBody<PostInput>(event)
 
   const error = validatePost(body)
@@ -9,5 +9,16 @@ export default defineEventHandler(async (event) => {
   if (!body.published) body.published = new Date().toISOString().slice(0, 10)
   body.visibility ??= 'draft'
 
-  return await postStore.create(body)
+  const created = await postStore.create(body, user.id)
+  await recordAdminAudit(user, {
+    action: 'create',
+    entityType: 'post',
+    entityId: created.id,
+    entityTitle: created.title,
+    metadata: {
+      visibility: created.visibility,
+      published: created.published
+    }
+  })
+  return created
 })
