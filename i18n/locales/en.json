@@ -201,7 +201,18 @@
     "addImages": "Add Images",
     "heroImagesEmpty": "No images yet — click \"Add Images\" to upload or select",
     "removeImage": "Remove image",
-    "saved": "Saved"
+    "saved": "Saved",
+    "sectionContent": "Content",
+    "sectionUtilities": "Utilities",
+    "sectionAdminTools": "Admin tools",
+    "r2ImagesTitle": "R2 Images",
+    "r2ImagesMeta": "Bucket inventory and orphaned-file cleanup",
+    "iamTitle": "IAM",
+    "iamMeta": "Admin accounts, roles, and access",
+    "manageIam": "Manage IAM",
+    "logsTitle": "Logs",
+    "logsMeta": "Audit trail of admin changes",
+    "viewLogs": "View logs"
   },
   "adminPicker": {
     "title": "Select Image",

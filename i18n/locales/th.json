@@ -201,7 +201,18 @@
     "addImages": "เพิ่มภาพ",
     "heroImagesEmpty": "ยังไม่มีภาพ — กด \"เพิ่มภาพ\" เพื่อเลือกหรืออัปโหลด",
     "removeImage": "ลบภาพนี้",
-    "saved": "บันทึกแล้ว"
+    "saved": "บันทึกแล้ว",
+    "sectionContent": "เนื้อหา",
+    "sectionUtilities": "เครื่องมือ",
+    "sectionAdminTools": "เครื่องมือผู้ดูแล",
+    "r2ImagesTitle": "ภาพใน R2",
+    "r2ImagesMeta": "คลังไฟล์ในบักเก็ตและการล้างไฟล์ที่ไม่ถูกอ้างอิง",
+    "iamTitle": "IAM",
+    "iamMeta": "บัญชีผู้ดูแล บทบาท และสิทธิ์การเข้าถึง",
+    "manageIam": "จัดการ IAM",
+    "logsTitle": "Logs",
+    "logsMeta": "บันทึกการเปลี่ยนแปลงของผู้ดูแล",
+    "viewLogs": "ดูบันทึก"
   },
   "adminPicker": {
     "title": "เลือกรูปภาพ",

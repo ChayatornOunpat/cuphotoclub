@@ -126,6 +126,10 @@ const lastSelectedIndex = ref<number | null>(null)
 function isSelected(key: string) {
   return selected.value.has(key)
 }
+function selectionOrder(key: string) {
+  const index = [...selected.value].indexOf(key)
+  return index >= 0 ? index + 1 : null
+}
 function toggleSelected(key: string) {
   const next = new Set(selected.value)
   if (next.has(key)) next.delete(key)
@@ -273,7 +277,8 @@ async function bulkDelete() {
       <div class="r2__bulk">
         <label class="r2__select-all">
           <input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAllFiltered">
-          Select all shown
+          <span class="r2__select-box" aria-hidden="true" />
+          <span>Select all shown</span>
         </label>
         <div v-if="selected.size" class="r2__bulk-actions">
           <span>{{ selected.size }} selected</span>
@@ -290,6 +295,9 @@ async function bulkDelete() {
           <div class="image-row__thumb">
             <label class="image-row__check">
               <input type="checkbox" :checked="isSelected(image.key)" @click="onCheckboxClick($event, image.key, index)">
+              <span class="image-row__check-box" aria-hidden="true">
+                {{ selectionOrder(image.key) || '' }}
+              </span>
             </label>
             <a :href="`/images/${image.key}`" target="_blank" rel="noopener">
               <img :src="`/images/${image.key}`" alt="" loading="lazy">
@@ -526,14 +534,49 @@ async function bulkDelete() {
 .r2__select-all {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
   color: var(--muted);
   font-size: 0.6rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
 }
-.r2__select-all input { accent-color: var(--accent); cursor: pointer; }
+.r2__select-all input,
+.image-row__check input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.r2__select-box {
+  position: relative;
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--subtle);
+  background: color-mix(in srgb, var(--body-bg) 70%, white);
+}
+.r2__select-box::after {
+  content: '';
+  position: absolute;
+  inset: 0.25rem;
+  background: transparent;
+}
+.r2__select-all:hover .r2__select-box {
+  border-color: var(--accent);
+}
+.r2__select-all input:focus-visible + .r2__select-box {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.r2__select-all input:checked + .r2__select-box {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.r2__select-all input:checked + .r2__select-box::after {
+  background: #F5F4F0;
+}
 
 .r2__bulk-actions {
   display: inline-flex;
@@ -582,6 +625,8 @@ async function bulkDelete() {
   display: grid;
   grid-template-columns: 13rem minmax(0, 1fr);
   background: var(--body-bg);
+  position: relative;
+  transition: background 0.15s;
 }
 
 .image-row__thumb {
@@ -596,27 +641,61 @@ async function bulkDelete() {
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: opacity 0.15s, transform 0.15s;
 }
 .image-row__check {
   position: absolute;
-  top: 0.6rem;
-  left: 0.6rem;
+  top: 0.55rem;
+  left: 0.55rem;
   z-index: 2;
-  display: flex;
-  padding: 0.3rem;
-  background: rgba(12, 12, 10, 0.55);
-  backdrop-filter: blur(4px);
-  border-radius: 4px;
-}
-.image-row__check input {
-  width: 1rem;
-  height: 1rem;
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
   cursor: pointer;
-  accent-color: var(--accent);
+}
+.image-row__check-box {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(245, 244, 240, 0.78);
+  background: rgba(12, 12, 10, 0.56);
+  color: #F5F4F0;
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  font-weight: 600;
+  line-height: 1;
+  backdrop-filter: blur(4px);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.image-row__check:hover .image-row__check-box {
+  border-color: #F5F4F0;
+  background: rgba(12, 12, 10, 0.72);
+}
+.image-row__check input:focus-visible + .image-row__check-box {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .image-row.is-selected {
-  outline: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--body-bg));
+  outline: 2.5px solid var(--accent);
   outline-offset: -2px;
+}
+.image-row.is-selected .image-row__thumb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2.5px solid var(--accent);
+  pointer-events: none;
+}
+.image-row.is-selected .image-row__thumb img {
+  opacity: 0.62;
+}
+.image-row.is-selected .image-row__check-box {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
 }
 
 .image-row__body {

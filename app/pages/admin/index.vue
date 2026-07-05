@@ -12,7 +12,7 @@ const [{ data: albums }, { data: posts }, { data: members }, { data: heroImages 
 const { user } = useUserSession()
 const canManage = computed(() => user.value?.role === 'owner' || user.value?.role === 'admin')
 
-const sections = computed(() => [
+const primarySections = computed(() => [
   {
     key: 'albums',
     title: t('admin.albums'),
@@ -30,47 +30,46 @@ const sections = computed(() => [
     to: localePath('/admin/posts'),
     newTo: localePath('/admin/posts/new'),
     quickLabel: t('admin.newPost')
-  },
+  }
+])
+
+const secondarySections = computed(() => [
   {
     key: 'members',
     title: t('admin.membersTitle'),
     count: members.value?.length ?? 0,
     meta: t('admin.memberWork'),
-    to: localePath('/admin/members'),
-    newTo: localePath('/admin/members'),
-    quickLabel: t('admin.manageMembers')
+    to: localePath('/admin/members')
   },
   {
     key: 'heroImages',
     title: t('admin.heroImagesTitle'),
     count: heroImages.value?.images?.length ?? 0,
     meta: t('admin.heroImagesMeta'),
-    to: localePath('/admin/hero-images'),
-    newTo: localePath('/admin/hero-images'),
-    quickLabel: t('admin.heroImagesTitle')
+    to: localePath('/admin/hero-images')
   },
-  ...(canManage.value
-    ? [
-        {
-          key: 'users',
-          title: 'IAM',
-          count: 0,
-          meta: 'Admin accounts, roles, and access.',
-          to: localePath('/admin/users'),
-          newTo: localePath('/admin/users'),
-          quickLabel: 'Manage IAM'
-        },
-        {
-          key: 'logs',
-          title: 'Logs',
-          count: 0,
-          meta: 'Audit trail of admin changes.',
-          to: localePath('/admin/logs'),
-          newTo: localePath('/admin/logs'),
-          quickLabel: 'View Logs'
-        }
-      ]
-    : [])
+  {
+    key: 'r2Images',
+    title: t('admin.r2ImagesTitle'),
+    count: null as number | null,
+    meta: t('admin.r2ImagesMeta'),
+    to: localePath('/admin/r2-images')
+  }
+])
+
+const adminSections = computed(() => [
+  {
+    key: 'users',
+    title: t('admin.iamTitle'),
+    meta: t('admin.iamMeta'),
+    to: localePath('/admin/users')
+  },
+  {
+    key: 'logs',
+    title: t('admin.logsTitle'),
+    meta: t('admin.logsMeta'),
+    to: localePath('/admin/logs')
+  }
 ])
 
 useHead({ title: () => `${t('admin.dashboard')} - Admin` })
@@ -78,56 +77,97 @@ useHead({ title: () => `${t('admin.dashboard')} - Admin` })
 
 <template>
   <div class="admin-wrap">
-  <section class="dash">
-    <div class="dash__head">
-      <p class="kicker">{{ t('admin.brand') }}</p>
-      <h1>{{ t('admin.dashboard') }}</h1>
-      <p>{{ t('admin.dashboardLead') }}</p>
-    </div>
+    <section class="dash">
+      <div class="dash__head">
+        <p class="kicker">{{ t('admin.brand') }}</p>
+        <h1>{{ t('admin.dashboard') }}</h1>
+        <p>{{ t('admin.dashboardLead') }}</p>
+      </div>
 
-    <div class="dash__tabs" role="list">
-      <NuxtLink v-for="section in sections" :key="section.key" :to="section.to" class="tab" role="listitem">
-        <span class="tab__count">{{ section.count }}</span>
-        <span>
-          <strong>{{ section.title }}</strong>
-          <small>{{ section.meta }}</small>
-        </span>
-      </NuxtLink>
-    </div>
+      <div class="dash__group">
+        <p class="dash__label">{{ t('admin.sectionContent') }}</p>
+        <div class="primary">
+          <article v-for="section in primarySections" :key="section.key" class="pcard">
+            <NuxtLink :to="section.to" class="pcard__link">
+              <span class="pcard__count">{{ section.count }}</span>
+              <span class="pcard__text">
+                <strong>{{ section.title }}</strong>
+                <small>{{ section.meta }}</small>
+              </span>
+            </NuxtLink>
+            <NuxtLink :to="section.newTo" class="pcard__new">{{ section.quickLabel }}</NuxtLink>
+          </article>
+        </div>
+      </div>
 
-    <div class="quick">
-      <NuxtLink v-for="section in sections" :key="section.key" :to="section.newTo" class="quick__action">
-        {{ section.quickLabel }}
-      </NuxtLink>
-    </div>
-  </section>
+      <div class="dash__group">
+        <p class="dash__label">{{ t('admin.sectionUtilities') }}</p>
+        <div class="secondary" role="list">
+          <NuxtLink v-for="section in secondarySections" :key="section.key" :to="section.to" class="scard" role="listitem">
+            <span v-if="section.count !== null" class="scard__count">{{ section.count }}</span>
+            <span class="scard__text">
+              <strong>{{ section.title }}</strong>
+              <small>{{ section.meta }}</small>
+            </span>
+          </NuxtLink>
+        </div>
+      </div>
+
+      <div v-if="canManage" class="dash__group dash__group--admin">
+        <p class="dash__label">{{ t('admin.sectionAdminTools') }}</p>
+        <div class="admintools">
+          <NuxtLink v-for="section in adminSections" :key="section.key" :to="section.to" class="acard">
+            <strong>{{ section.title }}</strong>
+            <small>{{ section.meta }}</small>
+          </NuxtLink>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
 
 <style scoped>
 .admin-wrap { max-width: 1120px; margin: 0 auto; padding: 3rem 2rem 5rem; }
-.dash { display: grid; gap: 2rem; }
+.dash { display: grid; gap: 2.75rem; }
 .dash__head { max-width: 720px; }
 .kicker { color: var(--accent); font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1rem; }
 .dash__head h1 { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 6.5rem); line-height: 0.95; font-weight: 200; margin-bottom: 1rem; }
 .dash__head p:last-child { color: var(--muted); line-height: 1.8; max-width: 560px; }
-.dash__tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); border-top: 1px solid var(--subtle); }
-.tab { display: grid; grid-template-columns: auto 1fr; gap: 1.25rem; padding: 1.5rem 0; color: var(--dark); text-decoration: none; border-bottom: 1px solid var(--subtle); transition: color 0.2s; }
-.tab:not(:first-child) { padding-left: 1.5rem; border-left: 1px solid var(--subtle); }
-.tab:not(:last-child) { padding-right: 1.5rem; }
-.tab:hover { color: var(--accent); }
-.tab__count { font-family: var(--font-serif); font-size: 3rem; line-height: 0.9; font-weight: 200; }
-.tab strong { display: block; font-weight: 500; margin-bottom: 0.35rem; }
-.tab small { color: var(--muted); font-size: 0.72rem; line-height: 1.5; }
-.quick { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.quick__action { font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; padding: 0.75rem 1.25rem; background: var(--dark); color: #F5F4F0; text-decoration: none; transition: background 0.2s; }
-.quick__action:hover { background: var(--accent); }
+
+.dash__group { display: grid; gap: 1.25rem; }
+.dash__label { color: var(--accent); font-size: 0.56rem; letter-spacing: 0.2em; text-transform: uppercase; }
+
+/* Primary — featured content cards */
+.primary { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1px; background: var(--subtle); border: 1px solid var(--subtle); }
+.pcard { display: flex; flex-direction: column; background: var(--body-bg); }
+.pcard__link { display: grid; grid-template-columns: auto 1fr; gap: 1.5rem; align-items: start; padding: 2rem 1.75rem; color: var(--dark); text-decoration: none; transition: color 0.2s; }
+.pcard__link:hover { color: var(--accent); }
+.pcard__count { font-family: var(--font-serif); font-size: 4.5rem; line-height: 0.85; font-weight: 200; }
+.pcard__text strong { display: block; font-size: 1rem; font-weight: 500; margin-bottom: 0.5rem; }
+.pcard__text small { display: block; color: var(--muted); font-size: 0.74rem; line-height: 1.6; }
+.pcard__new { align-self: flex-start; margin: 0 1.75rem 1.75rem; font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; padding: 0.75rem 1.25rem; background: var(--dark); color: #F5F4F0; text-decoration: none; transition: background 0.2s; }
+.pcard__new:hover { background: var(--accent); }
+
+/* Secondary — compact utility tiles */
+.secondary { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); border-top: 1px solid var(--subtle); }
+.scard { display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: center; padding: 1.25rem 0; color: var(--dark); text-decoration: none; border-bottom: 1px solid var(--subtle); transition: color 0.2s; }
+.scard:not(:first-child) { padding-left: 1.25rem; border-left: 1px solid var(--subtle); }
+.scard:not(:last-child) { padding-right: 1.25rem; }
+.scard:hover { color: var(--accent); }
+.scard__count { font-family: var(--font-serif); font-size: 2.25rem; line-height: 0.9; font-weight: 200; }
+.scard__text strong { display: block; font-weight: 500; margin-bottom: 0.3rem; }
+.scard__text small { color: var(--muted); font-size: 0.68rem; line-height: 1.5; }
+
+/* Admin tools — visually set apart */
+.dash__group--admin { padding: 1.5rem; border: 1px solid var(--subtle); background: var(--paper); }
+.admintools { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; }
+.acard { display: grid; gap: 0.35rem; padding: 1.1rem 1.25rem; border: 1px solid var(--subtle); color: var(--dark); text-decoration: none; transition: border-color 0.2s, color 0.2s; }
+.acard:hover { border-color: var(--accent); color: var(--accent); }
+.acard strong { font-weight: 500; letter-spacing: 0.04em; }
+.acard small { color: var(--muted); font-size: 0.68rem; line-height: 1.5; }
+
 @media (max-width: 720px) {
-  .dash__tabs { grid-template-columns: 1fr; }
-  .tab:nth-child(n) { padding-left: 0; padding-right: 0; border-left: 0; }
-}
-@media (min-width: 721px) and (max-width: 960px) {
-  .tab:nth-child(odd) { padding-left: 0; border-left: 0; }
-  .tab:nth-child(n+3) { border-top: 1px solid var(--subtle); }
+  .secondary { grid-template-columns: 1fr; }
+  .scard:nth-child(n) { padding-left: 0; padding-right: 0; border-left: 0; }
 }
 </style>

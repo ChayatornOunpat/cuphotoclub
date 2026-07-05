@@ -18,6 +18,7 @@ interface AuditLog {
 const { data: logs, pending } = await useFetch<AuditLog[]>('/api/admin/logs')
 
 const actionLabels: Record<string, string> = {
+  bootstrap: 'Bootstrapped',
   create: 'Created',
   update: 'Updated',
   delete: 'Deleted',
