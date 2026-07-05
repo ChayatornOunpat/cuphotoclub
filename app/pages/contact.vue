@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ layout: 'site' })
+
 const { data: settings } = useSiteSettings()
 
 const form = reactive({ name: '', email: '', subject: '', message: '' })

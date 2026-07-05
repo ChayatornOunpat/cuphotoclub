@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ layout: 'site' })
+
 interface EventItem {
   id: number
   slug: string

@@ -21,9 +21,8 @@ function imageSrc(key: string | null | undefined) {
   return `/images/${value.replace(/^\/+/, '')}`
 }
 
-// contentAlbums (canvas editor) live under /albums/:slug; schema.albums galleries under /galleries/:slug.
-function albumPath(a: { slug: string, source?: string }) {
-  return a.source === 'content' ? `/albums/${a.slug}` : `/galleries/${a.slug}`
+function albumPath(a: { slug: string }) {
+  return `/albums/${a.slug}`
 }
 
 // ── Hero background: randomise from the admin-managed image pool.

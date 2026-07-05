@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ layout: 'site' })
+
 const { data: page } = await useFetch<{ title: string, bodyHtml: string }>('/api/pages/about')
 
 useSeoMeta({

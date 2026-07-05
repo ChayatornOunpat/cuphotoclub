@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ layout: 'site' })
+
 interface EventRow {
   id: number
   slug: string

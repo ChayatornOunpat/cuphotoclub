@@ -27,33 +27,6 @@ function isISODate(value?: string | null) {
   return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
-function pad2(value: number) {
-  return String(value).padStart(2, '0')
-}
-
-function isoToDisplayDate(value?: string | null) {
-  if (!isISODate(value)) return ''
-  const [year, month, day] = value.split('-')
-  return `${day}/${month}/${year.slice(-2)}`
-}
-
-function displayDateToISO(value: string) {
-  const raw = value.trim()
-  if (!raw) return ''
-
-  const separated = raw.match(/^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{2}|\d{4})$/)
-  const compact = raw.match(/^(\d{2})(\d{2})(\d{2}|\d{4})$/)
-  const match = separated || compact
-  if (!match) return null
-
-  const day = Number(match[1])
-  const month = Number(match[2])
-  const year = Number(match[3].length === 2 ? `20${match[3]}` : match[3])
-  const date = new Date(year, month - 1, day)
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null
-  return `${year}-${pad2(month)}-${pad2(day)}`
-}
-
 function normalizeInitialAlbum(input: AlbumInput): AlbumInput {
   const album = structuredClone(toRaw(input))
   if (!isISODate(album.date)) album.date = isISODate(album.published) ? album.published : ''
@@ -89,8 +62,6 @@ function blank(): AlbumInput {
 
 const form = reactive<AlbumInput>(props.initial ? normalizeInitialAlbum(props.initial) : blank())
 const publishedMatchesEvent = ref(!!form.date && form.published === form.date)
-const dateText = ref(isoToDisplayDate(form.date))
-const publishedText = ref(isoToDisplayDate(form.published))
 const uploadedMediaKeys = ref<string[]>([])
 const mediaLoading = ref(false)
 const photoManagerOpen = ref(false)
@@ -141,11 +112,9 @@ watch(publishedMatchesEvent, (enabled) => {
 })
 watch(() => form.date, (date) => {
   if (publishedMatchesEvent.value) form.published = date || ''
-  if (import.meta.client && document.activeElement !== dateInput.value) dateText.value = isoToDisplayDate(date)
 })
 watch(() => form.published, (published) => {
   if (publishedMatchesEvent.value && published !== form.date) publishedMatchesEvent.value = false
-  if (import.meta.client && document.activeElement !== publishedInput.value) publishedText.value = isoToDisplayDate(published)
 })
 
 onBeforeRouteLeave((to) => {
@@ -774,31 +743,6 @@ function editContent(
   void focusField(field)
 }
 
-function commitDisplayDate(kind: 'date' | 'published') {
-  const value = kind === 'date' ? dateText.value : publishedText.value
-  const parsed = displayDateToISO(value)
-  if (parsed === null) {
-    if (kind === 'date') dateText.value = isoToDisplayDate(form.date)
-    else publishedText.value = isoToDisplayDate(form.published)
-    return
-  }
-  if (kind === 'date') {
-    form.date = parsed
-    dateText.value = isoToDisplayDate(parsed)
-  } else {
-    form.published = parsed
-    publishedText.value = isoToDisplayDate(parsed)
-  }
-}
-
-function onDisplayDateInput(kind: 'date' | 'published') {
-  const value = kind === 'date' ? dateText.value : publishedText.value
-  const parsed = displayDateToISO(value)
-  if (!parsed) return
-  if (kind === 'date') form.date = parsed
-  else form.published = parsed
-}
-
 function trimmedAlbumPayload(): AlbumInput {
   const payload = structuredClone(toRaw(form))
   payload.title = payload.title.trim()
@@ -820,8 +764,6 @@ function trimmedAlbumPayload(): AlbumInput {
 
 // Submit
 function onSubmit() {
-  commitDisplayDate('date')
-  commitDisplayDate('published')
   validationError.value = null
   const missing: string[] = []
   if (!form.title.trim()) missing.push(t('adminEditor.fieldTitle'))
@@ -883,17 +825,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
         </div>
         <div class="field">
           <label>{{ t('adminForm.publishedSort') }}</label>
-          <input
-            ref="publishedInput"
-            v-model="publishedText"
-            type="text"
-            inputmode="numeric"
-            placeholder="DD/MM/YY"
-            :disabled="publishedMatchesEvent"
-            @input="onDisplayDateInput('published')"
-            @blur="commitDisplayDate('published')"
-            @keydown.enter.prevent="commitDisplayDate('published')"
-          >
+          <input ref="publishedInput" v-model="form.published" type="date" lang="en-GB" :disabled="publishedMatchesEvent">
           <label class="date-sync">
             <input v-model="publishedMatchesEvent" type="checkbox">
             <span>{{ t('adminForm.publishedSameAsEvent') }}</span>
@@ -1194,14 +1126,10 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           <label>{{ t('adminForm.dateDisplay') }}</label>
           <input
             ref="dateInput"
-            v-model="dateText"
-            type="text"
-            inputmode="numeric"
-            placeholder="DD/MM/YY"
-            @input="onDisplayDateInput('date')"
+            v-model="form.date"
+            type="date"
+            lang="en-GB"
             @focus="activeField = 'date'"
-            @blur="commitDisplayDate('date')"
-            @keydown.enter.prevent="commitDisplayDate('date')"
           >
         </div>
         <div class="field" :class="{ active: activeField === 'location' }">

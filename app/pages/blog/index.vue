@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ layout: 'site' })
+
 interface PostRow {
   id: number
   slug: string
