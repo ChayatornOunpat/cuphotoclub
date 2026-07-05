@@ -32,18 +32,17 @@ const pad = (n: number) => String(n).padStart(2, '0')
 
 <template>
   <article>
-    <div class="crumb">
-      <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ t('albums.stickyBreadcrumb') }}</span>
-      <NuxtLink v-else :to="localePath('/albums')">{{ t('albums.stickyBreadcrumb') }}</NuxtLink><span>/</span>
-      <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ album.category }}</span>
-      <NuxtLink v-else :to="localePath('/albums')">{{ album.category }}</NuxtLink><span>/</span>
-      <span class="here" :lang="textLang(album.title)">{{ album.title }}</span>
-    </div>
-
     <div class="split">
       <!-- STICKY META -->
       <aside class="meta">
-        <div class="meta__thumb"><AppImg :src="cover" :alt="album.title" width="700" height="525" /></div>
+        <div class="crumb">
+          <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ t('albums.stickyBreadcrumb') }}</span>
+          <NuxtLink v-else :to="localePath('/albums')">{{ t('albums.stickyBreadcrumb') }}</NuxtLink><span>/</span>
+          <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ album.category }}</span>
+          <NuxtLink v-else :to="localePath('/albums')">{{ album.category }}</NuxtLink><span>/</span>
+          <span class="here" :lang="textLang(album.title)">{{ album.title }}</span>
+        </div>
+        <div class="meta__thumb"><AppImg :src="cover" :alt="album.title" sizes="sm:100vw lg:360px" /></div>
         <p class="meta__cat" :lang="textLang(album.category)">{{ album.category }}</p>
         <h1 class="meta__title" :lang="textLang(album.title)">{{ album.title }}</h1>
         <p class="meta__excerpt" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
@@ -77,18 +76,18 @@ const pad = (n: number) => String(n).padStart(2, '0')
 </template>
 
 <style scoped>
-.crumb { padding: 6rem 3rem 0; max-width: 1500px; margin: 0 auto; }
+.crumb { margin-bottom: 1.5rem; }
 .crumb :deep(a), .crumb__link { font-size: 0.56rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
 .crumb :deep(a):hover { color: var(--accent); }
 .crumb__link.is-disabled { cursor: default; pointer-events: none; }
-.crumb span { color: var(--subtle); margin: 0 0.6rem; font-size: 0.56rem; }
+.crumb span { color: var(--subtle); margin: 0 0.45rem; font-size: 0.56rem; }
 .crumb .here { color: var(--dark); letter-spacing: 0.2em; text-transform: uppercase; }
 
-.split { display: grid; grid-template-columns: 360px 1fr; gap: 4rem; max-width: 1500px; margin: 0 auto; padding: 2.5rem 3rem 5rem; align-items: start; }
+.split { display: grid; grid-template-columns: 360px 1fr; gap: 4rem; max-width: 1500px; margin: 0 auto; padding: 6rem 3rem 5rem; align-items: start; }
 
 .meta { position: sticky; top: 6rem; }
-.meta__thumb { width: 100%; aspect-ratio: 4 / 3; overflow: hidden; margin-bottom: 1.75rem; background: var(--hero-bg); }
-.meta__thumb :deep(img) { width: 100%; height: 100%; object-fit: cover; }
+.meta__thumb { width: 100%; overflow: hidden; margin-bottom: 1.75rem; background: var(--hero-bg); }
+.meta__thumb :deep(img) { width: 100%; height: auto; display: block; object-fit: contain; }
 .meta__cat { font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1rem; }
 .meta__title { font-family: var(--font-serif); font-size: clamp(2rem, 3vw, 3rem); font-weight: 200; line-height: 1; letter-spacing: -0.02em; margin-bottom: 1.5rem; white-space: pre-line; }
 .meta__excerpt { font-size: 0.82rem; color: var(--muted); line-height: 1.85; margin-bottom: 2rem; }
@@ -107,8 +106,7 @@ figure { margin: 0; }
 figcaption { margin-top: 0.85rem; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 
 @media (max-width: 880px) {
-  .crumb, .split { padding-left: 1.5rem; padding-right: 1.5rem; }
-  .split { grid-template-columns: 1fr; gap: 2.5rem; }
+  .split { grid-template-columns: 1fr; gap: 2.5rem; padding: 6rem 1.5rem 5rem; }
   .meta { position: static; }
 }
 </style>

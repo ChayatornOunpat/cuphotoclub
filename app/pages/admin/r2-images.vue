@@ -84,6 +84,124 @@ function formatBytes(value?: number) {
 function usageLabel(item: ImageUsage) {
   return item.role ? `${item.label} · ${item.role}` : item.label
 }
+
+const deletingKey = ref<string | null>(null)
+
+async function requestDelete(key: string, force = false) {
+  await $fetch('/api/admin/r2-images/delete', {
+    method: 'POST',
+    body: { key, force }
+  })
+}
+
+async function deleteImage(image: R2Image, force = false) {
+  deletingKey.value = image.key
+  try {
+    await requestDelete(image.key, force)
+    await refresh()
+  } catch (err: any) {
+    if (err?.statusCode === 409 && !force) {
+      if (confirm(`${err.data?.message || 'This image is still referenced elsewhere.'}\n\nDelete it anyway?`)) {
+        await deleteImage(image, true)
+        return
+      }
+    } else {
+      alert(err?.data?.message || 'Could not delete image.')
+    }
+  } finally {
+    deletingKey.value = null
+  }
+}
+
+function confirmDelete(image: R2Image) {
+  if (!confirm(`Delete "${image.key}" from R2? This cannot be undone.`)) return
+  deleteImage(image)
+}
+
+// ── Bulk selection ───────────────────────────────────────────────────────
+const selected = ref<Set<string>>(new Set())
+const bulkDeleting = ref(false)
+const lastSelectedIndex = ref<number | null>(null)
+
+function isSelected(key: string) {
+  return selected.value.has(key)
+}
+function toggleSelected(key: string) {
+  const next = new Set(selected.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  selected.value = next
+}
+function selectRange(fromIndex: number, toIndex: number) {
+  const [start, end] = fromIndex <= toIndex ? [fromIndex, toIndex] : [toIndex, fromIndex]
+  const next = new Set(selected.value)
+  for (let i = start; i <= end; i++) {
+    const image = filteredImages.value[i]
+    if (image) next.add(image.key)
+  }
+  selected.value = next
+}
+function onCheckboxClick(event: MouseEvent, key: string, index: number) {
+  event.preventDefault()
+  if (event.shiftKey && lastSelectedIndex.value !== null) {
+    selectRange(lastSelectedIndex.value, index)
+  } else {
+    toggleSelected(key)
+  }
+  lastSelectedIndex.value = index
+}
+function clearSelection() {
+  selected.value = new Set()
+  lastSelectedIndex.value = null
+}
+const allFilteredSelected = computed(() =>
+  filteredImages.value.length > 0 && filteredImages.value.every(image => selected.value.has(image.key))
+)
+function toggleSelectAllFiltered() {
+  if (allFilteredSelected.value) {
+    clearSelection()
+  } else {
+    selected.value = new Set(filteredImages.value.map(image => image.key))
+  }
+}
+
+async function bulkDelete() {
+  const keys = [...selected.value]
+  if (!keys.length) return
+  if (!confirm(`Delete ${keys.length} image${keys.length === 1 ? '' : 's'} from R2? This cannot be undone.`)) return
+
+  bulkDeleting.value = true
+  const blocked: string[] = []
+  const failed: string[] = []
+  try {
+    for (const key of keys) {
+      try {
+        await requestDelete(key)
+      } catch (err: any) {
+        if (err?.statusCode === 409) blocked.push(key)
+        else failed.push(key)
+      }
+    }
+
+    if (blocked.length && confirm(
+      `${blocked.length} of the selected images are still referenced elsewhere. Delete them anyway?`
+    )) {
+      for (const key of blocked) {
+        try { await requestDelete(key, true) }
+        catch { failed.push(key) }
+      }
+    }
+
+    clearSelection()
+    await refresh()
+
+    if (failed.length) {
+      alert(`Could not delete ${failed.length} image${failed.length === 1 ? '' : 's'}.`)
+    }
+  } finally {
+    bulkDeleting.value = false
+  }
+}
 </script>
 
 <template>
@@ -151,55 +269,88 @@ function usageLabel(item: ImageUsage) {
     </div>
     <div v-else-if="!filteredImages.length" class="r2__empty">No images match this view.</div>
 
-    <section v-else class="r2__list" aria-label="R2 image list">
-      <article v-for="image in filteredImages" :key="image.key" class="image-row">
-        <a class="image-row__thumb" :href="`/images/${image.key}`" target="_blank" rel="noopener">
-          <img :src="`/images/${image.key}`" alt="" loading="lazy">
-        </a>
-
-        <div class="image-row__body">
-          <div class="image-row__main">
-            <h2>{{ image.key }}</h2>
-            <dl>
-              <div>
-                <dt>Type</dt>
-                <dd>{{ image.contentType || 'image' }}</dd>
-              </div>
-              <div>
-                <dt>Size</dt>
-                <dd>{{ formatBytes(image.size) }}</dd>
-              </div>
-              <div>
-                <dt>Uploaded</dt>
-                <dd>{{ formatDateTime(image.uploadedAt) }}</dd>
-              </div>
-            </dl>
-          </div>
-
-          <div class="image-row__refs">
-            <div>
-              <p>Gallery albums</p>
-              <div v-if="image.albums.length" class="image-row__links">
-                <NuxtLink v-for="album in image.albums" :key="`${image.key}-${album.href}-${album.role}`" :to="album.href || '#'">
-                  {{ usageLabel(album) }}
-                </NuxtLink>
-              </div>
-              <span v-else class="image-row__none">None</span>
-            </div>
-
-            <div>
-              <p>Other references</p>
-              <div v-if="image.usages.length" class="image-row__links">
-                <NuxtLink v-for="usage in image.usages" :key="`${image.key}-${usage.kind}-${usage.href}-${usage.role}`" :to="usage.href || '#'">
-                  {{ usageLabel(usage) }}
-                </NuxtLink>
-              </div>
-              <span v-else class="image-row__none">None</span>
-            </div>
-          </div>
+    <template v-else>
+      <div class="r2__bulk">
+        <label class="r2__select-all">
+          <input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAllFiltered">
+          Select all shown
+        </label>
+        <div v-if="selected.size" class="r2__bulk-actions">
+          <span>{{ selected.size }} selected</span>
+          <button type="button" class="r2__bulk-clear" @click="clearSelection">Clear</button>
+          <button type="button" class="r2__bulk-delete" :disabled="bulkDeleting" @click="bulkDelete">
+            <Icon name="heroicons:trash" />
+            {{ bulkDeleting ? 'Deleting…' : `Delete ${selected.size}` }}
+          </button>
         </div>
-      </article>
-    </section>
+      </div>
+
+      <section class="r2__list" aria-label="R2 image list">
+        <article v-for="(image, index) in filteredImages" :key="image.key" class="image-row" :class="{ 'is-selected': isSelected(image.key) }">
+          <div class="image-row__thumb">
+            <label class="image-row__check">
+              <input type="checkbox" :checked="isSelected(image.key)" @click="onCheckboxClick($event, image.key, index)">
+            </label>
+            <a :href="`/images/${image.key}`" target="_blank" rel="noopener">
+              <img :src="`/images/${image.key}`" alt="" loading="lazy">
+            </a>
+          </div>
+
+          <div class="image-row__body">
+            <div class="image-row__main">
+              <div class="image-row__title">
+                <h2>{{ image.key }}</h2>
+                <button
+                  type="button"
+                  class="image-row__delete"
+                  :disabled="deletingKey === image.key"
+                  @click="confirmDelete(image)"
+                >
+                  <Icon name="heroicons:trash" />
+                  {{ deletingKey === image.key ? 'Deleting…' : 'Delete' }}
+                </button>
+              </div>
+              <dl>
+                <div>
+                  <dt>Type</dt>
+                  <dd>{{ image.contentType || 'image' }}</dd>
+                </div>
+                <div>
+                  <dt>Size</dt>
+                  <dd>{{ formatBytes(image.size) }}</dd>
+                </div>
+                <div>
+                  <dt>Uploaded</dt>
+                  <dd>{{ formatDateTime(image.uploadedAt) }}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="image-row__refs">
+              <div>
+                <p>Gallery albums</p>
+                <div v-if="image.albums.length" class="image-row__links">
+                  <NuxtLink v-for="album in image.albums" :key="`${image.key}-${album.href}-${album.role}`" :to="album.href || '#'">
+                    {{ usageLabel(album) }}
+                  </NuxtLink>
+                </div>
+                <span v-else class="image-row__none">None</span>
+              </div>
+
+              <div>
+                <p>Other references</p>
+                <div v-if="image.usages.length" class="image-row__links">
+                  <NuxtLink v-for="usage in image.usages" :key="`${image.key}-${usage.kind}-${usage.href}-${usage.role}`" :to="usage.href || '#'">
+                    {{ usageLabel(usage) }}
+                  </NuxtLink>
+                </div>
+                <span v-else class="image-row__none">None</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </template>
   </div>
 </template>
 
@@ -363,6 +514,63 @@ function usageLabel(item: ImageUsage) {
 }
 .r2__error { color: #b0243c; }
 
+.r2__bulk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.2rem 0;
+}
+
+.r2__select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.r2__select-all input { accent-color: var(--accent); cursor: pointer; }
+
+.r2__bulk-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.68rem;
+  color: var(--dark);
+}
+
+.r2__bulk-clear {
+  border: none;
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+.r2__bulk-clear:hover { color: var(--dark); }
+
+.r2__bulk-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #b0243c;
+  background: #b0243c;
+  color: #F5F4F0;
+  padding: 0.5rem 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.r2__bulk-delete:hover { background: #8f1c30; border-color: #8f1c30; }
+.r2__bulk-delete:disabled { opacity: 0.55; cursor: wait; }
+.r2__bulk-delete svg { width: 0.85rem; height: 0.85rem; }
+
 .r2__list {
   display: grid;
   gap: 1px;
@@ -377,6 +585,7 @@ function usageLabel(item: ImageUsage) {
 }
 
 .image-row__thumb {
+  position: relative;
   display: block;
   aspect-ratio: 4 / 3;
   overflow: hidden;
@@ -387,6 +596,27 @@ function usageLabel(item: ImageUsage) {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+.image-row__check {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  z-index: 2;
+  display: flex;
+  padding: 0.3rem;
+  background: rgba(12, 12, 10, 0.55);
+  backdrop-filter: blur(4px);
+  border-radius: 4px;
+}
+.image-row__check input {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.image-row.is-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .image-row__body {
@@ -402,8 +632,15 @@ function usageLabel(item: ImageUsage) {
   min-width: 0;
 }
 
-.image-row__main h2 {
+.image-row__title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin-bottom: 0.9rem;
+}
+
+.image-row__main h2 {
   color: var(--dark);
   font-family: var(--font-sans);
   font-size: 0.82rem;
@@ -411,6 +648,26 @@ function usageLabel(item: ImageUsage) {
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
+
+.image-row__delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  border: 1px solid var(--subtle);
+  background: none;
+  color: #b0243c;
+  padding: 0.35rem 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.image-row__delete:hover { border-color: #b0243c; background: color-mix(in srgb, #b0243c 8%, transparent); }
+.image-row__delete:disabled { opacity: 0.55; cursor: wait; }
+.image-row__delete svg { width: 0.8rem; height: 0.8rem; }
 
 .image-row__main dl {
   display: flex;

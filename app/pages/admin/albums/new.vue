@@ -8,13 +8,28 @@ const busy = ref(false)
 const saveError = ref<string | null>(null)
 const saved = ref(false)
 const draftMediaPrefix = useState('draft-album-media-prefix', () => `content-albums/drafts/${crypto.randomUUID()}`)
+const draftMediaStorageKey = 'cu-photo-draft-album-media-prefix'
+
+onMounted(() => {
+  const savedPrefix = localStorage.getItem(draftMediaStorageKey)
+  if (savedPrefix?.startsWith('content-albums/drafts/')) {
+    draftMediaPrefix.value = savedPrefix
+  } else {
+    localStorage.setItem(draftMediaStorageKey, draftMediaPrefix.value)
+  }
+})
 
 async function save(value: AlbumInput) {
   busy.value = true
   saveError.value = null
   try {
-    const album = await $fetch('/api/admin/albums', { method: 'POST', body: value })
+    const album = await $fetch('/api/admin/albums', {
+      method: 'POST',
+      body: { ...value, draftMediaPrefix: draftMediaPrefix.value }
+    })
     saved.value = true
+    localStorage.removeItem(draftMediaStorageKey)
+    draftMediaPrefix.value = `content-albums/drafts/${crypto.randomUUID()}`
     await navigateTo(localePath(value.visibility === 'draft' ? `/admin/albums/${album.id}` : `/albums/${album.id}`))
   } catch (e) {
     saveError.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || t('admin.saveFailed')
