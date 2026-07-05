@@ -21,13 +21,23 @@ const props = defineProps<{
 const isRoutedImage = computed(() => props.src?.startsWith('/images/'))
 
 const loaded = ref(false)
+const imgEl = ref<HTMLImageElement | null>(null)
 const isEager = computed(() => props.eager === true)
 const done = computed(() => loaded.value || isEager.value)
+
+function markLoaded() {
+  loaded.value = true
+}
+
+onMounted(() => {
+  if (imgEl.value?.complete) markLoaded()
+})
 </script>
 
 <template>
   <img
     v-if="isRoutedImage"
+    ref="imgEl"
     :src="props.src"
     :alt="props.alt ?? ''"
     :sizes="props.sizes"
@@ -37,7 +47,7 @@ const done = computed(() => loaded.value || isEager.value)
     :fetchpriority="isEager ? 'high' : 'auto'"
     :class="{ 'app-img--done': done }"
     class="app-img"
-    @load="loaded = true"
+    @load="markLoaded"
   >
   <NuxtImg
     v-else
@@ -50,7 +60,7 @@ const done = computed(() => loaded.value || isEager.value)
     :fetchpriority="isEager ? 'high' : 'auto'"
     :preload="isEager ? true : undefined"
     :class="{ 'app-img--done': done }"
-    @load="loaded = true"
+    @load="markLoaded"
     class="app-img"
   />
 </template>
