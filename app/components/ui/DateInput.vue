@@ -25,20 +25,24 @@ function toDisplayDate(value?: string | null) {
 }
 
 function toISODate(value: string) {
-  const raw = value.trim()
-  if (!raw) return ''
-
-  const separated = raw.match(/^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{2}|\d{4})$/)
-  const compact = raw.match(/^(\d{2})(\d{2})(\d{2}|\d{4})$/)
-  const match = separated || compact
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
   if (!match) return null
 
   const day = Number(match[1])
   const month = Number(match[2])
-  const year = Number(match[3].length === 2 ? `20${match[3]}` : match[3])
+  const year = Number(match[3])
   const date = new Date(year, month - 1, day)
   if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null
   return `${year}-${pad2(month)}-${pad2(day)}`
+}
+
+// Masks input to digits only and auto-inserts slashes as DD/MM/YYYY, so
+// typing can never produce anything but a well-formed date string.
+function maskDigits(raw: string) {
+  const digits = raw.replace(/\D/g, '').slice(0, 8)
+  if (digits.length > 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+  if (digits.length > 2) return `${digits.slice(0, 2)}/${digits.slice(2)}`
+  return digits
 }
 
 const text = ref(toDisplayDate(model.value))
@@ -49,6 +53,7 @@ watch(model, (value) => {
 })
 
 function onTextInput() {
+  text.value = maskDigits(text.value)
   const parsed = toISODate(text.value)
   if (parsed) model.value = parsed
 }
@@ -92,7 +97,7 @@ defineExpose({
       placeholder="DD/MM/YYYY"
       :required="required"
       :disabled="disabled"
-      class="block w-full rounded-md bg-white px-3 py-1.5 pr-9 text-sm text-ink outline-1 -outline-offset-1 outline-line placeholder:text-ink-soft/50 focus:outline-2 focus:-outline-offset-2 focus:outline-accent disabled:cursor-not-allowed disabled:bg-paper-soft disabled:text-ink-soft"
+      class="block w-full bg-white px-3 py-1.5 pr-9 text-sm text-ink outline-1 -outline-offset-1 outline-line placeholder:text-ink-soft/50 focus:outline-2 focus:-outline-offset-2 focus:outline-accent disabled:cursor-not-allowed disabled:bg-paper-soft disabled:text-ink-soft"
       @input="onTextInput"
       @focus="emit('focus')"
       @blur="commitText"
@@ -102,7 +107,7 @@ defineExpose({
       type="button"
       tabindex="-1"
       :disabled="disabled"
-      class="absolute right-1.5 flex size-6 items-center justify-center rounded text-ink-soft hover:text-ink disabled:cursor-not-allowed disabled:text-ink-soft/40"
+      class="absolute right-1.5 flex size-6 items-center justify-center text-ink-soft hover:text-ink disabled:cursor-not-allowed disabled:text-ink-soft/40"
       @click="openPicker"
     >
       <Icon name="heroicons:calendar-days" class="size-4" />
