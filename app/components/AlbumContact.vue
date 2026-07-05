@@ -34,6 +34,7 @@ const idx = ref(0)
 const current = computed(() => imageCells.value[idx.value])
 
 function show(i: number) {
+  if (props.disableNavigation) return
   idx.value = (i + imageCells.value.length) % imageCells.value.length
   open.value = true
 }
@@ -84,6 +85,7 @@ onUnmounted(() => {
         <button
           v-for="(img, i) in imageCells"
           :key="i"
+          type="button"
           class="cell"
           :data-row-n="img.row"
           :data-cell-n="img.cell"
@@ -91,24 +93,53 @@ onUnmounted(() => {
           @click="show(i)"
         >
           <span class="cell__num">{{ pad(i + 1) }}</span>
-          <AppImg :src="img.src" :alt="img.caption || album.title" sizes="sm:50vw lg:460px" />
+          <AppImg :src="img.src" :alt="img.caption || album.title" sizes="180px" />
           <span v-if="img.caption" class="cell__cap" :lang="textLang(img.caption)">{{ img.caption }}</span>
         </button>
       </div>
     </section>
 
     <!-- LIGHTBOX -->
-    <div v-if="open" class="lb open" @click.self="close">
+    <div v-if="open" class="lb" role="dialog" aria-modal="true" @click.self="close">
       <div class="lb__top">
-        <span class="lb__counter" :lang="textLang(album.title)"><b>{{ pad(idx + 1) }}</b> / {{ pad(imageCells.length) }} · {{ album.title }}</span>
-        <button class="lb__close" @click="close">{{ t('albums.close') }}</button>
+        <div class="lb__identity">
+          <span class="lb__counter"><b>{{ pad(idx + 1) }}</b> / {{ pad(imageCells.length) }}</span>
+          <span class="lb__title" :lang="textLang(album.title)">{{ album.title }}</span>
+        </div>
+        <button class="lb__close" :aria-label="t('albums.close')" @click="close">
+          <Icon name="heroicons:x-mark" />
+          <span>{{ t('albums.close') }}</span>
+        </button>
       </div>
+
       <div class="lb__stage">
-        <button class="lb__nav" @click="prev">‹</button>
-        <AppImg :src="current!.src" :alt="current!.caption || album.title" class="lb__img" sizes="xs:90vw sm:86vw md:86vw lg:1100px xl:1100px" />
-        <button class="lb__nav" @click="next">›</button>
+        <button class="lb__nav lb__nav--prev" aria-label="Previous image" @click="prev">
+          <Icon name="heroicons:chevron-left" />
+        </button>
+        <figure class="lb__figure">
+          <AppImg :src="current!.src" :alt="current!.caption || album.title" class="lb__img" sizes="xs:92vw sm:88vw md:84vw lg:1120px xl:1280px" />
+          <figcaption v-if="current!.caption" class="lb__cap" :lang="textLang(current!.caption)">
+            <span>{{ pad(idx + 1) }}</span>{{ current!.caption }}
+          </figcaption>
+        </figure>
+        <button class="lb__nav lb__nav--next" aria-label="Next image" @click="next">
+          <Icon name="heroicons:chevron-right" />
+        </button>
       </div>
-      <div class="lb__cap" :lang="textLang(current!.caption)"><span>{{ pad(idx + 1) }}</span>{{ current!.caption }}</div>
+
+      <div class="lb__rail" aria-label="Contact sheet thumbnails">
+        <button
+          v-for="(img, i) in imageCells"
+          :key="`rail-${i}`"
+          type="button"
+          class="lb__thumb"
+          :class="{ 'is-active': i === idx }"
+          :aria-label="`Open image ${i + 1}`"
+          @click="show(i)"
+        >
+          <AppImg :src="img.src" :alt="img.caption || album.title" sizes="72px" />
+        </button>
+      </div>
     </div>
   </article>
 </template>
@@ -129,36 +160,222 @@ onUnmounted(() => {
 .head__sub { margin-top: 1.5rem; max-width: 520px; font-size: 0.82rem; color: rgba(245, 244, 240, 0.5); line-height: 1.8; }
 
 .sheet { padding: 4rem 3rem 6rem; max-width: 1380px; margin: 0 auto; }
-.sheet__bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; flex-wrap: wrap; gap: 1rem; }
+.sheet__bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
 .eyebrow { font-size: 0.54rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 1rem; }
 .eyebrow .num { color: var(--accent); font-weight: 500; }
 .sheet__hint { font-size: 0.54rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
 
-.grid { column-count: 3; column-gap: 1rem; }
-.cell { break-inside: avoid; margin-bottom: 1rem; position: relative; overflow: hidden; cursor: zoom-in; background: var(--hero-bg); display: block; border: none; padding: 0; width: 100%; }
-.cell :deep(img) { width: 100%; display: block; object-fit: cover; }
-.cell__num { position: absolute; top: 0.7rem; left: 0.7rem; font-size: 0.5rem; letter-spacing: 0.16em; color: #F5F4F0; background: rgba(12, 12, 10, 0.5); backdrop-filter: blur(4px); padding: 0.35rem 0.55rem; opacity: 0.8; transition: background 0.25s; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.65rem; }
+.cell { position: relative; overflow: hidden; cursor: zoom-in; background: var(--hero-bg); display: block; border: 1px solid var(--subtle); padding: 0; width: 100%; aspect-ratio: 1; }
+.cell :deep(img) { width: 100%; height: 100%; display: block; object-fit: cover; transition: opacity 0.18s, transform 0.18s; }
+.cell:hover :deep(img) { opacity: 0.82; transform: scale(1.025); }
+.cell__num { position: absolute; top: 0.4rem; left: 0.4rem; font-size: 0.45rem; letter-spacing: 0.12em; color: #F5F4F0; background: rgba(12, 12, 10, 0.58); backdrop-filter: blur(4px); padding: 0.28rem 0.4rem; opacity: 0.88; transition: background 0.25s; }
 .cell:hover .cell__num { background: var(--accent); opacity: 1; }
-.cell__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 2rem 0.8rem 0.7rem; background: linear-gradient(transparent, rgba(12, 12, 10, 0.8)); font-size: 0.56rem; letter-spacing: 0.1em; color: rgba(245, 244, 240, 0.85); text-align: left; opacity: 0; transition: opacity 0.28s; }
+.cell__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.4rem 0.45rem 0.4rem; background: linear-gradient(transparent, rgba(12, 12, 10, 0.84)); font-size: 0.48rem; letter-spacing: 0.08em; color: rgba(245, 244, 240, 0.85); text-align: left; opacity: 0; transition: opacity 0.18s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cell:hover .cell__cap { opacity: 1; }
 
-.lb { position: fixed; inset: 0; z-index: 300; background: rgba(10, 10, 8, 0.97); display: flex; flex-direction: column; }
-.lb__top { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; color: rgba(245, 244, 240, 0.7); }
-.lb__counter { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; }
+.lb {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: #0C0C0A;
+  color: #F5F4F0;
+}
+.lb__top {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(245, 244, 240, 0.12);
+  background: rgba(12, 12, 10, 0.88);
+}
+.lb__identity {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.8rem;
+}
+.lb__counter {
+  flex-shrink: 0;
+  color: rgba(245, 244, 240, 0.62);
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
 .lb__counter b { color: var(--accent); font-weight: 500; }
-.lb__close { background: none; border: none; color: rgba(245, 244, 240, 0.7); font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: color 0.2s; }
-.lb__close:hover { color: var(--accent); }
-.lb__stage { flex: 1; display: flex; align-items: center; justify-content: center; gap: 1.5rem; padding: 0 2rem; position: relative; }
-:deep(.lb__img) { max-width: min(1100px, 86vw); max-height: 78vh; object-fit: contain; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5); }
-.lb__nav { background: none; border: 1px solid rgba(245, 244, 240, 0.2); color: #F5F4F0; width: 48px; height: 48px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; flex-shrink: 0; transition: background 0.2s, border-color 0.2s; }
-.lb__nav:hover { background: var(--accent); border-color: var(--accent); }
-.lb__cap { text-align: center; padding: 1.25rem 2rem 2rem; color: rgba(245, 244, 240, 0.55); font-size: 0.68rem; letter-spacing: 0.12em; }
-.lb__cap span { color: var(--accent); margin-right: 0.75rem; }
+.lb__title {
+  min-width: 0;
+  color: rgba(245, 244, 240, 0.86);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb__close {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.15rem;
+  border: 1px solid rgba(245, 244, 240, 0.18);
+  background: transparent;
+  color: rgba(245, 244, 240, 0.76);
+  padding: 0 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+.lb__close:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.lb__close svg { width: 0.95rem; height: 0.95rem; }
+.lb__stage {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+.lb__figure {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  margin: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  place-items: center;
+}
+:deep(.lb__img) {
+  max-width: 100%;
+  max-height: calc(100svh - 12rem);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.48);
+}
+.lb__nav {
+  display: grid;
+  place-items: center;
+  width: 2.8rem;
+  height: 4.8rem;
+  border: 1px solid rgba(245, 244, 240, 0.16);
+  background: rgba(245, 244, 240, 0.04);
+  color: rgba(245, 244, 240, 0.82);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+.lb__nav:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.lb__nav svg { width: 1.2rem; height: 1.2rem; }
+.lb__cap {
+  width: min(860px, 100%);
+  margin-top: 0.9rem;
+  color: rgba(245, 244, 240, 0.64);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  line-height: 1.6;
+  text-align: center;
+}
+.lb__cap span {
+  color: var(--accent);
+  margin-right: 0.65rem;
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+}
+.lb__rail {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid rgba(245, 244, 240, 0.12);
+  background: rgba(12, 12, 10, 0.9);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 244, 240, 0.3) transparent;
+}
+.lb__thumb {
+  position: relative;
+  flex: 0 0 4.25rem;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid rgba(245, 244, 240, 0.16);
+  background: rgba(245, 244, 240, 0.08);
+  padding: 0;
+  cursor: pointer;
+}
+.lb__thumb :deep(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0.62;
+  transition: opacity 0.16s;
+}
+.lb__thumb:hover :deep(img),
+.lb__thumb.is-active :deep(img) {
+  opacity: 1;
+}
+.lb__thumb.is-active {
+  border-color: var(--accent);
+}
+.lb__thumb.is-active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+}
 
-@media (max-width: 880px) { .grid { column-count: 2; } }
 @media (max-width: 720px) {
   .head__back { left: 1.5rem; }
   .head__body, .sheet { padding-left: 1.5rem; padding-right: 1.5rem; }
-  .grid { column-count: 1; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 0.5rem; }
+  .lb__top {
+    align-items: flex-start;
+    padding: 0.85rem;
+  }
+  .lb__identity {
+    display: grid;
+    gap: 0.25rem;
+  }
+  .lb__close span {
+    display: none;
+  }
+  .lb__stage {
+    grid-template-columns: 1fr;
+    padding: 0.75rem;
+  }
+  .lb__nav {
+    position: absolute;
+    z-index: 4;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2.35rem;
+    height: 3.8rem;
+    background: rgba(12, 12, 10, 0.56);
+  }
+  .lb__nav--prev { left: 0.75rem; }
+  .lb__nav--next { right: 0.75rem; }
+  :deep(.lb__img) {
+    max-height: calc(100svh - 11rem);
+  }
+  .lb__thumb {
+    flex-basis: 3.45rem;
+  }
 }
 </style>
