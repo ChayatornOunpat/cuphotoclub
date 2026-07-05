@@ -246,6 +246,7 @@
     "dateDisplay": "Date",
     "datePlaceholder": "Date not set",
     "publishedSort": "Published (sort date)",
+    "publishedSameAsEvent": "Same as event date",
     "style": "Style",
     "styleEssay": "Essay",
     "styleSticky": "Sticky",

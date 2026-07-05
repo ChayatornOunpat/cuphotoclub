@@ -941,7 +941,7 @@ function onSubmit() {
 
 /* ─── Dark full-bleed hero ───────────────────────────────────────────────── */
 .df-head {
-  position: relative; min-height: 72svh; background: #0C0C0A;
+  position: relative; height: 72svh; background: #0C0C0A;
   display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
 }
 .df-head__bg { position: absolute; inset: 0; }
@@ -961,7 +961,7 @@ function onSubmit() {
 .df-head__sep { width: 2px; height: 2px; border-radius: 50%; background: rgba(245,244,240,0.3); }
 
 /* ─── Split hero ─────────────────────────────────────────────────────────── */
-.sp-head { display: grid; grid-template-columns: 1fr 1fr; min-height: 100svh; background: #0C0C0A; }
+.sp-head { display: grid; grid-template-columns: 1fr 1fr; height: 100svh; background: #0C0C0A; }
 .sp-head__img { position: relative; overflow: hidden; }
 .sp-head__img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .sp-head__img::after {

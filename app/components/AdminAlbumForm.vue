@@ -61,6 +61,7 @@ function blank(): AlbumInput {
 }
 
 const form = reactive<AlbumInput>(props.initial ? normalizeInitialAlbum(props.initial) : blank())
+const publishedMatchesEvent = ref(!!form.date && form.published === form.date)
 const uploadedMediaKeys = ref<string[]>([])
 const mediaLoading = ref(false)
 const photoManagerOpen = ref(false)
@@ -104,6 +105,15 @@ const allowPendingLeave = ref(false)
 watch(form, () => { if (initialized.value) dirty.value = true }, { deep: true })
 onMounted(() => nextTick(() => { initialized.value = true }))
 watch(() => props.saved, (val) => { if (val) dirty.value = false })
+watch(publishedMatchesEvent, (enabled) => {
+  if (enabled) form.published = form.date || ''
+})
+watch(() => form.date, (date) => {
+  if (publishedMatchesEvent.value) form.published = date || ''
+})
+watch(() => form.published, (published) => {
+  if (publishedMatchesEvent.value && published !== form.date) publishedMatchesEvent.value = false
+})
 
 onBeforeRouteLeave((to) => {
   if (!dirty.value || allowPendingLeave.value) return true
@@ -790,7 +800,11 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
         </div>
         <div class="field">
           <label>{{ t('adminForm.publishedSort') }}</label>
-          <input v-model="form.published" type="date">
+          <input v-model="form.published" type="date" :disabled="publishedMatchesEvent">
+          <label class="date-sync">
+            <input v-model="publishedMatchesEvent" type="checkbox">
+            <span>{{ t('adminForm.publishedSameAsEvent') }}</span>
+          </label>
         </div>
         <div class="field field--visibility">
           <label>Visibility</label>
@@ -2234,7 +2248,45 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   width: 100%; border: 1px solid var(--subtle); background: #fff; color: var(--dark);
   font-family: var(--font-sans); font-size: 0.72rem; padding: 0.35rem 0.45rem; outline: none;
 }
+.tray .field input:disabled {
+  background: var(--paper);
+  color: var(--muted);
+}
 .tray .field :is(input, select):focus { border-color: var(--accent); }
+.date-sync {
+  display: flex !important;
+  align-items: center;
+  gap: 0.42rem;
+  margin-top: 0.4rem !important;
+  color: var(--muted) !important;
+  cursor: pointer;
+}
+.date-sync input {
+  width: 0.86rem !important;
+  height: 0.86rem;
+  min-height: 0 !important;
+  margin: 0;
+  padding: 0 !important;
+  border: 1px solid var(--subtle) !important;
+  background: #fff;
+  appearance: none;
+  cursor: pointer;
+}
+.date-sync input:checked {
+  background:
+    linear-gradient(45deg, transparent 58%, #F5F4F0 58% 72%, transparent 72%),
+    linear-gradient(-45deg, transparent 46%, #F5F4F0 46% 60%, transparent 60%),
+    var(--accent);
+  border-color: var(--accent) !important;
+}
+.date-sync input:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+.date-sync span {
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+}
 
 @media (max-width: 820px) {
   .editor {

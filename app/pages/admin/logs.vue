@@ -37,13 +37,6 @@ function metadataText(log: AuditLog) {
   if (!log.metadata || !Object.keys(log.metadata).length) return ''
   return JSON.stringify(log.metadata, null, 2)
 }
-
-function when(value: string) {
-  return new Intl.DateTimeFormat('en-GB', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(new Date(value))
-}
 </script>
 
 <template>
@@ -69,7 +62,7 @@ function when(value: string) {
         </thead>
         <tbody>
           <tr v-for="log in logs" :key="log.id">
-            <td class="muted">{{ when(log.createdAt) }}</td>
+            <td class="muted">{{ formatDateTime(log.createdAt) }}</td>
             <td>
               <strong>{{ actorLabel(log) }}</strong>
               <span>{{ log.actorEmail }}</span>

@@ -23,14 +23,14 @@ async function save(value: AlbumInput) {
   busy.value = true
   saveError.value = null
   try {
-    const album = await $fetch('/api/admin/albums', {
+    await $fetch('/api/admin/albums', {
       method: 'POST',
       body: { ...value, draftMediaPrefix: draftMediaPrefix.value }
     })
     saved.value = true
     localStorage.removeItem(draftMediaStorageKey)
     draftMediaPrefix.value = `content-albums/drafts/${crypto.randomUUID()}`
-    await navigateTo(localePath(value.visibility === 'draft' ? `/admin/albums/${album.id}` : `/albums/${album.id}`))
+    await navigateTo(localePath('/admin/albums'))
   } catch (e) {
     saveError.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || t('admin.saveFailed')
   } finally {

@@ -144,7 +144,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.head { min-height: 58svh; background: var(--hero-bg); position: relative; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+.head { height: 58svh; background: var(--hero-bg); position: relative; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
 .head__bg { position: absolute; inset: 0; will-change: transform; }
 .head__bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(12, 12, 10, 0.5), rgba(12, 12, 10, 0.9)); }
 :deep(.head__img) { width: 100%; height: 100%; object-fit: cover; opacity: 0.4; display: block; }

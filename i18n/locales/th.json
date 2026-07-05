@@ -246,6 +246,7 @@
     "dateDisplay": "วันที่",
     "datePlaceholder": "ยังไม่ระบุวันที่",
     "publishedSort": "วันที่เผยแพร่ (เรียงลำดับ)",
+    "publishedSameAsEvent": "เหมือนวันที่จัดกิจกรรม",
     "style": "รูปแบบ",
     "styleEssay": "เรียงความ",
     "styleSticky": "ติดหนึบ",

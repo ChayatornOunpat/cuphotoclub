@@ -10,8 +10,8 @@ const postTitle = ref('')
 async function save(value: PostInput) {
   busy.value = true
   try {
-    const post = await $fetch('/api/admin/posts', { method: 'POST', body: value })
-    await navigateTo(localePath(value.visibility === 'draft' ? `/admin/posts/${post.id}` : `/posts/${post.id}`))
+    await $fetch('/api/admin/posts', { method: 'POST', body: value })
+    await navigateTo(localePath('/admin/posts'))
   } catch (e) {
     alert((e as { data?: { statusMessage?: string } })?.data?.statusMessage || t('admin.saveFailed'))
   } finally {

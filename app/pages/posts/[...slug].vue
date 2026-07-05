@@ -269,7 +269,7 @@ body[style*="background:#0C0C0A"] { color: #F5F4F0; }
 
 /* ─── Dark full-bleed hero ───────────────────────────────────────────────── */
 .df-head {
-  position: relative; min-height: 72svh; background: #0C0C0A;
+  position: relative; height: 72svh; background: #0C0C0A;
   display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
 }
 .df-head__bg {
@@ -305,7 +305,7 @@ body[style*="background:#0C0C0A"] { color: #F5F4F0; }
 /* ─── Split hero ─────────────────────────────────────────────────────────── */
 .sp-head {
   display: grid; grid-template-columns: 1fr 1fr;
-  min-height: 100svh; background: #0C0C0A;
+  height: 100svh; background: #0C0C0A;
 }
 .sp-head__img { position: relative; overflow: hidden; }
 .sp-head__img img {

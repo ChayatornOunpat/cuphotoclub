@@ -21,7 +21,7 @@ async function save(value: PostInput) {
   busy.value = true
   try {
     await $fetch(`/api/admin/posts/${id}`, { method: 'PUT', body: value })
-    await navigateTo(localePath(value.visibility === 'draft' ? `/admin/posts/${id}` : `/posts/${id}`))
+    await navigateTo(localePath('/admin/posts'))
   } catch (e) {
     alert((e as { data?: { statusMessage?: string } })?.data?.statusMessage || t('admin.saveFailed'))
   } finally {
