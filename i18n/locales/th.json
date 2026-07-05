@@ -227,7 +227,8 @@
     "selectedCount": "{count} รูปที่เลือก",
     "cancel": "ยกเลิก",
     "select": "เลือก",
-    "managePhotos": "จัดการรูปภาพ"
+    "managePhotos": "จัดการรูปภาพ",
+    "chooseFromLibrary": "เลือกจากไลบรารี"
   },
   "adminPhotoManager": {
     "title": "รูปภาพ",

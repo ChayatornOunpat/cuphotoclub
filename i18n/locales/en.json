@@ -227,7 +227,8 @@
     "selectedCount": "{count} selected",
     "cancel": "Cancel",
     "select": "Select",
-    "managePhotos": "Manage Photos"
+    "managePhotos": "Manage Photos",
+    "chooseFromLibrary": "Choose from library"
   },
   "adminPhotoManager": {
     "title": "Photos",

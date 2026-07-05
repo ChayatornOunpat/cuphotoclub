@@ -107,7 +107,6 @@ onUnmounted(() => {
           <span class="lb__title" :lang="textLang(album.title)">{{ album.title }}</span>
         </div>
         <button class="lb__close" :aria-label="t('albums.close')" @click="close">
-          <Icon name="heroicons:x-mark" />
           <span>{{ t('albums.close') }}</span>
         </button>
       </div>
@@ -180,7 +179,7 @@ onUnmounted(() => {
   z-index: 300;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  background: #0C0C0A;
+  background: color-mix(in srgb, var(--hero-bg) 94%, #000);
   color: #F5F4F0;
 }
 .lb__top {
@@ -190,9 +189,9 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: 1.5rem;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid rgba(245, 244, 240, 0.12);
-  background: rgba(12, 12, 10, 0.88);
+  padding: 1.05rem 1.4rem;
+  border-bottom: 1px solid rgba(245, 244, 240, 0.08);
+  background: linear-gradient(to bottom, rgba(12, 12, 10, 0.96), rgba(12, 12, 10, 0.72));
 }
 .lb__identity {
   min-width: 0;
@@ -221,25 +220,21 @@ onUnmounted(() => {
 .lb__close {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  min-height: 2.15rem;
-  border: 1px solid rgba(245, 244, 240, 0.18);
+  min-height: 1.8rem;
+  border: 0;
   background: transparent;
-  color: rgba(245, 244, 240, 0.76);
-  padding: 0 0.75rem;
+  color: rgba(245, 244, 240, 0.62);
+  padding: 0;
   font-family: var(--font-sans);
   font-size: 0.52rem;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: border-color 0.18s, color 0.18s, background 0.18s;
+  transition: color 0.18s;
 }
 .lb__close:hover {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #fff;
+  color: var(--accent);
 }
-.lb__close svg { width: 0.95rem; height: 0.95rem; }
 .lb__stage {
   position: relative;
   min-height: 0;
@@ -264,23 +259,24 @@ onUnmounted(() => {
   width: auto;
   height: auto;
   object-fit: contain;
-  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.48);
+  box-shadow: 0 2.2rem 6rem rgba(0, 0, 0, 0.42);
 }
 .lb__nav {
   display: grid;
   place-items: center;
-  width: 2.8rem;
+  width: 2.4rem;
   height: 4.8rem;
-  border: 1px solid rgba(245, 244, 240, 0.16);
-  background: rgba(245, 244, 240, 0.04);
-  color: rgba(245, 244, 240, 0.82);
+  border: 0;
+  border-left: 1px solid rgba(245, 244, 240, 0.16);
+  border-right: 1px solid rgba(245, 244, 240, 0.16);
+  background: transparent;
+  color: rgba(245, 244, 240, 0.66);
   cursor: pointer;
-  transition: background 0.18s, border-color 0.18s, color 0.18s;
+  transition: color 0.18s, border-color 0.18s;
 }
 .lb__nav:hover {
-  background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent);
 }
 .lb__nav svg { width: 1.2rem; height: 1.2rem; }
 .lb__cap {
@@ -300,21 +296,21 @@ onUnmounted(() => {
 }
 .lb__rail {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.28rem;
   overflow-x: auto;
-  padding: 0.75rem 1rem 1rem;
-  border-top: 1px solid rgba(245, 244, 240, 0.12);
-  background: rgba(12, 12, 10, 0.9);
+  padding: 0.62rem 1rem 0.82rem;
+  border-top: 1px solid rgba(245, 244, 240, 0.08);
+  background: linear-gradient(to top, rgba(12, 12, 10, 0.96), rgba(12, 12, 10, 0.72));
   scrollbar-width: thin;
   scrollbar-color: rgba(245, 244, 240, 0.3) transparent;
 }
 .lb__thumb {
   position: relative;
-  flex: 0 0 4.25rem;
+  flex: 0 0 4rem;
   aspect-ratio: 1;
   overflow: hidden;
-  border: 1px solid rgba(245, 244, 240, 0.16);
-  background: rgba(245, 244, 240, 0.08);
+  border: 1px solid rgba(245, 244, 240, 0.1);
+  background: rgba(245, 244, 240, 0.04);
   padding: 0;
   cursor: pointer;
 }
@@ -352,9 +348,6 @@ onUnmounted(() => {
   .lb__identity {
     display: grid;
     gap: 0.25rem;
-  }
-  .lb__close span {
-    display: none;
   }
   .lb__stage {
     grid-template-columns: 1fr;
