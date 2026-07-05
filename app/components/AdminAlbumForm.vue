@@ -553,12 +553,53 @@ function onRowDragStart(ri: number) {
   draggingRowIndex.value = ri
 }
 function onRowDragOver(ri: number) {
-  if (draggingRowIndex.value !== null || draggingFromPalette.value !== null) {
+  if (draggingRowIndex.value !== null || draggingFromPalette.value !== null || draggingCellInfo.value !== null) {
     dragOverRowIndex.value = ri
   }
 }
+
+// Moves a cell from one row/position to another, including across rows.
+// toCell === null means "append at the end of the target row".
+function moveCellToRow(fromRow: number, fromCell: number, toRow: number, toCell: number | null) {
+  const source = form.rows[fromRow]
+  const target = form.rows[toRow]
+  const moving = source?.cells[fromCell]
+  if (!source || !target || !moving) return
+
+  if (fromRow === toRow) {
+    const insertAt = toCell === null ? source.cells.length - 1 : toCell
+    if (fromCell === insertAt) return
+    const [item] = source.cells.splice(fromCell, 1)
+    source.cells.splice(insertAt, 0, item!)
+    if (selectedRow.value === fromRow && selectedCell.value === fromCell) {
+      selectedCell.value = insertAt
+    } else if (selectedRow.value === fromRow && selectedCell.value !== null) {
+      if (fromCell < selectedCell.value && insertAt >= selectedCell.value) selectedCell.value--
+      else if (fromCell > selectedCell.value && insertAt <= selectedCell.value) selectedCell.value++
+    }
+    return
+  }
+
+  if (isEssay.value && rowUsed(target) + moving.span > 6) return
+
+  source.cells.splice(fromCell, 1)
+  const insertAt = toCell === null ? target.cells.length : Math.min(toCell, target.cells.length)
+  target.cells.splice(insertAt, 0, moving)
+
+  if (selectedRow.value === fromRow && selectedCell.value === fromCell) {
+    selectedRow.value = toRow
+    selectedCell.value = insertAt
+  } else if (selectedRow.value === fromRow && selectedCell.value !== null && selectedCell.value > fromCell) {
+    selectedCell.value--
+  } else if (selectedRow.value === toRow && selectedCell.value !== null && selectedCell.value >= insertAt) {
+    selectedCell.value++
+  }
+}
+
 function onRowDrop(ri: number) {
-  if (draggingRowIndex.value !== null) {
+  if (draggingCellInfo.value !== null) {
+    moveCellToRow(draggingCellInfo.value.row, draggingCellInfo.value.cell, ri, null)
+  } else if (draggingRowIndex.value !== null) {
     const from = draggingRowIndex.value
     if (from !== ri) {
       const [item] = form.rows.splice(from, 1)
@@ -581,36 +622,27 @@ function onRowDrop(ri: number) {
   }
   draggingRowIndex.value = null
   draggingFromPalette.value = null
+  draggingCellInfo.value = null
   dragOverRowIndex.value = null
+  dragOverCellIndex.value = null
 }
 function onRowDragEnd() {
   draggingRowIndex.value = null
   dragOverRowIndex.value = null
 }
 
-// Cell drag (reorder within row)
+// Cell drag (reorder within a row, or move to a different row)
 function onCellDragStart(ri: number, ci: number) {
   draggingCellInfo.value = { row: ri, cell: ci }
 }
 function onCellDragOver(ri: number, ci: number) {
-  if (draggingCellInfo.value?.row === ri) {
+  if (draggingCellInfo.value !== null) {
     dragOverCellIndex.value = { row: ri, cell: ci }
   }
 }
 function onCellDrop(ri: number, ci: number) {
-  if (draggingCellInfo.value?.row === ri) {
-    const from = draggingCellInfo.value.cell
-    if (from !== ci) {
-      const row = form.rows[ri]!
-      const [item] = row.cells.splice(from, 1)
-      row.cells.splice(ci, 0, item!)
-      if (selectedRow.value === ri && selectedCell.value === from) {
-        selectedCell.value = ci
-      } else if (selectedRow.value === ri && selectedCell.value !== null) {
-        if (from < selectedCell.value && ci >= selectedCell.value) selectedCell.value--
-        else if (from > selectedCell.value && ci <= selectedCell.value) selectedCell.value++
-      }
-    }
+  if (draggingCellInfo.value !== null) {
+    moveCellToRow(draggingCellInfo.value.row, draggingCellInfo.value.cell, ri, ci)
   }
   draggingCellInfo.value = null
   dragOverCellIndex.value = null
@@ -674,10 +706,15 @@ function onCanvasDrop(event: DragEvent) {
       const ri = parseInt(cellEl.getAttribute('data-row-n') || '0')
       const ci = parseInt(cellEl.getAttribute('data-cell-n') || '0')
       onCellDrop(ri, ci)
-    } else {
-      draggingCellInfo.value = null
-      dragOverCellIndex.value = null
+      return
     }
+    const rowEl = (event.target as HTMLElement).closest('[data-row-n]') as HTMLElement | null
+    if (rowEl) {
+      onRowDrop(parseInt(rowEl.getAttribute('data-row-n') || '0'))
+      return
+    }
+    draggingCellInfo.value = null
+    dragOverCellIndex.value = null
   } else if (draggingFromPalette.value) {
     const { type, span } = draggingFromPalette.value
     // If dropped on an existing row, try to add there first
