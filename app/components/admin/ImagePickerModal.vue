@@ -14,18 +14,40 @@ const emit = defineEmits<{ select: [keys: string[]] }>()
 const { t } = useI18n()
 const modalTitle = computed(() => props.title || t('adminPicker.title'))
 
-const libraryKeys = ref<string[]>([])
+interface LibraryImage {
+  key: string
+  uploadedAt?: string
+  size?: number
+}
+
+type SortMode = 'newest' | 'oldest' | 'name-asc' | 'name-desc'
+
+const libraryImages = ref<LibraryImage[]>([])
 const loading = ref(false)
 const selected = ref(new Set<string>())
 const managerOpen = ref(false)
+const sortMode = ref<SortMode>('newest')
+const lastSelectedKey = ref<string | null>(null)
+
+const sortedImages = computed(() => {
+  return [...libraryImages.value].sort((a, b) => {
+    const aTime = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0
+    const bTime = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0
+
+    if (sortMode.value === 'oldest') return aTime - bTime || a.key.localeCompare(b.key)
+    if (sortMode.value === 'name-asc') return a.key.localeCompare(b.key)
+    if (sortMode.value === 'name-desc') return b.key.localeCompare(a.key)
+    return bTime - aTime || a.key.localeCompare(b.key)
+  })
+})
 
 async function loadLibrary() {
   loading.value = true
   try {
-    const { keys } = await $fetch<{ keys: string[] }>('/api/admin/media', { query: { prefix: props.prefix } })
-    libraryKeys.value = keys
+    const result = await $fetch<{ keys: string[], images?: LibraryImage[] }>('/api/admin/media', { query: { prefix: props.prefix } })
+    libraryImages.value = result.images ?? result.keys.map(key => ({ key }))
   } catch {
-    libraryKeys.value = []
+    libraryImages.value = []
   } finally {
     loading.value = false
   }
@@ -34,6 +56,7 @@ async function loadLibrary() {
 watch(open, val => {
   if (!val) return
   selected.value = new Set()
+  lastSelectedKey.value = null
   loadLibrary()
 })
 
@@ -41,20 +64,46 @@ watch(managerOpen, val => {
   if (!val) loadLibrary()
 })
 
-function toggleItem(key: string) {
+function toggleItem(key: string, event?: MouseEvent) {
   if (!props.multiple) {
     emit('select', [key])
     open.value = false
     return
   }
+
+  if (event?.shiftKey && lastSelectedKey.value) {
+    const visibleKeys = sortedImages.value.map(image => image.key)
+    const anchorIndex = visibleKeys.indexOf(lastSelectedKey.value)
+    const targetIndex = visibleKeys.indexOf(key)
+
+    if (anchorIndex !== -1 && targetIndex !== -1) {
+      const start = Math.min(anchorIndex, targetIndex)
+      const end = Math.max(anchorIndex, targetIndex)
+      const range = visibleKeys.slice(start, end + 1)
+      const orderedRange = anchorIndex <= targetIndex ? range : range.reverse()
+      const next = new Set(selected.value)
+
+      for (const rangeKey of orderedRange) next.add(rangeKey)
+      selected.value = next
+      lastSelectedKey.value = key
+      return
+    }
+  }
+
   const next = new Set(selected.value)
   next.has(key) ? next.delete(key) : next.add(key)
   selected.value = next
+  lastSelectedKey.value = key
 }
 
 function confirm() {
   emit('select', [...selected.value])
   open.value = false
+}
+
+function selectionOrder(key: string) {
+  const index = [...selected.value].indexOf(key)
+  return index >= 0 ? index + 1 : null
 }
 </script>
 
@@ -68,24 +117,38 @@ function confirm() {
           <UiSpinner />
           <span>{{ t('adminPicker.loading') }}</span>
         </div>
-        <p v-else-if="!libraryKeys.length" class="picker__empty">
+        <p v-else-if="!libraryImages.length" class="picker__empty">
           {{ t('adminPicker.empty') }}
         </p>
-        <div v-else class="picker__grid">
-          <button
-            v-for="key in libraryKeys"
-            :key="key"
-            type="button"
-            class="picker__item"
-            :class="{ 'is-selected': selected.has(key) }"
-            @click="toggleItem(key)"
-          >
-            <img :src="`/images/${key}`" alt="" loading="lazy">
-            <span v-if="selected.has(key)" class="picker__check" aria-hidden="true">
-              <Icon name="heroicons:check" />
-            </span>
-          </button>
-        </div>
+        <template v-else>
+          <div class="picker__toolbar">
+            <label class="picker__sort">
+              <span>{{ t('adminPicker.sortBy') }}</span>
+              <select v-model="sortMode">
+                <option value="newest">{{ t('adminPicker.sortNewest') }}</option>
+                <option value="oldest">{{ t('adminPicker.sortOldest') }}</option>
+                <option value="name-asc">{{ t('adminPicker.sortNameAsc') }}</option>
+                <option value="name-desc">{{ t('adminPicker.sortNameDesc') }}</option>
+              </select>
+            </label>
+            <span class="picker__total">{{ t('adminPicker.imageCount', { count: sortedImages.length }) }}</span>
+          </div>
+          <div class="picker__grid">
+            <button
+              v-for="image in sortedImages"
+              :key="image.key"
+              type="button"
+              class="picker__item"
+              :class="{ 'is-selected': selected.has(image.key) }"
+              @click="toggleItem(image.key, $event)"
+            >
+              <img :src="`/images/${image.key}`" alt="" loading="lazy">
+              <span v-if="selected.has(image.key)" class="picker__order" aria-hidden="true">
+                {{ selectionOrder(image.key) }}
+              </span>
+            </button>
+          </div>
+        </template>
       </div>
 
       <!-- Footer -->
@@ -148,20 +211,61 @@ function confirm() {
   color: var(--muted);
 }
 
+.picker__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--subtle);
+  background: var(--body-bg);
+}
+
+.picker__sort {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.picker__sort span,
+.picker__total {
+  font-size: 0.48rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.picker__sort select {
+  min-height: 2.1rem;
+  min-width: 10.5rem;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.66rem;
+  padding: 0 0.55rem;
+  outline: none;
+}
+.picker__sort select:focus {
+  border-color: var(--accent);
+}
+
 .picker__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 1px;
-  background: var(--subtle);
-  padding: 1px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0.45rem;
+  padding: 0.75rem 0.9rem;
 }
 
 .picker__item {
   position: relative;
+  flex: 0 0 164px;
   aspect-ratio: 3 / 2;
   overflow: hidden;
   background: var(--paper);
-  border: none;
+  border: 1px solid var(--subtle);
   cursor: pointer;
   padding: 0;
 }
@@ -182,19 +286,22 @@ function confirm() {
   pointer-events: none;
 }
 
-.picker__check {
+.picker__order {
   position: absolute;
   top: 0.35rem;
   right: 0.35rem;
-  width: 1.4rem;
+  min-width: 1.45rem;
   height: 1.4rem;
   background: var(--accent);
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0 0.35rem;
 }
 
 /* ── Footer ── */
@@ -231,4 +338,18 @@ function confirm() {
   text-underline-offset: 2px;
 }
 .picker__manage:hover { color: var(--dark); }
+
+@media (max-width: 620px) {
+  .picker__toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+  .picker__sort select {
+    width: 100%;
+  }
+  .picker__item {
+    flex-basis: calc(50% - 0.225rem);
+  }
+}
 </style>

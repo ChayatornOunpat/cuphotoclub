@@ -140,9 +140,8 @@ const tiles = computed<Tile[]>(() => {
 .gitem :deep(img) {
   width: 100%; height: 100%;
   object-fit: cover; display: block;
-  transition: transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s;
+  transition: opacity 0.3s;
 }
-.gitem:hover :deep(img) { transform: scale(1.06); }
 
 .gitem__label {
   position: absolute;

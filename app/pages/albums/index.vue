@@ -189,8 +189,7 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
 
 .feature { display: grid; grid-template-columns: 1.45fr 1fr; gap: 0; margin-bottom: 4.5rem; background: var(--hero-bg); cursor: pointer; overflow: hidden; text-decoration: none; }
 .feature__img { position: relative; overflow: hidden; min-height: 460px; }
-.feature__img :deep(img) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
-.feature:hover .feature__img :deep(img) { transform: scale(1.04); }
+.feature__img :deep(img) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .feature__flag { position: absolute; top: 1.5rem; left: 1.5rem; z-index: 2; font-size: 0.5rem; letter-spacing: 0.24em; text-transform: uppercase; color: #F5F4F0; background: var(--accent); padding: 0.5rem 0.85rem; }
 .feature__body { padding: 3rem; display: flex; flex-direction: column; justify-content: center; color: #F5F4F0; }
 .feature__cat { font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.25rem; }
@@ -210,8 +209,7 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
 .album:hover .album__stack::before { transform: translate(10px, 10px); }
 .album:hover .album__stack::after { transform: translate(18px, 18px); }
 .album__cover { position: relative; z-index: 1; overflow: hidden; background: var(--hero-bg); }
-.album__cover :deep(img) { width: 100%; display: block; object-fit: cover; transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
-.album:hover .album__cover :deep(img) { transform: scale(1.05); }
+.album__cover :deep(img) { width: 100%; display: block; object-fit: cover; }
 .album__frames { position: absolute; top: 0.85rem; right: 0.85rem; z-index: 2; display: flex; align-items: center; gap: 0.4rem; font-size: 0.5rem; letter-spacing: 0.16em; text-transform: uppercase; color: #F5F4F0; background: rgba(12, 12, 10, 0.55); backdrop-filter: blur(4px); padding: 0.4rem 0.6rem; transition: background 0.25s; }
 .album:hover .album__frames { background: var(--accent); }
 .album__frames svg { width: 9px; height: 9px; display: block; }

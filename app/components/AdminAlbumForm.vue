@@ -696,10 +696,10 @@ function onCanvasClick(event: MouseEvent) {
   if (target.closest('.cover__title, .head__title, .meta__title')) {
     editContent('title', titleInput); return
   }
-  if (target.closest('.cover__kicker, .head__kicker, .meta__cat')) {
+  if (target.closest('.cover__kicker, .head__kicker-category, .meta__cat')) {
     editContent('category', categoryInput); return
   }
-  if (target.closest('.cover__meta, .head__kicker, .meta__facts')) {
+  if (target.closest('.cover__meta, .head__kicker-date, .meta__facts')) {
     editContent('date', dateInput); return
   }
   if (target.closest('.intro__lead, .head__sub, .meta__excerpt')) {

@@ -58,8 +58,7 @@ function removeImage(key: string) {
     </div>
     <p v-else class="hi__empty">{{ t('admin.heroImagesEmpty') }}</p>
 
-    <div v-if="images.length" class="hi__footer">
-      <UiButton :loading="saving" @click="save">{{ t('admin.save') }}</UiButton>
+    <div v-if="savedMsg" class="hi__footer">
       <span v-if="savedMsg" class="hi__saved">{{ savedMsg }}</span>
     </div>
 

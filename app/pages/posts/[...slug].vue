@@ -568,9 +568,7 @@ body[style*="background:#0C0C0A"] { color: #F5F4F0; }
 .rcard__img { aspect-ratio: 16/9; overflow: hidden; margin-bottom: 1.25rem; }
 .rcard__img img {
   width: 100%; height: 100%; object-fit: cover; display: block;
-  transition: transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
-.rcard:hover .rcard__img img { transform: scale(1.04); }
 .rcard__tag {
   font-size: 0.52rem; letter-spacing: 0.22em; text-transform: uppercase;
   color: var(--accent); margin-bottom: 0.65rem;

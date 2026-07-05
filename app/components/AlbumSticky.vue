@@ -102,8 +102,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 .frames { display: flex; flex-direction: column; gap: 2rem; }
 figure { margin: 0; }
 .frame { overflow: hidden; background: var(--hero-bg); position: relative; }
-.frame :deep(img) { width: 100%; display: block; object-fit: cover; transition: transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
-.frame:hover :deep(img) { transform: scale(1.03); }
+.frame :deep(img) { width: 100%; display: block; object-fit: cover; }
 .frame__num { position: absolute; top: 1rem; left: 1rem; z-index: 2; font-size: 0.5rem; letter-spacing: 0.18em; color: #F5F4F0; background: rgba(12, 12, 10, 0.5); backdrop-filter: blur(4px); padding: 0.4rem 0.6rem; }
 figcaption { margin-top: 0.85rem; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
 

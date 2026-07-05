@@ -16,13 +16,9 @@ const props = defineProps<{
   eager?: boolean
 }>()
 
-// R2 blob images are served by a server route, not from public/.
-// IPX can only HTTP-fetch them, so we prefix the origin so NuxtImg
-// treats the path as a remote URL (origin must be in image.domains).
-const { origin } = useRequestURL()
-const resolvedSrc = computed(() =>
-  props.src?.startsWith('/images/') ? `${origin}${props.src}` : props.src
-)
+// R2 blob images are already served by the app's /images route. Render those
+// directly so covers do not depend on Nuxt Image's remote-domain allowlist.
+const isRoutedImage = computed(() => props.src?.startsWith('/images/'))
 
 const loaded = ref(false)
 const isEager = computed(() => props.eager === true)
@@ -30,8 +26,22 @@ const done = computed(() => loaded.value || isEager.value)
 </script>
 
 <template>
+  <img
+    v-if="isRoutedImage"
+    :src="props.src"
+    :alt="props.alt ?? ''"
+    :sizes="props.sizes"
+    :width="props.width"
+    :height="props.height"
+    :loading="isEager ? 'eager' : 'lazy'"
+    :fetchpriority="isEager ? 'high' : 'auto'"
+    :class="{ 'app-img--done': done }"
+    class="app-img"
+    @load="loaded = true"
+  >
   <NuxtImg
-    :src="resolvedSrc"
+    v-else
+    :src="props.src"
     :alt="props.alt ?? ''"
     :sizes="props.sizes"
     :width="props.width"

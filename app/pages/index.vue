@@ -13,8 +13,12 @@ const { data: home } = await useAsyncData('home', () =>
 )
 
 function imageSrc(key: string | null | undefined) {
-  if (!key) return ''
-  return /^https?:\/\//.test(key) ? key : `/images/${key}`
+  const value = key?.trim()
+  if (!value) return ''
+  if (/^(https?:)?\/\//.test(value) || value.startsWith('/') || value.startsWith('data:') || value.startsWith('blob:')) {
+    return value
+  }
+  return `/images/${value.replace(/^\/+/, '')}`
 }
 
 // contentAlbums (canvas editor) live under /albums/:slug; schema.albums galleries under /galleries/:slug.

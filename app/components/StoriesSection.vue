@@ -1,6 +1,6 @@
 <script setup lang="ts">
 interface FeedItem {
-  kind: 'album' | 'post'
+  kind: 'album' | 'post' | 'event'
   title: string
   tag: string
   date: string
@@ -77,9 +77,9 @@ const { t } = useI18n()
   width: 100%; height: 100%;
   object-fit: cover;
   opacity: 0.5;
-  transition: opacity 0.4s ease, transform 0.65s ease;
+  transition: opacity 0.4s ease;
 }
-.scard-lead:hover .scard-lead__img :deep(img) { opacity: 0.35; transform: scale(1.04); }
+.scard-lead:hover .scard-lead__img :deep(img) { opacity: 0.35; }
 .scard-lead__body {
   position: relative;
   z-index: 1;
@@ -147,9 +147,7 @@ const { t } = useI18n()
 .scard__img :deep(img) {
   width: 100%; height: 100%;
   object-fit: cover; display: block;
-  transition: transform 0.6s ease;
 }
-.scard:hover .scard__img :deep(img) { transform: scale(1.05); }
 .scard__tag {
   font-size: 0.52rem;
   letter-spacing: 0.22em;

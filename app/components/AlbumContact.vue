@@ -68,7 +68,7 @@ onUnmounted(() => {
       <span v-if="disableNavigation" class="head__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="head__back">{{ t('albums.coverBack') }}</NuxtLink>
       <div class="head__body">
-        <p class="head__kicker">{{ t('albums.albumKicker', { category: album.category }) }} · {{ album.date }}</p>
+        <p class="head__kicker"><span class="head__kicker-category">{{ t('albums.albumKicker', { category: album.category }) }}</span> · <span class="head__kicker-date">{{ album.date }}</span></p>
         <h1 class="head__title" :lang="textLang(album.title)">{{ album.title }}</h1>
         <p class="head__sub" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
       </div>
@@ -124,6 +124,7 @@ onUnmounted(() => {
 .head__back.is-disabled:hover { color: rgba(245, 244, 240, 0.7); }
 .head__body { position: relative; z-index: 2; padding: 0 3rem 3rem; max-width: 1380px; margin: 0 auto; width: 100%; }
 .head__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.25rem; }
+.head__kicker-category, .head__kicker-date { display: inline; }
 .head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; }
 .head__sub { margin-top: 1.5rem; max-width: 520px; font-size: 0.82rem; color: rgba(245, 244, 240, 0.5); line-height: 1.8; }
 
@@ -135,8 +136,7 @@ onUnmounted(() => {
 
 .grid { column-count: 3; column-gap: 1rem; }
 .cell { break-inside: avoid; margin-bottom: 1rem; position: relative; overflow: hidden; cursor: zoom-in; background: var(--hero-bg); display: block; border: none; padding: 0; width: 100%; }
-.cell :deep(img) { width: 100%; display: block; object-fit: cover; transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
-.cell:hover :deep(img) { transform: scale(1.04); }
+.cell :deep(img) { width: 100%; display: block; object-fit: cover; }
 .cell__num { position: absolute; top: 0.7rem; left: 0.7rem; font-size: 0.5rem; letter-spacing: 0.16em; color: #F5F4F0; background: rgba(12, 12, 10, 0.5); backdrop-filter: blur(4px); padding: 0.35rem 0.55rem; opacity: 0.8; transition: background 0.25s; }
 .cell:hover .cell__num { background: var(--accent); opacity: 1; }
 .cell__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 2rem 0.8rem 0.7rem; background: linear-gradient(transparent, rgba(12, 12, 10, 0.8)); font-size: 0.56rem; letter-spacing: 0.1em; color: rgba(245, 244, 240, 0.85); text-align: left; opacity: 0; transition: opacity 0.28s; }
