@@ -241,7 +241,23 @@ const preview = ref(false)
 // ─── Submit ──────────────────────────────────────────────────────────────────
 
 function onSubmit() {
-  emit('submit', structuredClone(toRaw(form)))
+  const payload = structuredClone(toRaw(form))
+  payload.title = payload.title.trim()
+  payload.tag = payload.tag.trim()
+  payload.date = payload.date.trim()
+  payload.published = payload.published.trim()
+  payload.image = payload.image.trim()
+  payload.excerpt = payload.excerpt.trim()
+  payload.author = payload.author.trim()
+  payload.authorBio = payload.authorBio.trim()
+  payload.authorAvatar = payload.authorAvatar.trim()
+  for (const block of payload.blocks) {
+    const item = block as Record<string, unknown>
+    for (const key of ['content', 'question', 'answer', 'src', 'src1', 'src2', 'caption', 'cite']) {
+      if (typeof item[key] === 'string') item[key] = item[key].trim()
+    }
+  }
+  emit('submit', payload)
 }
 </script>
 
@@ -297,7 +313,7 @@ function onSubmit() {
         </div>
         <div class="field">
           <label>{{ t('adminForm.publishedSort') }}</label>
-          <input v-model="form.published" type="date">
+          <UiDateInput v-model="form.published" />
         </div>
         <div class="field field--span3 field--visibility">
           <label>Visibility</label>

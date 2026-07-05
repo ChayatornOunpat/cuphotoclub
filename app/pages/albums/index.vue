@@ -31,8 +31,23 @@ const filtered = computed(() =>
     ? galleryAlbums.value
     : galleryAlbums.value.filter(a => a.category === activeCat.value)
 )
-const featured = computed(() => filtered.value[0] ?? null)
-const rest = computed(() => filtered.value.slice(1))
+
+const pageSize = 30
+const page = ref(1)
+const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
+watch(activeCat, () => { page.value = 1 })
+watch(totalPages, () => {
+  if (page.value > totalPages.value) page.value = totalPages.value
+})
+const paged = computed(() => filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+
+const featured = computed(() => paged.value[0] ?? null)
+const rest = computed(() => paged.value.slice(1))
+
+function goToPage(n: number) {
+  page.value = Math.min(Math.max(1, n), totalPages.value)
+  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 function imageCount(a: NonNullable<typeof albums.value>[number]): number {
   return (a.rows ?? []).reduce((n: number, r: any) => n + r.cells.filter((c: any) => c.type === 'image').length, 0)
@@ -131,6 +146,16 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
           </NuxtLink>
         </div>
         <p v-if="filtered.length === 0" class="empty">{{ t('albums.noAlbums') }}</p>
+
+        <nav v-if="totalPages > 1" class="pager" aria-label="Pagination">
+          <button type="button" class="pager__nav" :disabled="page === 1" @click="goToPage(page - 1)">
+            {{ t('albums.pagePrev') }}
+          </button>
+          <span class="pager__status">{{ t('albums.pageOf', { page, total: totalPages }) }}</span>
+          <button type="button" class="pager__nav" :disabled="page === totalPages" @click="goToPage(page + 1)">
+            {{ t('albums.pageNext') }}
+          </button>
+        </nav>
       </div>
     </section>
   </div>
@@ -221,6 +246,12 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
 .album__date { font-size: 0.58rem; letter-spacing: 0.1em; color: var(--muted); }
 
 .empty { text-align: center; padding: 4rem 0; font-family: var(--font-serif); font-style: italic; font-size: 1.2rem; color: var(--muted); }
+
+.pager { display: flex; align-items: center; justify-content: center; gap: 2rem; margin-top: 3.5rem; padding-top: 2.5rem; border-top: 1px solid var(--subtle); }
+.pager__nav { background: none; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 0.6rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dark); transition: color 0.2s; }
+.pager__nav:hover:not(:disabled) { color: var(--accent); }
+.pager__nav:disabled { color: var(--subtle); cursor: default; }
+.pager__status { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 
 @media (max-width: 1000px) {
   .albums { column-count: 2; }

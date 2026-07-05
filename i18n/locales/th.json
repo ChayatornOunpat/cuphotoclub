@@ -117,7 +117,10 @@
     "category": "หมวดหมู่",
     "date": "วันที่",
     "location": "สถานที่",
-    "stickyBreadcrumb": "อัลบั้ม"
+    "stickyBreadcrumb": "อัลบั้ม",
+    "pagePrev": "← ก่อนหน้า",
+    "pageNext": "ถัดไป →",
+    "pageOf": "หน้า {page} จาก {total}"
   },
   "posts": {
     "backToHome": "← CU Photo Club"

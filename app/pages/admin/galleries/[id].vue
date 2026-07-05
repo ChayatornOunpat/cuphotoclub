@@ -157,7 +157,7 @@ async function deleteAlbum() {
             <UiInput id="e-slug" v-model="form.slug" />
           </UiField>
           <UiField label="วันที่จัดกิจกรรม" input-id="e-date">
-            <UiInput id="e-date" v-model="form.eventDate" type="date" />
+            <UiDateInput id="e-date" v-model="form.eventDate" />
           </UiField>
           <UiField label="คำอธิบาย" input-id="e-desc">
             <UiTextarea id="e-desc" v-model="form.description" :rows="4" />

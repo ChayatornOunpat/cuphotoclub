@@ -104,7 +104,7 @@ async function create() {
           <UiTextarea id="a-title" v-model="form.title" required :rows="2" placeholder="เช่น งานรับน้อง 2026" />
         </UiField>
         <UiField label="วันที่จัดกิจกรรม" input-id="a-date">
-          <UiInput id="a-date" v-model="form.eventDate" type="date" />
+          <UiDateInput id="a-date" v-model="form.eventDate" />
         </UiField>
         <UiField label="คำอธิบาย" input-id="a-desc">
           <UiTextarea id="a-desc" v-model="form.description" placeholder="รายละเอียดสั้น ๆ (ไม่บังคับ)" />

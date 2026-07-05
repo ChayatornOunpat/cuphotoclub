@@ -117,7 +117,10 @@
     "category": "Category",
     "date": "Date",
     "location": "Location",
-    "stickyBreadcrumb": "Albums"
+    "stickyBreadcrumb": "Albums",
+    "pagePrev": "← Previous",
+    "pageNext": "Next →",
+    "pageOf": "Page {page} of {total}"
   },
   "posts": {
     "backToHome": "← CU Photo Club"

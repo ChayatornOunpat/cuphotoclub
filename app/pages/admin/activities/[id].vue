@@ -107,7 +107,7 @@ async function remove() {
         </UiField>
         <div class="grid gap-4 sm:grid-cols-2">
           <UiField label="วันที่จัดกิจกรรม" input-id="e-date">
-            <UiInput id="e-date" v-model="form.eventDate" type="date" />
+            <UiDateInput id="e-date" v-model="form.eventDate" />
           </UiField>
           <UiField label="สถานที่" input-id="e-loc">
             <UiInput id="e-loc" v-model="form.location" placeholder="เช่น หอศิลป์ กทม." />
