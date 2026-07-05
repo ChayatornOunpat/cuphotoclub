@@ -102,9 +102,9 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
             <AppImg :src="coverOf(featured)" :alt="featured.title" sizes="sm:100vw lg:55vw" />
           </div>
           <div class="feature__body">
-            <p class="feature__cat">{{ featured.category }}</p>
-            <h3 class="feature__title">{{ featured.title }}</h3>
-            <p class="feature__excerpt">{{ featured.excerpt }}</p>
+            <p class="feature__cat" :lang="textLang(featured.category)">{{ featured.category }}</p>
+            <h3 class="feature__title" :lang="textLang(featured.title)">{{ featured.title }}</h3>
+            <p class="feature__excerpt" :lang="textLang(featured.excerpt)">{{ featured.excerpt }}</p>
             <div class="feature__meta">
               <span>{{ featured.date }}</span><span class="dot" /><span>{{ t('albums.metaFrames', { count: imageCount(featured) }) }}</span>
             </div>
@@ -125,8 +125,8 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
                 <div class="album__view">{{ t('albums.viewAlbum') }}</div>
               </div>
             </div>
-            <p class="album__cat">{{ a.category }}</p>
-            <h3 class="album__title">{{ a.title }}</h3>
+            <p class="album__cat" :lang="textLang(a.category)">{{ a.category }}</p>
+            <h3 class="album__title" :lang="textLang(a.title)">{{ a.title }}</h3>
             <p class="album__date">{{ a.date }}</p>
           </NuxtLink>
         </div>
@@ -194,7 +194,7 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
 .feature__flag { position: absolute; top: 1.5rem; left: 1.5rem; z-index: 2; font-size: 0.5rem; letter-spacing: 0.24em; text-transform: uppercase; color: #F5F4F0; background: var(--accent); padding: 0.5rem 0.85rem; }
 .feature__body { padding: 3rem; display: flex; flex-direction: column; justify-content: center; color: #F5F4F0; }
 .feature__cat { font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.25rem; }
-.feature__title { font-family: var(--font-serif); font-size: clamp(2rem, 3.2vw, 3.2rem); font-weight: 300; line-height: 1.05; letter-spacing: -0.02em; margin-bottom: 1.5rem; }
+.feature__title { font-family: var(--font-serif); font-size: clamp(2rem, 3.2vw, 3.2rem); font-weight: 300; line-height: 1.05; letter-spacing: -0.02em; margin-bottom: 1.5rem; white-space: pre-line; }
 .feature__excerpt { font-size: 0.82rem; color: rgba(245, 244, 240, 0.52); line-height: 1.85; margin-bottom: 2rem; max-width: 420px; }
 .feature__meta { display: flex; align-items: center; gap: 1.5rem; font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(245, 244, 240, 0.45); margin-bottom: 2rem; }
 .feature__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
@@ -218,7 +218,7 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
 .album__view { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 2.5rem 1rem 1rem; background: linear-gradient(transparent, rgba(12, 12, 10, 0.8)); font-size: 0.54rem; letter-spacing: 0.22em; text-transform: uppercase; color: #F5F4F0; opacity: 0; transform: translateY(8px); transition: opacity 0.3s, transform 0.3s; }
 .album:hover .album__view { opacity: 1; transform: translateY(0); }
 .album__cat { font-size: 0.52rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.55rem; }
-.album__title { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 400; line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 0.6rem; transition: color 0.2s; }
+.album__title { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 400; line-height: 1.2; letter-spacing: -0.01em; margin-bottom: 0.6rem; transition: color 0.2s; white-space: pre-line; }
 .album:hover .album__title { color: var(--accent); }
 .album__date { font-size: 0.58rem; letter-spacing: 0.1em; color: var(--muted); }
 

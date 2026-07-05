@@ -89,7 +89,7 @@ const dragOverCellIndex = ref<{ row: number, cell: number } | null>(null)
 
 // Content editing refs
 const activeField = ref<'title' | 'category' | 'date' | 'location' | 'excerpt'>('title')
-const titleInput = ref<HTMLInputElement | null>(null)
+const titleInput = ref<HTMLTextAreaElement | null>(null)
 const categoryInput = ref<HTMLInputElement | null>(null)
 const dateInput = ref<HTMLInputElement | null>(null)
 const locationInput = ref<HTMLInputElement | null>(null)
@@ -1077,7 +1077,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       <div class="dock-fields">
         <div class="field field--title" :class="{ active: activeField === 'title' }">
           <label>{{ t('adminForm.title') }}</label>
-          <input ref="titleInput" v-model="form.title" type="text" :placeholder="t('adminForm.titlePlaceholder')" @focus="activeField = 'title'">
+          <textarea ref="titleInput" v-model="form.title" rows="2" :placeholder="t('adminForm.titlePlaceholder')" @focus="activeField = 'title'" />
         </div>
         <div class="field" :class="{ active: activeField === 'category' }">
           <label>{{ t('adminForm.category') }}</label>

@@ -24,7 +24,7 @@ if (!album.value) {
 const styles = { essay: AlbumEssay, sticky: AlbumSticky, contact: AlbumContact }
 const styleComponent = computed(() => styles[album.value!.style] ?? AlbumEssay)
 
-useHead({ title: () => `${album.value?.title} — CU Photo Club` })
+useHead({ title: () => `${album.value?.title?.replace(/\n+/g, ' ')} — CU Photo Club` })
 </script>
 
 <template>

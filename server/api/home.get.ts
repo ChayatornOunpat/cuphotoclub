@@ -21,6 +21,21 @@ export default defineEventHandler(async () => {
     .orderBy(desc(schema.albums.eventDate), desc(schema.albums.createdAt))
     .limit(6)
 
+  // "Lego-grid" albums built in the canvas editor (schema.contentAlbums, via albumStore) are a
+  // separate system from the relational galleries above (schema.albums/photos) — merge both so
+  // the home feed reflects everything admins actually publish. See CLAUDE.md / schema.ts comments.
+  const contentAlbums = (await albumStore.list())
+    .filter(a => a.visibility === 'public')
+    .map(a => ({
+      id: 0,
+      slug: a.id,
+      title: a.title,
+      eventDate: a.published || a.date,
+      coverKey: a.coverSrc || (a.rows ?? []).flatMap(r => r.cells).find(c => c.type === 'image' && c.src)?.src || null,
+      photoCount: (a.rows ?? []).flatMap(r => r.cells).filter(c => c.type === 'image' && c.src).length,
+      source: 'content' as const
+    }))
+
   const posts = await db
     .select({
       id: schema.posts.id,
@@ -50,11 +65,18 @@ export default defineEventHandler(async () => {
     .orderBy(desc(schema.events.eventDate), desc(schema.events.createdAt))
     .limit(3)
 
+  const galleryAlbums = albumRows.map(({ explicitCoverKey, firstPhotoKey, ...a }) => ({
+    ...a,
+    coverKey: explicitCoverKey ?? firstPhotoKey ?? null,
+    source: 'gallery' as const
+  }))
+
+  const albums = [...galleryAlbums, ...contentAlbums]
+    .sort((a, b) => (b.eventDate ?? '').localeCompare(a.eventDate ?? ''))
+    .slice(0, 6)
+
   return {
-    albums: albumRows.map(({ explicitCoverKey, firstPhotoKey, ...a }) => ({
-      ...a,
-      coverKey: explicitCoverKey ?? firstPhotoKey ?? null
-    })),
+    albums,
     posts,
     events
   }

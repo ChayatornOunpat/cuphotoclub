@@ -82,7 +82,7 @@ async function create() {
       <form class="space-y-4" @submit.prevent="create">
         <p v-if="createErr" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ createErr }}</p>
         <UiField label="ชื่อบทความ" input-id="p-title">
-          <UiInput id="p-title" v-model="title" required placeholder="เช่น สรุปกิจกรรม Workshop ถ่ายภาพ" />
+          <UiTextarea id="p-title" v-model="title" required :rows="2" placeholder="เช่น สรุปกิจกรรม Workshop ถ่ายภาพ" />
         </UiField>
         <div class="flex justify-end gap-2 pt-2">
           <UiButton type="button" variant="secondary" @click="showCreate = false">ยกเลิก</UiButton>

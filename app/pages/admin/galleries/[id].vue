@@ -151,7 +151,7 @@ async function deleteAlbum() {
         <h2 class="text-sm font-semibold text-ink">รายละเอียดอัลบั้ม</h2>
         <form class="mt-4 space-y-4" @submit.prevent="saveDetails">
           <UiField label="ชื่ออัลบั้ม" input-id="e-title">
-            <UiInput id="e-title" v-model="form.title" required />
+            <UiTextarea id="e-title" v-model="form.title" required :rows="2" />
           </UiField>
           <UiField label="Slug (URL)" input-id="e-slug" :hint="`/galleries/${form.slug}`">
             <UiInput id="e-slug" v-model="form.slug" />

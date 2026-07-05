@@ -68,7 +68,7 @@ function textCellStyle(cell: AlbumCell) {
       <NuxtLink v-else :to="localePath('/albums')" class="cover__back">{{ t('albums.coverBack') }}</NuxtLink>
       <div class="cover__body">
         <p class="cover__kicker">{{ t('albums.albumKicker', { category: album.category }) }}</p>
-        <h1 class="cover__title">{{ album.title }}</h1>
+        <h1 class="cover__title" :lang="textLang(album.title)">{{ album.title }}</h1>
         <div class="cover__meta">
           <span>{{ album.date }}</span><span class="dot" />
           <span>{{ t('albums.metaFrames', { count: totalImages }) }}</span>
@@ -80,7 +80,7 @@ function textCellStyle(cell: AlbumCell) {
 
     <!-- INTRO -->
     <section class="intro">
-      <p class="intro__lead">{{ album.excerpt }}</p>
+      <p class="intro__lead" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
     </section>
 
     <!-- ESSAY FLOW — Lego grid -->
@@ -106,7 +106,7 @@ function textCellStyle(cell: AlbumCell) {
             <div class="frame">
               <AppImg :src="cell.src || ''" :alt="cell.caption || album.title" :sizes="imgSizes(cell.span)" />
             </div>
-            <figcaption>
+            <figcaption :lang="textLang(cell.caption)">
               <span class="n">{{ pad(imageNumbers.get(`${ri}-${ci}`) ?? 0) }}</span>
               {{ cell.caption }}
             </figcaption>
@@ -122,7 +122,7 @@ function textCellStyle(cell: AlbumCell) {
             :draggable="draggableCells ? true : undefined"
             :class="{ 'is-admin-selected': selectedRow === ri && selectedCell === ci }"
           >
-            <p class="text-block" :style="textCellStyle(cell)">{{ cell.content }}</p>
+            <p class="text-block" :style="textCellStyle(cell)" :lang="textLang(cell.content)">{{ cell.content }}</p>
           </div>
 
           <!-- PAD cell — empty spacer -->
@@ -179,7 +179,7 @@ function textCellStyle(cell: AlbumCell) {
 .albnav__back.is-disabled:hover { color: var(--muted); }
 .cover__body { position: relative; z-index: 2; padding: 0 3rem 3.5rem; max-width: 1380px; margin: 0 auto; width: 100%; }
 .cover__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.5rem; }
-.cover__title { font-family: var(--font-serif); font-size: clamp(3.5rem, 9vw, 9rem); font-weight: 200; line-height: 0.9; letter-spacing: -0.03em; color: #F5F4F0; }
+.cover__title { font-family: var(--font-serif); font-size: clamp(3.5rem, 9vw, 9rem); font-weight: 200; line-height: 0.9; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; }
 .cover__meta { margin-top: 2rem; display: flex; gap: 1.5rem; align-items: center; font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245, 244, 240, 0.5); }
 .cover__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
 

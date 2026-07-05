@@ -245,6 +245,37 @@ html:lang(th) :where(.hero__title em, .about__heading em, .history__quote) {
   font-style: normal !important;
 }
 
+:where(
+  .feature__title,
+  .album__title,
+  .cover__title,
+  .head__title,
+  .meta__title,
+  .intro__lead
+):lang(th) {
+  font-family: 'Noto Serif Thai', serif !important;
+  line-height: 1.12 !important;
+  letter-spacing: 0 !important;
+  font-weight: 300 !important;
+}
+
+:where(
+  .feature__excerpt,
+  .head__sub,
+  .meta__excerpt,
+  .text-block
+):lang(th) {
+  font-family: 'Noto Serif Thai', serif !important;
+  line-height: 1.95 !important;
+  letter-spacing: 0 !important;
+}
+
+:where(.album__cat, .feature__cat, .crumb .here, figcaption, .cell__cap, .lb__counter, .lb__cap):lang(th) {
+  font-family: 'Noto Serif Thai', serif !important;
+  letter-spacing: 0.035em !important;
+  text-transform: none !important;
+}
+
 /* The signature pink line that separates dark → light */
 .cut-line {
   width: 100%;

@@ -101,7 +101,7 @@ async function create() {
       <form class="space-y-4" @submit.prevent="create">
         <p v-if="createErr" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ createErr }}</p>
         <UiField label="ชื่ออัลบั้ม" input-id="a-title">
-          <UiInput id="a-title" v-model="form.title" required placeholder="เช่น งานรับน้อง 2026" />
+          <UiTextarea id="a-title" v-model="form.title" required :rows="2" placeholder="เช่น งานรับน้อง 2026" />
         </UiField>
         <UiField label="วันที่จัดกิจกรรม" input-id="a-date">
           <UiInput id="a-date" v-model="form.eventDate" type="date" />

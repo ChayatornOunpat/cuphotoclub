@@ -37,16 +37,16 @@ const pad = (n: number) => String(n).padStart(2, '0')
       <NuxtLink v-else :to="localePath('/albums')">{{ t('albums.stickyBreadcrumb') }}</NuxtLink><span>/</span>
       <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ album.category }}</span>
       <NuxtLink v-else :to="localePath('/albums')">{{ album.category }}</NuxtLink><span>/</span>
-      <span class="here">{{ album.title }}</span>
+      <span class="here" :lang="textLang(album.title)">{{ album.title }}</span>
     </div>
 
     <div class="split">
       <!-- STICKY META -->
       <aside class="meta">
         <div class="meta__thumb"><AppImg :src="cover" :alt="album.title" width="700" height="525" /></div>
-        <p class="meta__cat">{{ album.category }}</p>
-        <h1 class="meta__title">{{ album.title }}</h1>
-        <p class="meta__excerpt">{{ album.excerpt }}</p>
+        <p class="meta__cat" :lang="textLang(album.category)">{{ album.category }}</p>
+        <h1 class="meta__title" :lang="textLang(album.title)">{{ album.title }}</h1>
+        <p class="meta__excerpt" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
         <div class="meta__facts">
           <div class="meta__fact"><span class="k">{{ t('albums.category') }}</span><span class="v">{{ album.category }}</span></div>
           <div class="meta__fact"><span class="k">{{ t('albums.date') }}</span><span class="v">{{ album.date }}</span></div>
@@ -69,7 +69,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
             <span class="frame__num">{{ pad(i + 1) }}</span>
             <AppImg :src="img.src" :alt="img.caption || album.title" sizes="sm:100vw lg:1100px" />
           </div>
-          <figcaption v-if="img.caption">{{ img.caption }}</figcaption>
+          <figcaption v-if="img.caption" :lang="textLang(img.caption)">{{ img.caption }}</figcaption>
         </figure>
       </div>
     </div>
@@ -90,7 +90,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 .meta__thumb { width: 100%; aspect-ratio: 4 / 3; overflow: hidden; margin-bottom: 1.75rem; background: var(--hero-bg); }
 .meta__thumb :deep(img) { width: 100%; height: 100%; object-fit: cover; }
 .meta__cat { font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1rem; }
-.meta__title { font-family: var(--font-serif); font-size: clamp(2rem, 3vw, 3rem); font-weight: 200; line-height: 1; letter-spacing: -0.02em; margin-bottom: 1.5rem; }
+.meta__title { font-family: var(--font-serif); font-size: clamp(2rem, 3vw, 3rem); font-weight: 200; line-height: 1; letter-spacing: -0.02em; margin-bottom: 1.5rem; white-space: pre-line; }
 .meta__excerpt { font-size: 0.82rem; color: var(--muted); line-height: 1.85; margin-bottom: 2rem; }
 .meta__facts { border-top: 1px solid var(--subtle); }
 .meta__fact { display: flex; justify-content: space-between; padding: 0.85rem 0; border-bottom: 1px solid var(--subtle); font-size: 0.62rem; letter-spacing: 0.08em; }

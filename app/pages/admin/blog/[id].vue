@@ -101,7 +101,7 @@ async function remove() {
     <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_18rem]">
       <section class="space-y-4 rounded-lg border border-line bg-white p-5">
         <UiField label="ชื่อบทความ" input-id="b-title">
-          <UiInput id="b-title" v-model="form.title" />
+          <UiTextarea id="b-title" v-model="form.title" :rows="2" />
         </UiField>
         <UiField label="Slug (URL)" input-id="b-slug" :hint="`/blog/${form.slug}`">
           <UiInput id="b-slug" v-model="form.slug" />

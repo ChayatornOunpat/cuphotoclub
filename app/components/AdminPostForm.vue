@@ -285,7 +285,7 @@ function onSubmit() {
       <div class="dock-fields">
         <div class="field field--span2">
           <label>Title</label>
-          <input v-model="form.title" type="text" :placeholder="t('adminPostForm.titlePlaceholder')">
+          <textarea v-model="form.title" rows="2" :placeholder="t('adminPostForm.titlePlaceholder')" />
         </div>
         <div class="field">
           <label>{{ t('adminPostForm.tag') }}</label>
@@ -930,7 +930,7 @@ function onSubmit() {
 }
 .std-head__title {
   font-family: var(--font-serif); font-size: clamp(2.2rem, 4.5vw, 3.8rem);
-  font-weight: 200; line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 1.5rem;
+  font-weight: 200; line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 1.5rem; white-space: pre-line;
 }
 .std-head__excerpt { font-size: 0.95rem; color: var(--muted); line-height: 1.8; margin-bottom: 1rem; }
 .std-head__author {
@@ -954,7 +954,7 @@ function onSubmit() {
 .df-head__tag { font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.25rem; }
 .df-head__title {
   font-family: var(--font-serif); font-size: clamp(3rem, 6.5vw, 5.5rem);
-  font-weight: 200; line-height: 0.93; letter-spacing: -0.03em; color: #F5F4F0; margin-bottom: 2rem; max-width: 800px;
+  font-weight: 200; line-height: 0.93; letter-spacing: -0.03em; color: #F5F4F0; margin-bottom: 2rem; max-width: 800px; white-space: pre-line;
 }
 .df-head__meta { display: flex; align-items: center; gap: 0.75rem; font-size: 0.58rem; letter-spacing: 0.12em; color: rgba(245,244,240,0.45); }
 .df-head__author { color: var(--accent); letter-spacing: 0.16em; text-transform: uppercase; }
@@ -970,7 +970,7 @@ function onSubmit() {
 }
 .sp-head__content { padding: 8rem 4rem 4rem; display: flex; flex-direction: column; justify-content: flex-end; color: #F5F4F0; }
 .sp-head__tag { font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1rem; }
-.sp-head__title { font-family: var(--font-serif); font-size: clamp(2.5rem, 5vw, 4.5rem); font-weight: 200; line-height: 0.95; letter-spacing: -0.03em; margin-bottom: 1.5rem; }
+.sp-head__title { font-family: var(--font-serif); font-size: clamp(2.5rem, 5vw, 4.5rem); font-weight: 200; line-height: 0.95; letter-spacing: -0.03em; margin-bottom: 1.5rem; white-space: pre-line; }
 .sp-head__excerpt { font-size: 0.85rem; line-height: 1.85; color: rgba(245,244,240,0.55); max-width: 440px; margin-bottom: 2rem; }
 .sp-head__meta { display: flex; align-items: center; gap: 0.75rem; font-size: 0.56rem; letter-spacing: 0.12em; color: rgba(245,244,240,0.4); }
 .sp-head__author { color: var(--accent); letter-spacing: 0.16em; text-transform: uppercase; }
@@ -981,7 +981,7 @@ function onSubmit() {
 .md-head__tag { font-size: 0.52rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.25rem; }
 .md-head__title {
   font-family: var(--font-serif); font-size: clamp(3rem, 6vw, 5rem);
-  font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; margin-bottom: 1.25rem;
+  font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; margin-bottom: 1.25rem; white-space: pre-line;
 }
 .md-head__sub { font-size: 0.95rem; color: rgba(245,244,240,0.45); line-height: 1.8; max-width: 520px; margin: 0 auto 2rem; }
 .md-head__meta { display: flex; align-items: center; justify-content: center; gap: 0.75rem; font-size: 0.56rem; letter-spacing: 0.12em; color: rgba(245,244,240,0.35); }

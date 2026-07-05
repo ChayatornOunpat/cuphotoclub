@@ -69,8 +69,8 @@ onUnmounted(() => {
       <NuxtLink v-else :to="localePath('/albums')" class="head__back">{{ t('albums.coverBack') }}</NuxtLink>
       <div class="head__body">
         <p class="head__kicker">{{ t('albums.albumKicker', { category: album.category }) }} · {{ album.date }}</p>
-        <h1 class="head__title">{{ album.title }}</h1>
-        <p class="head__sub">{{ album.excerpt }}</p>
+        <h1 class="head__title" :lang="textLang(album.title)">{{ album.title }}</h1>
+        <p class="head__sub" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
       </div>
     </header>
     <div class="cut-line" />
@@ -92,7 +92,7 @@ onUnmounted(() => {
         >
           <span class="cell__num">{{ pad(i + 1) }}</span>
           <AppImg :src="img.src" :alt="img.caption || album.title" sizes="sm:50vw lg:460px" />
-          <span v-if="img.caption" class="cell__cap">{{ img.caption }}</span>
+          <span v-if="img.caption" class="cell__cap" :lang="textLang(img.caption)">{{ img.caption }}</span>
         </button>
       </div>
     </section>
@@ -100,7 +100,7 @@ onUnmounted(() => {
     <!-- LIGHTBOX -->
     <div v-if="open" class="lb open" @click.self="close">
       <div class="lb__top">
-        <span class="lb__counter"><b>{{ pad(idx + 1) }}</b> / {{ pad(imageCells.length) }} · {{ album.title }}</span>
+        <span class="lb__counter" :lang="textLang(album.title)"><b>{{ pad(idx + 1) }}</b> / {{ pad(imageCells.length) }} · {{ album.title }}</span>
         <button class="lb__close" @click="close">{{ t('albums.close') }}</button>
       </div>
       <div class="lb__stage">
@@ -108,7 +108,7 @@ onUnmounted(() => {
         <AppImg :src="current!.src" :alt="current!.caption || album.title" class="lb__img" sizes="xs:90vw sm:86vw md:86vw lg:1100px xl:1100px" />
         <button class="lb__nav" @click="next">›</button>
       </div>
-      <div class="lb__cap"><span>{{ pad(idx + 1) }}</span>{{ current!.caption }}</div>
+      <div class="lb__cap" :lang="textLang(current!.caption)"><span>{{ pad(idx + 1) }}</span>{{ current!.caption }}</div>
     </div>
   </article>
 </template>
@@ -124,7 +124,7 @@ onUnmounted(() => {
 .head__back.is-disabled:hover { color: rgba(245, 244, 240, 0.7); }
 .head__body { position: relative; z-index: 2; padding: 0 3rem 3rem; max-width: 1380px; margin: 0 auto; width: 100%; }
 .head__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.25rem; }
-.head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; }
+.head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; }
 .head__sub { margin-top: 1.5rem; max-width: 520px; font-size: 0.82rem; color: rgba(245, 244, 240, 0.5); line-height: 1.8; }
 
 .sheet { padding: 4rem 3rem 6rem; max-width: 1380px; margin: 0 auto; }

@@ -8,39 +8,18 @@ const { t } = useI18n()
 const localizedPath = useLocalizedContentPath()
 const localizedSite = useLocalizedSite(site)
 
-const { data: home } = await useAsyncData('home', async () => {
-  const data = await $fetch('/api/home').catch(() => ({ albums: [], posts: [], events: [] }))
-  if (data.albums.length || data.posts.length || data.events.length || !import.meta.dev) return data
-
-  const [legacyAlbums, legacyPosts] = await Promise.all([
-    $fetch<any[]>('/api/albums').catch(() => []),
-    $fetch<any[]>('/api/posts').catch(() => [])
-  ])
-
-  return {
-    albums: legacyAlbums.map(album => ({
-      id: 0,
-      slug: album.id,
-      title: album.title,
-      eventDate: album.published ?? album.date ?? null,
-      coverKey: album.coverSrc || (album.rows ?? []).flatMap((r: any) => r.cells).find((c: any) => c.type === 'image' && c.src)?.src || null,
-      photoCount: (album.rows ?? []).flatMap((r: any) => r.cells).filter((c: any) => c.type === 'image' && c.src).length
-    })),
-    posts: legacyPosts.map(post => ({
-      id: 0,
-      slug: post.id,
-      title: post.title,
-      excerpt: post.excerpt,
-      coverR2Key: post.image,
-      publishedAt: post.published ?? post.date ?? null
-    })),
-    events: []
-  }
-})
+const { data: home } = await useAsyncData('home', () =>
+  $fetch('/api/home').catch(() => ({ albums: [], posts: [], events: [] }))
+)
 
 function imageSrc(key: string | null | undefined) {
   if (!key) return ''
   return /^https?:\/\//.test(key) ? key : `/images/${key}`
+}
+
+// contentAlbums (canvas editor) live under /albums/:slug; schema.albums galleries under /galleries/:slug.
+function albumPath(a: { slug: string, source?: string }) {
+  return a.source === 'content' ? `/albums/${a.slug}` : `/galleries/${a.slug}`
 }
 
 // ── Hero background: randomise from the admin-managed image pool.
@@ -70,7 +49,7 @@ const featuredAlbums = computed(() =>
       title: a.title,
       category: t('common.album'),
       cover: imageSrc(a.coverKey),
-      path: localizedPath(`/galleries/${a.slug}`)
+      path: localizedPath(albumPath(a))
     }))
     .filter(a => a.cover)
 )
@@ -86,7 +65,7 @@ const feed = computed(() => {
       published: a.eventDate ?? '',
       image: imageSrc(a.coverKey),
       excerpt: t('albums.metaFrames', { count: a.photoCount }),
-      path: localizedPath(`/galleries/${a.slug}`)
+      path: localizedPath(albumPath(a))
     }))
     .filter(a => a.image)
   const postItems = (home.value?.posts ?? [])

@@ -31,8 +31,8 @@ const lightboxIndex = ref<number | null>(null)
 
 const origin = useRequestURL().origin
 useSeoMeta({
-  title: () => album.value.title,
-  description: () => album.value.description || `ภาพถ่ายจาก ${album.value.title}`,
+  title: () => album.value.title.replace(/\n+/g, ' '),
+  description: () => (album.value.description || `ภาพถ่ายจาก ${album.value.title}`).replace(/\n+/g, ' '),
   ogImage: () => (photos.value[0] ? `${origin}/images/${photos.value[0].r2Key}` : undefined)
 })
 </script>
@@ -44,12 +44,12 @@ useSeoMeta({
     </NuxtLink>
 
     <header class="mt-4 max-w-2xl">
-      <h1 class="text-3xl font-bold tracking-tight text-ink">{{ album.title }}</h1>
+      <h1 class="whitespace-pre-line text-3xl font-bold tracking-tight text-ink" :lang="textLang(album.title)">{{ album.title }}</h1>
       <p class="mt-2 text-sm text-ink-soft">
         {{ album.eventDate ? formatDate(album.eventDate) : '' }}
         <span v-if="album.eventDate"> · </span>{{ photos.length }} รูป
       </p>
-      <p v-if="album.description" class="mt-3 text-ink-soft">{{ album.description }}</p>
+      <p v-if="album.description" class="mt-3 text-ink-soft" :lang="textLang(album.description)">{{ album.description }}</p>
     </header>
 
     <div v-if="photos.length" class="mt-10 columns-2 gap-3 sm:columns-3 lg:columns-4">

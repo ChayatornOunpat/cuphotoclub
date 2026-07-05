@@ -25,7 +25,7 @@ defineProps<{
       </div>
     </div>
     <p class="mt-3 text-xs text-ink-soft">{{ formatDate(post.publishedAt) }}</p>
-    <h3 class="mt-1 font-semibold text-ink group-hover:text-accent">{{ post.title }}</h3>
+    <h3 class="mt-1 whitespace-pre-line font-semibold text-ink group-hover:text-accent">{{ post.title }}</h3>
     <p v-if="post.excerpt" class="mt-1 line-clamp-2 text-sm text-ink-soft">{{ post.excerpt }}</p>
   </NuxtLink>
 </template>

@@ -53,7 +53,7 @@ async function handleShare() {
 }
 
 useHead(() => ({
-  title: `${post.value?.title} — CU Photo Club`,
+  title: `${post.value?.title?.replace(/\n+/g, ' ')} — CU Photo Club`,
   bodyAttrs: { style: isDark.value ? 'background:#0C0C0A' : '' },
 }))
 </script>
@@ -255,7 +255,7 @@ body[style*="background:#0C0C0A"] { color: #F5F4F0; }
 }
 .std-head__title {
   font-family: var(--font-serif); font-size: clamp(2.2rem, 4.5vw, 3.8rem);
-  font-weight: 200; line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 1.5rem;
+  font-weight: 200; line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 1.5rem; white-space: pre-line;
 }
 .std-head__excerpt {
   font-size: 0.95rem; color: var(--muted); line-height: 1.8; margin-bottom: 1rem;
@@ -293,7 +293,7 @@ body[style*="background:#0C0C0A"] { color: #F5F4F0; }
 .df-head__title {
   font-family: var(--font-serif); font-size: clamp(3rem, 6.5vw, 5.5rem);
   font-weight: 200; line-height: 0.93; letter-spacing: -0.03em;
-  color: #F5F4F0; margin-bottom: 2rem; max-width: 800px;
+  color: #F5F4F0; margin-bottom: 2rem; max-width: 800px; white-space: pre-line;
 }
 .df-head__meta {
   display: flex; align-items: center; gap: 0.75rem;
@@ -326,7 +326,7 @@ body[style*="background:#0C0C0A"] { color: #F5F4F0; }
 }
 .sp-head__title {
   font-family: var(--font-serif); font-size: clamp(2.5rem, 5vw, 4.5rem);
-  font-weight: 200; line-height: 0.95; letter-spacing: -0.03em; margin-bottom: 1.5rem;
+  font-weight: 200; line-height: 0.95; letter-spacing: -0.03em; margin-bottom: 1.5rem; white-space: pre-line;
 }
 .sp-head__excerpt {
   font-size: 0.85rem; line-height: 1.85;
@@ -352,7 +352,7 @@ body[style*="background:#0C0C0A"] { color: #F5F4F0; }
 .md-head__title {
   font-family: var(--font-serif); font-size: clamp(3rem, 6vw, 5rem);
   font-weight: 200; line-height: 0.92; letter-spacing: -0.03em;
-  color: #F5F4F0; margin-bottom: 1.25rem;
+  color: #F5F4F0; margin-bottom: 1.25rem; white-space: pre-line;
 }
 .md-head__sub {
   font-size: 0.95rem; color: rgba(245,244,240,0.45);
@@ -578,7 +578,7 @@ body[style*="background:#0C0C0A"] { color: #F5F4F0; }
 .rcard__title {
   font-family: var(--font-serif); font-size: 1.15rem; font-weight: 400;
   line-height: 1.25; letter-spacing: -0.01em; transition: color 0.2s;
-  border-top: 1px solid var(--subtle); padding-top: 1rem;
+  border-top: 1px solid var(--subtle); padding-top: 1rem; white-space: pre-line;
 }
 .rcard:hover .rcard__title { color: var(--accent); }
 .rcard__date { font-size: 0.58rem; color: var(--muted); letter-spacing: 0.1em; margin-top: 0.6rem; }

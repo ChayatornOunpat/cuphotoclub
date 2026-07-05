@@ -106,6 +106,7 @@ const { t } = useI18n()
   letter-spacing: -0.02em;
   color: #F5F4F0;
   margin-bottom: 1.25rem;
+  white-space: pre-line;
 }
 .scard-lead__excerpt {
   font-size: 0.76rem;
@@ -165,6 +166,7 @@ const { t } = useI18n()
   flex: 1;
   margin-bottom: 1.25rem;
   transition: color 0.2s;
+  white-space: pre-line;
 }
 .scard:hover .scard__title { color: var(--accent); }
 .scard__date {

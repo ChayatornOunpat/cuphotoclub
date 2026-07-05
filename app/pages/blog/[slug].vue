@@ -20,8 +20,8 @@ if (error.value || !post.value) {
 
 const origin = useRequestURL().origin
 useSeoMeta({
-  title: () => post.value!.title,
-  description: () => post.value!.excerpt || post.value!.title,
+  title: () => post.value!.title.replace(/\n+/g, ' '),
+  description: () => (post.value!.excerpt || post.value!.title).replace(/\n+/g, ' '),
   ogImage: () => (post.value!.coverR2Key ? `${origin}/images/${post.value!.coverR2Key}` : undefined)
 })
 </script>
@@ -34,7 +34,7 @@ useSeoMeta({
 
     <header class="mt-4">
       <p class="text-sm text-ink-soft">{{ formatDate(post.publishedAt) }}</p>
-      <h1 class="mt-2 text-3xl font-bold tracking-tight text-ink sm:text-4xl">{{ post.title }}</h1>
+      <h1 class="mt-2 whitespace-pre-line text-3xl font-bold tracking-tight text-ink sm:text-4xl">{{ post.title }}</h1>
       <div v-if="post.tags?.length" class="mt-3 flex flex-wrap gap-2">
         <UiBadge v-for="t in post.tags" :key="t" tone="pink">{{ t }}</UiBadge>
       </div>

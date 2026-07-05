@@ -24,7 +24,7 @@ defineProps<{
         <Icon name="heroicons:photo" class="size-10" />
       </div>
     </div>
-    <h3 class="mt-3 font-semibold text-ink group-hover:text-accent">{{ album.title }}</h3>
+    <h3 class="mt-3 whitespace-pre-line font-semibold text-ink group-hover:text-accent" :lang="textLang(album.title)">{{ album.title }}</h3>
     <p class="mt-0.5 text-sm text-ink-soft">
       {{ album.eventDate ? formatDate(album.eventDate) : '' }}
       <span v-if="album.eventDate"> · </span>{{ album.photoCount }} รูป
