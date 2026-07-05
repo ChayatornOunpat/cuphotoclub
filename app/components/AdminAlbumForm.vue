@@ -93,8 +93,8 @@ const dragOverCellIndex = ref<{ row: number, cell: number } | null>(null)
 const activeField = ref<'title' | 'category' | 'date' | 'location' | 'excerpt'>('title')
 const titleInput = ref<HTMLTextAreaElement | null>(null)
 const categoryInput = ref<HTMLInputElement | null>(null)
-const dateInput = ref<HTMLInputElement | null>(null)
-const publishedInput = ref<HTMLInputElement | null>(null)
+const dateInput = ref<FocusSelectable | null>(null)
+const publishedInput = ref<FocusSelectable | null>(null)
 const locationInput = ref<HTMLInputElement | null>(null)
 const excerptInput = ref<HTMLTextAreaElement | null>(null)
 
@@ -726,7 +726,9 @@ function onCanvasClick(event: MouseEvent) {
   dockHidden.value = true
 }
 
-async function focusField(field: { value: HTMLInputElement | HTMLTextAreaElement | null }) {
+type FocusSelectable = { focus: () => void, select: () => void }
+
+async function focusField(field: { value: FocusSelectable | null }) {
   await nextTick()
   field.value?.focus()
   field.value?.select()
@@ -734,7 +736,7 @@ async function focusField(field: { value: HTMLInputElement | HTMLTextAreaElement
 
 function editContent(
   fieldName: typeof activeField.value,
-  field: { value: HTMLInputElement | HTMLTextAreaElement | null }
+  field: { value: FocusSelectable | null }
 ) {
   clearCellSelection()
   dockHidden.value = false
@@ -825,7 +827,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
         </div>
         <div class="field">
           <label>{{ t('adminForm.publishedSort') }}</label>
-          <input ref="publishedInput" v-model="form.published" type="date" lang="en-GB" :disabled="publishedMatchesEvent">
+          <UiDateInput ref="publishedInput" v-model="form.published" :disabled="publishedMatchesEvent" />
           <label class="date-sync">
             <input v-model="publishedMatchesEvent" type="checkbox">
             <span>{{ t('adminForm.publishedSameAsEvent') }}</span>
@@ -1124,13 +1126,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
         </div>
         <div class="field" :class="{ active: activeField === 'date' }">
           <label>{{ t('adminForm.dateDisplay') }}</label>
-          <input
-            ref="dateInput"
-            v-model="form.date"
-            type="date"
-            lang="en-GB"
-            @focus="activeField = 'date'"
-          >
+          <UiDateInput ref="dateInput" v-model="form.date" @focus="activeField = 'date'" />
         </div>
         <div class="field" :class="{ active: activeField === 'location' }">
           <label>{{ t('adminForm.location') }} <span class="opt">{{ t('adminForm.locationOptional') }}</span></label>
