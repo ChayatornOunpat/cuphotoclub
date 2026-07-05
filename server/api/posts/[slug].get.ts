@@ -1,25 +1,9 @@
-import { and, eq } from 'drizzle-orm'
-
-// Public: a published post with rendered HTML body.
+// Public: a published (or link-only) post, block content included.
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, 'slug') || ''
 
-  const [post] = await db
-    .select()
-    .from(schema.posts)
-    .where(and(eq(schema.posts.slug, slug), eq(schema.posts.status, 'published')))
-    .limit(1)
+  const post = await postStore.get(slug)
+  if (!post || post.visibility === 'draft') throw createError({ statusCode: 404, message: 'ไม่พบบทความ' })
 
-  if (!post) throw createError({ statusCode: 404, message: 'ไม่พบบทความ' })
-
-  return {
-    id: post.id,
-    slug: post.slug,
-    title: post.title,
-    excerpt: post.excerpt,
-    coverR2Key: post.coverR2Key,
-    tags: post.tags,
-    publishedAt: post.publishedAt,
-    bodyHtml: renderMarkdown(post.body)
-  }
+  return post
 })

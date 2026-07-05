@@ -132,10 +132,6 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
           <NuxtLink v-for="a in rest" :key="a.path" :to="localizedPath(a.path)" class="album">
             <div class="album__stack">
               <div class="album__cover">
-                <span class="album__frames">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="1" /><rect x="6" y="3" width="14" height="3" rx="1" /></svg>
-                  {{ imageCount(a) }}
-                </span>
                 <AppImg :src="coverOf(a)" :alt="a.title" sizes="sm:100vw md:50vw lg:33vw" />
                 <div class="album__view">{{ t('albums.viewAlbum') }}</div>
               </div>
@@ -235,9 +231,6 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
 .album:hover .album__stack::after { transform: translate(18px, 18px); }
 .album__cover { position: relative; z-index: 1; overflow: hidden; background: var(--hero-bg); }
 .album__cover :deep(img) { width: 100%; display: block; object-fit: cover; }
-.album__frames { position: absolute; top: 0.85rem; right: 0.85rem; z-index: 2; display: flex; align-items: center; gap: 0.4rem; font-size: 0.5rem; letter-spacing: 0.16em; text-transform: uppercase; color: #F5F4F0; background: rgba(12, 12, 10, 0.55); backdrop-filter: blur(4px); padding: 0.4rem 0.6rem; transition: background 0.25s; }
-.album:hover .album__frames { background: var(--accent); }
-.album__frames svg { width: 9px; height: 9px; display: block; }
 .album__view { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 2.5rem 1rem 1rem; background: linear-gradient(transparent, rgba(12, 12, 10, 0.8)); font-size: 0.54rem; letter-spacing: 0.22em; text-transform: uppercase; color: #F5F4F0; opacity: 0; transform: translateY(8px); transition: opacity 0.3s, transform 0.3s; }
 .album:hover .album__view { opacity: 1; transform: translateY(0); }
 .album__cat { font-size: 0.52rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.55rem; }

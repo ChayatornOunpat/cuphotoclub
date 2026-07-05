@@ -36,19 +36,19 @@ export default defineEventHandler(async () => {
       source: 'content' as const
     }))
 
-  const posts = await db
-    .select({
-      id: schema.posts.id,
-      slug: schema.posts.slug,
-      title: schema.posts.title,
-      excerpt: schema.posts.excerpt,
-      coverR2Key: schema.posts.coverR2Key,
-      publishedAt: schema.posts.publishedAt
-    })
-    .from(schema.posts)
-    .where(eq(schema.posts.status, 'published'))
-    .orderBy(desc(schema.posts.publishedAt), desc(schema.posts.createdAt))
-    .limit(3)
+  // Editorial posts are managed via the block-based editor (schema.contentPosts, via
+  // postStore) — the same "content store" pattern as contentAlbums above.
+  const posts = (await postStore.list())
+    .filter(p => p.visibility === 'public')
+    .sort((a, b) => b.published.localeCompare(a.published))
+    .slice(0, 3)
+    .map(p => ({
+      slug: p.id,
+      title: p.title,
+      excerpt: p.excerpt,
+      coverR2Key: p.image,
+      publishedAt: p.published
+    }))
 
   const events = await db
     .select({

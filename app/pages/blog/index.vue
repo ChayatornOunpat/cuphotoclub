@@ -1,17 +1,10 @@
 <script setup lang="ts">
+import type { Post } from '~~/shared/types'
+
 definePageMeta({ layout: 'site' })
 
-interface PostRow {
-  id: number
-  slug: string
-  title: string
-  excerpt: string | null
-  coverR2Key: string | null
-  publishedAt: string | null
-}
-
 const { t } = useI18n()
-const { data: posts } = await useFetch<PostRow[]>('/api/posts')
+const { data: posts } = await useFetch<Post[]>('/api/posts')
 
 useSeoMeta({
   title: () => t('posts.pageTitle'),
