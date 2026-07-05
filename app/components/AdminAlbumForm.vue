@@ -1171,7 +1171,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
         </div>
         <div class="field field--excerpt" :class="{ active: activeField === 'excerpt' }">
           <label>{{ t('adminForm.excerpt') }}</label>
-          <textarea ref="excerptInput" v-model="form.excerpt" rows="2" :placeholder="t('adminForm.excerptPlaceholder')" @focus="activeField = 'excerpt'" />
+          <textarea ref="excerptInput" v-model="form.excerpt" rows="4" :placeholder="t('adminForm.excerptPlaceholder')" @focus="activeField = 'excerpt'" />
         </div>
         <div class="field field--cover">
           <label>Cover <span class="opt">choose from uploaded photos</span></label>
@@ -2245,6 +2245,18 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .context-dock .field.active textarea { max-height: 8rem; }
 .field--text-content textarea { max-height: 5rem; }
 .field :is(input, select, textarea):focus { border-color: var(--accent); }
+.field :deep(.ui-date-input__text) {
+  min-height: 2rem;
+  padding: 0.38rem 2rem 0.38rem 0.5rem;
+  border: 1px solid var(--subtle);
+  border-radius: 0;
+  background: #fff;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  outline: none;
+}
+.field :deep(.ui-date-input__text:focus) { border-color: var(--accent); }
 .opt { font-size: 0.4rem; color: var(--muted); letter-spacing: 0.06em; text-transform: none; }
 
 .field--visibility {
@@ -2324,6 +2336,20 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   color: var(--muted);
 }
 .tray .field :is(input, select):focus { border-color: var(--accent); }
+.tray .field :deep(.ui-date-input__text) {
+  width: 100%;
+  min-height: 0;
+  padding: 0.35rem 2rem 0.35rem 0.45rem;
+  border: 1px solid var(--subtle);
+  border-radius: 0;
+  background: #fff;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  outline: none;
+}
+.tray .field :deep(.ui-date-input__text:disabled) { background: var(--paper); color: var(--muted); }
+.tray .field :deep(.ui-date-input__text:focus) { border-color: var(--accent); }
 .date-sync {
   display: flex !important;
   align-items: center;

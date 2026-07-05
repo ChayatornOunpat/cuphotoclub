@@ -331,6 +331,7 @@ body[style*="background:#0C0C0A"] { color: #F5F4F0; }
 .sp-head__excerpt {
   font-size: 0.85rem; line-height: 1.85;
   color: rgba(245,244,240,0.55); max-width: 440px; margin-bottom: 2rem;
+  white-space: pre-line;
 }
 .sp-head__meta {
   display: flex; align-items: center; gap: 0.75rem;
@@ -357,6 +358,7 @@ body[style*="background:#0C0C0A"] { color: #F5F4F0; }
 .md-head__sub {
   font-size: 0.95rem; color: rgba(245,244,240,0.45);
   line-height: 1.8; max-width: 520px; margin: 0 auto 2rem;
+  white-space: pre-line;
 }
 .md-head__meta {
   display: flex; align-items: center; justify-content: center; gap: 0.75rem;

@@ -87,7 +87,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="relative flex items-center">
+  <div class="ui-date-input relative flex items-center">
     <input
       :id="id"
       ref="textEl"
@@ -97,7 +97,7 @@ defineExpose({
       placeholder="DD/MM/YYYY"
       :required="required"
       :disabled="disabled"
-      class="block w-full bg-white px-3 py-1.5 pr-9 text-sm text-ink outline-1 -outline-offset-1 outline-line placeholder:text-ink-soft/50 focus:outline-2 focus:-outline-offset-2 focus:outline-accent disabled:cursor-not-allowed disabled:bg-paper-soft disabled:text-ink-soft"
+      class="ui-date-input__text block w-full bg-white px-3 py-1.5 pr-9 text-sm text-ink outline-1 -outline-offset-1 outline-line placeholder:text-ink-soft/50 focus:outline-2 focus:-outline-offset-2 focus:outline-accent disabled:cursor-not-allowed disabled:bg-paper-soft disabled:text-ink-soft"
       @input="onTextInput"
       @focus="emit('focus')"
       @blur="commitText"

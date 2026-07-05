@@ -184,7 +184,7 @@ function textCellStyle(cell: AlbumCell) {
 .cover__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
 
 .intro { padding: 6rem 3rem 2rem; max-width: 880px; margin: 0 auto; }
-.intro__lead { font-family: var(--font-serif); font-size: clamp(1.6rem, 3vw, 2.6rem); font-weight: 200; line-height: 1.4; letter-spacing: -0.01em; }
+.intro__lead { font-family: var(--font-serif); font-size: clamp(1.6rem, 3vw, 2.6rem); font-weight: 200; line-height: 1.4; letter-spacing: -0.01em; white-space: pre-line; }
 
 .essay { padding: 3rem 3rem 6rem; max-width: 1380px; margin: 0 auto; }
 
