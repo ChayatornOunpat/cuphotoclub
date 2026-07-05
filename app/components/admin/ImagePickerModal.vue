@@ -255,14 +255,14 @@ function selectionOrder(key: string) {
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
+  align-items: flex-start;
   gap: 0.45rem;
   padding: 0.75rem 0.9rem;
 }
 
 .picker__item {
   position: relative;
-  flex: 0 0 164px;
-  aspect-ratio: 3 / 2;
+  height: 150px;
   overflow: hidden;
   background: var(--paper);
   border: 1px solid var(--subtle);
@@ -270,9 +270,10 @@ function selectionOrder(key: string) {
   padding: 0;
 }
 .picker__item img {
-  width: 100%;
   height: 100%;
-  object-fit: cover;
+  width: auto;
+  max-width: 280px;
+  object-fit: contain;
   display: block;
   transition: opacity 0.15s;
 }
@@ -349,7 +350,10 @@ function selectionOrder(key: string) {
     width: 100%;
   }
   .picker__item {
-    flex-basis: calc(50% - 0.225rem);
+    height: 110px;
+  }
+  .picker__item img {
+    max-width: 200px;
   }
 }
 </style>
