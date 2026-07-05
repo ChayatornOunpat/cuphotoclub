@@ -123,7 +123,23 @@
     "pageOf": "Page {page} of {total}"
   },
   "posts": {
-    "backToHome": "← CU Photo Club"
+    "backToHome": "← CU Photo Club",
+    "pageTitle": "Blog",
+    "pageLead": "News, stories, and photography techniques",
+    "empty": "No posts published yet",
+    "prev": "← Previous",
+    "next": "Next →",
+    "pageOf": "Page {page} of {total}"
+  },
+  "activities": {
+    "pageTitle": "Activities",
+    "pageLead": "Workshops, photo trips, and club events",
+    "empty": "No activities published yet",
+    "comingSoon": "Coming soon",
+    "backToList": "Back to Activities",
+    "notFound": "Activity not found",
+    "interested": "Interested in joining this event?",
+    "register": "Register to join"
   },
   "members": {
     "kicker": "CU Photo Club · Members",

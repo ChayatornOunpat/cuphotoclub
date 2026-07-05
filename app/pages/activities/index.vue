@@ -11,19 +11,20 @@ interface EventRow {
   location: string | null
 }
 
+const { t } = useI18n()
 const { data: events } = await useFetch<EventRow[]>('/api/events')
 
 useSeoMeta({
-  title: 'กิจกรรม',
-  description: 'กิจกรรมและเวิร์กชอปของชมรมถ่ายภาพ'
+  title: () => t('activities.pageTitle'),
+  description: () => t('activities.pageLead')
 })
 </script>
 
 <template>
   <div class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
     <header class="max-w-2xl">
-      <h1 class="text-3xl font-bold tracking-tight text-ink">กิจกรรม</h1>
-      <p class="mt-3 text-ink-soft">เวิร์กชอป ทริปถ่ายภาพ และกิจกรรมของชมรม</p>
+      <h1 class="text-3xl font-bold tracking-tight text-ink">{{ t('activities.pageTitle') }}</h1>
+      <p class="mt-3 text-ink-soft">{{ t('activities.pageLead') }}</p>
     </header>
 
     <div v-if="events && events.length" class="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -32,7 +33,7 @@ useSeoMeta({
 
     <div v-else class="mt-16 text-center text-ink-soft">
       <Icon name="heroicons:calendar-days" class="mx-auto size-12 text-ink-soft/30" />
-      <p class="mt-4">ยังไม่มีกิจกรรมที่เผยแพร่</p>
+      <p class="mt-4">{{ t('activities.empty') }}</p>
     </div>
   </div>
 </template>

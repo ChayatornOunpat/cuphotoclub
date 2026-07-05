@@ -140,7 +140,7 @@ function selectRange(fromIndex: number, toIndex: number) {
   const [start, end] = fromIndex <= toIndex ? [fromIndex, toIndex] : [toIndex, fromIndex]
   const next = new Set(selected.value)
   for (let i = start; i <= end; i++) {
-    const image = filteredImages.value[i]
+    const image = pagedImages.value[i]
     if (image) next.add(image.key)
   }
   selected.value = next
@@ -167,6 +167,24 @@ function toggleSelectAllFiltered() {
   } else {
     selected.value = new Set(filteredImages.value.map(image => image.key))
   }
+}
+
+// ── Pagination ───────────────────────────────────────────────────────────
+const pageSizeOptions = [50, 100, 200, 500] as const
+const pageSize = ref(100)
+const page = ref(1)
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredImages.value.length / pageSize.value)))
+watch([filteredImages, pageSize], () => {
+  if (page.value > totalPages.value) page.value = totalPages.value
+})
+watch([search, statusFilter, activePrefix], () => { page.value = 1 })
+const pagedImages = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return filteredImages.value.slice(start, start + pageSize.value)
+})
+function goToPage(n: number) {
+  page.value = Math.min(Math.max(1, n), totalPages.value)
+  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function bulkDelete() {
@@ -214,7 +232,7 @@ async function bulkDelete() {
       <div>
         <p class="r2__kicker">Admin inventory</p>
         <h1 class="r2__title">R2 Images</h1>
-        <p class="r2__lead">Browse uploaded image objects and see which gallery albums or site surfaces still point to them.</p>
+        <p class="r2__lead">Browse uploaded image objects and see which video (placeholder) entries or site surfaces still point to them.</p>
       </div>
       <button type="button" class="r2__refresh" :disabled="pending" @click="refresh">
         <Icon name="heroicons:arrow-path" />
@@ -229,7 +247,7 @@ async function bulkDelete() {
       </div>
       <div>
         <strong>{{ data?.linkedToAlbums ?? 0 }}</strong>
-        <span>In gallery albums</span>
+        <span>Video (placeholder)</span>
       </div>
       <div>
         <strong>{{ data?.referenced ?? 0 }}</strong>
@@ -259,7 +277,7 @@ async function bulkDelete() {
         <input v-model="search" type="search" placeholder="Search key or album">
         <select v-model="statusFilter">
           <option value="all">All images</option>
-          <option value="album">Linked to gallery album</option>
+          <option value="album">Linked to video (placeholder)</option>
           <option value="referenced">Referenced anywhere</option>
           <option value="unlinked">No known reference</option>
         </select>
@@ -291,7 +309,7 @@ async function bulkDelete() {
       </div>
 
       <section class="r2__list" aria-label="R2 image list">
-        <article v-for="(image, index) in filteredImages" :key="image.key" class="image-row" :class="{ 'is-selected': isSelected(image.key) }">
+        <article v-for="(image, index) in pagedImages" :key="image.key" class="image-row" :class="{ 'is-selected': isSelected(image.key) }">
           <div class="image-row__thumb">
             <label class="image-row__check">
               <input type="checkbox" :checked="isSelected(image.key)" @click="onCheckboxClick($event, image.key, index)">
@@ -336,7 +354,7 @@ async function bulkDelete() {
 
             <div class="image-row__refs">
               <div>
-                <p>Gallery albums</p>
+                <p>Video (placeholder)</p>
                 <div v-if="image.albums.length" class="image-row__links">
                   <NuxtLink v-for="album in image.albums" :key="`${image.key}-${album.href}-${album.role}`" :to="album.href || '#'">
                     {{ usageLabel(album) }}
@@ -358,6 +376,21 @@ async function bulkDelete() {
           </div>
         </article>
       </section>
+
+      <nav v-if="filteredImages.length" class="r2__pagination" aria-label="Pagination">
+        <label class="r2__page-size">
+          <span>Per page</span>
+          <select v-model.number="pageSize">
+            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+          </select>
+        </label>
+
+        <div v-if="totalPages > 1" class="r2__page-nav">
+          <button type="button" :disabled="page === 1" @click="goToPage(page - 1)">← Previous</button>
+          <span>Page {{ page }} of {{ totalPages }}</span>
+          <button type="button" :disabled="page === totalPages" @click="goToPage(page + 1)">Next →</button>
+        </div>
+      </nav>
     </template>
   </div>
 </template>
@@ -619,7 +652,61 @@ async function bulkDelete() {
   gap: 1px;
   background: var(--subtle);
   border: 1px solid var(--subtle);
+  user-select: none;
 }
+
+.r2__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 0 0.2rem;
+}
+
+.r2__page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--muted);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.r2__page-size select {
+  min-height: 2.1rem;
+  border: 1px solid var(--subtle);
+  background: color-mix(in srgb, var(--body-bg) 60%, white);
+  color: var(--dark);
+  padding: 0 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+}
+
+.r2__page-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.25rem;
+  color: var(--muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.r2__page-nav button {
+  border: none;
+  background: none;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.r2__page-nav button:hover:not(:disabled) { color: var(--accent); }
+.r2__page-nav button:disabled { opacity: 0.4; cursor: default; }
 
 .image-row {
   display: grid;

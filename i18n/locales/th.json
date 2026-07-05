@@ -123,7 +123,23 @@
     "pageOf": "หน้า {page} จาก {total}"
   },
   "posts": {
-    "backToHome": "← CU Photo Club"
+    "backToHome": "← CU Photo Club",
+    "pageTitle": "บทความ",
+    "pageLead": "ข่าวสาร เรื่องเล่า และเทคนิคการถ่ายภาพ",
+    "empty": "ยังไม่มีบทความที่เผยแพร่",
+    "prev": "← ก่อนหน้า",
+    "next": "ถัดไป →",
+    "pageOf": "หน้า {page} จาก {total}"
+  },
+  "activities": {
+    "pageTitle": "กิจกรรม",
+    "pageLead": "เวิร์กชอป ทริปถ่ายภาพ และกิจกรรมของชมรม",
+    "empty": "ยังไม่มีกิจกรรมที่เผยแพร่",
+    "comingSoon": "เร็ว ๆ นี้",
+    "backToList": "กลับไปกิจกรรม",
+    "notFound": "ไม่พบกิจกรรม",
+    "interested": "สนใจเข้าร่วมกิจกรรมนี้?",
+    "register": "ลงทะเบียนเข้าร่วม"
   },
   "members": {
     "kicker": "CU Photo Club · สมาชิก",

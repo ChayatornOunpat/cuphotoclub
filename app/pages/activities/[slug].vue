@@ -14,12 +14,13 @@ interface EventItem {
   bodyHtml: string
 }
 
+const { t } = useI18n()
 const route = useRoute()
 const slug = route.params.slug as string
 
 const { data: ev, error } = await useFetch<EventItem>(`/api/events/${slug}`)
 if (error.value || !ev.value) {
-  throw createError({ statusCode: 404, statusMessage: 'ไม่พบกิจกรรม', fatal: true })
+  throw createError({ statusCode: 404, statusMessage: t('activities.notFound'), fatal: true })
 }
 
 const origin = useRequestURL().origin
@@ -33,7 +34,7 @@ useSeoMeta({
 <template>
   <article v-if="ev" class="mx-auto max-w-3xl px-4 py-12 sm:py-16">
     <NuxtLink to="/activities" class="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink">
-      <Icon name="heroicons:arrow-left" class="size-4" /> กลับไปกิจกรรม
+      <Icon name="heroicons:arrow-left" class="size-4" /> {{ t('activities.backToList') }}
     </NuxtLink>
 
     <header class="mt-4">
@@ -60,10 +61,10 @@ useSeoMeta({
     <div class="prose prose-zinc mt-6 max-w-none prose-a:text-accent prose-img:rounded-lg" v-html="ev.bodyHtml" />
 
     <div v-if="ev.registerUrl" class="mt-10 rounded-lg border border-line bg-paper-soft p-6 text-center">
-      <p class="text-sm text-ink-soft">สนใจเข้าร่วมกิจกรรมนี้?</p>
+      <p class="text-sm text-ink-soft">{{ t('activities.interested') }}</p>
       <div class="mt-3">
         <UiButton :to="ev.registerUrl" size="lg" target="_blank" rel="noopener">
-          ลงทะเบียนเข้าร่วม <Icon name="heroicons:arrow-top-right-on-square" class="size-4" />
+          {{ t('activities.register') }} <Icon name="heroicons:arrow-top-right-on-square" class="size-4" />
         </UiButton>
       </div>
     </div>

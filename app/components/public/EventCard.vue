@@ -9,6 +9,8 @@ defineProps<{
     location: string | null
   }
 }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -27,7 +29,7 @@ defineProps<{
     </div>
     <div class="flex flex-1 flex-col p-4">
       <p class="text-xs font-medium text-accent">
-        {{ event.eventDate ? formatDate(event.eventDate) : 'เร็ว ๆ นี้' }}
+        {{ event.eventDate ? formatDate(event.eventDate) : t('activities.comingSoon') }}
       </p>
       <h3 class="mt-1 font-semibold text-ink group-hover:text-accent">{{ event.title }}</h3>
       <p v-if="event.location" class="mt-1 flex items-center gap-1 text-sm text-ink-soft">
