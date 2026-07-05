@@ -92,7 +92,6 @@ onUnmounted(() => {
           :class="{ 'is-admin-selected': selectedRow === img.row && (selectedCell === img.cell || selectedCell === undefined) }"
           @click="show(i)"
         >
-          <span class="cell__num">{{ pad(i + 1) }}</span>
           <AppImg :src="img.src" :alt="img.caption || album.title" sizes="180px" />
           <span v-if="img.caption" class="cell__cap" :lang="textLang(img.caption)">{{ img.caption }}</span>
         </button>
@@ -164,12 +163,10 @@ onUnmounted(() => {
 .eyebrow .num { color: var(--accent); font-weight: 500; }
 .sheet__hint { font-size: 0.54rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.65rem; }
-.cell { position: relative; overflow: hidden; cursor: zoom-in; background: var(--hero-bg); display: block; border: 1px solid var(--subtle); padding: 0; width: 100%; aspect-ratio: 1; }
-.cell :deep(img) { width: 100%; height: 100%; display: block; object-fit: cover; transition: opacity 0.18s, transform 0.18s; }
+.grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.65rem; }
+.cell { position: relative; overflow: hidden; cursor: zoom-in; background: var(--hero-bg); display: block; border: 1px solid var(--subtle); padding: 0; height: 210px; }
+.cell :deep(img) { position: relative; height: 100%; width: auto; max-width: 70vw; display: block; object-fit: contain; transition: opacity 0.18s, transform 0.18s; }
 .cell:hover :deep(img) { opacity: 0.82; transform: scale(1.025); }
-.cell__num { position: absolute; top: 0.4rem; left: 0.4rem; font-size: 0.45rem; letter-spacing: 0.12em; color: #F5F4F0; background: rgba(12, 12, 10, 0.58); backdrop-filter: blur(4px); padding: 0.28rem 0.4rem; opacity: 0.88; transition: background 0.25s; }
-.cell:hover .cell__num { background: var(--accent); opacity: 1; }
 .cell__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.4rem 0.45rem 0.4rem; background: linear-gradient(transparent, rgba(12, 12, 10, 0.84)); font-size: 0.48rem; letter-spacing: 0.08em; color: rgba(245, 244, 240, 0.85); text-align: left; opacity: 0; transition: opacity 0.18s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cell:hover .cell__cap { opacity: 1; }
 
@@ -264,13 +261,11 @@ onUnmounted(() => {
 .lb__nav {
   display: grid;
   place-items: center;
-  width: 2.4rem;
-  height: 4.8rem;
-  border: 0;
-  border-left: 1px solid rgba(245, 244, 240, 0.16);
-  border-right: 1px solid rgba(245, 244, 240, 0.16);
+  width: 2.6rem;
+  height: 2.6rem;
+  border: 1px solid rgba(245, 244, 240, 0.2);
   background: transparent;
-  color: rgba(245, 244, 240, 0.66);
+  color: rgba(245, 244, 240, 0.7);
   cursor: pointer;
   transition: color 0.18s, border-color 0.18s;
 }
@@ -340,7 +335,9 @@ onUnmounted(() => {
 @media (max-width: 720px) {
   .head__back { left: 1.5rem; }
   .head__body, .sheet { padding-left: 1.5rem; padding-right: 1.5rem; }
-  .grid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 0.5rem; }
+  .grid { gap: 0.5rem; }
+  .cell { height: 130px; }
+  .cell :deep(img) { max-width: 85vw; }
   .lb__top {
     align-items: flex-start;
     padding: 0.85rem;
