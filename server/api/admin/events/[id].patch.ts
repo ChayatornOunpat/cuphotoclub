@@ -7,6 +7,7 @@ const bodySchema = z.object({
   summary: z.string().trim().nullable().optional(),
   body: z.string().optional(),
   eventDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
   location: z.string().trim().nullable().optional(),
   coverR2Key: z.string().nullable().optional(),
   registerUrl: z.string().trim().nullable().optional(),
@@ -32,6 +33,14 @@ export default defineEventHandler(async (event) => {
   if (data.location !== undefined) updates.location = data.location
   if (data.registerUrl !== undefined) updates.registerUrl = data.registerUrl || null
   if (data.eventDate !== undefined) updates.eventDate = data.eventDate ? new Date(data.eventDate) : null
+  if (data.endDate !== undefined) updates.endDate = data.endDate ? new Date(data.endDate) : null
+  {
+    const nextStart = (updates.eventDate !== undefined ? updates.eventDate : row.eventDate) as Date | null
+    const nextEnd = (updates.endDate !== undefined ? updates.endDate : row.endDate) as Date | null
+    if (nextEnd && (!nextStart || nextEnd < nextStart)) {
+      throw createError({ statusCode: 400, message: 'วันสิ้นสุดต้องไม่มาก่อนวันเริ่มกิจกรรม' })
+    }
+  }
   if (data.slug !== undefined) updates.slug = await uniqueSlug(schema.events, data.slug, id)
   if (data.status !== undefined) {
     updates.status = data.status

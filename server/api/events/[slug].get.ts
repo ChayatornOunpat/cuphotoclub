@@ -19,6 +19,7 @@ export default defineEventHandler(async (event) => {
     summary: row.summary,
     coverR2Key: row.coverR2Key,
     eventDate: row.eventDate,
+    endDate: row.endDate,
     location: row.location,
     registerUrl: row.registerUrl,
     publishedAt: row.publishedAt,

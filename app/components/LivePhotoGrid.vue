@@ -8,7 +8,7 @@
 // and only fetch a fresh sample when the current one runs low. Everything
 // pauses when the grid is offscreen or the tab is hidden.
 
-const TILE_COUNT = 120
+const TILE_COUNT = 70
 const SWAP_INTERVAL_MS = 3500
 const REFILL_THRESHOLD = 20
 const BATCH_COUNT = 250
@@ -36,16 +36,60 @@ interface Tile {
   activeLayer: 0 | 1
 }
 
-const root = ref<HTMLElement | null>(null)
-const tiles = ref<Tile[]>([])
-const queue = ref<string[]>([])
-const shown = new Set<string>()
+// Breakpoints mirrored from the CSS below — kept in sync so the JS height
+// calculation matches whatever column count/row height is actually in effect.
+const BREAKPOINTS = [
+  { maxWidth: 460, columns: 4, rowHeight: 64 },
+  { maxWidth: 700, columns: 6, rowHeight: 70 },
+  { maxWidth: 1100, columns: 10, rowHeight: 80 },
+  { maxWidth: Infinity, columns: 16, rowHeight: 70 }
+]
+const GAP = 3
 
 let tileKeyCounter = 0
+
+// Sizes are rolled up front, synchronously, so the grid's real footprint is
+// known and reserved before any image has loaded — the placeholder tiles
+// ARE the final layout, just with empty <img> layers filled in later.
+function makePlaceholderTiles(): Tile[] {
+  const out: Tile[] = []
+  for (let i = 0; i < TILE_COUNT; i++) {
+    tileKeyCounter++
+    out.push({ key: tileKeyCounter, size: pickSize(), layers: ['', ''], activeLayer: 0 })
+  }
+  return out
+}
+
+const root = ref<HTMLElement | null>(null)
+const tiles = ref<Tile[]>(makePlaceholderTiles())
+const queue = ref<string[]>([])
+const shown = new Set<string>()
+// Defaults to "no media query active" (desktop) to match the CSS's own
+// default rule, since we don't know the real viewport until mount.
+const viewportWidth = ref(Infinity)
+
 let intervalId: ReturnType<typeof setInterval> | null = null
 let observer: IntersectionObserver | null = null
 let visible = false
 let refilling = false
+
+const activeBreakpoint = computed(() =>
+  BREAKPOINTS.find(bp => viewportWidth.value <= bp.maxWidth) ?? BREAKPOINTS[BREAKPOINTS.length - 1]!
+)
+
+// Exact height for the CURRENT set of tile sizes (not a statistical average),
+// recomputed whenever tiles change size (swap) or the viewport breakpoint
+// changes — this is what keeps the container from ever jumping.
+const gridHeight = computed(() => {
+  const { columns, rowHeight } = activeBreakpoint.value
+  const totalArea = tiles.value.reduce((sum, t) => sum + SPANS[t.size].col * SPANS[t.size].row, 0)
+  const rows = Math.max(1, Math.ceil(totalArea / columns))
+  return rows * rowHeight + (rows - 1) * GAP
+})
+
+function updateViewportWidth() {
+  viewportWidth.value = window.innerWidth
+}
 
 async function fetchBatch(): Promise<string[]> {
   try {
@@ -116,17 +160,8 @@ function handleVisibilityChange() {
 }
 
 onMounted(async () => {
-  const batch = await fetchBatch()
-  enqueueUnseen(batch)
-
-  const initial: Tile[] = []
-  for (let i = 0; i < TILE_COUNT; i++) {
-    const src = nextImage()
-    if (!src) break
-    tileKeyCounter++
-    initial.push({ key: tileKeyCounter, size: pickSize(), layers: [src, ''], activeLayer: 0 })
-  }
-  tiles.value = initial
+  updateViewportWidth()
+  window.addEventListener('resize', updateViewportWidth)
 
   if (root.value) {
     observer = new IntersectionObserver(([entry]) => {
@@ -136,19 +171,29 @@ onMounted(async () => {
     }, { threshold: 0.1 })
     observer.observe(root.value)
   }
-
   document.addEventListener('visibilitychange', handleVisibilityChange)
+
+  // Placeholder tiles (and thus the grid's real height) already exist —
+  // this just fills their first image in, without changing any sizes.
+  const batch = await fetchBatch()
+  enqueueUnseen(batch)
+  for (const tile of tiles.value) {
+    const src = nextImage()
+    if (!src) break
+    tile.layers[0] = src
+  }
 })
 
 onBeforeUnmount(() => {
   stop()
   observer?.disconnect()
+  window.removeEventListener('resize', updateViewportWidth)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 
 <template>
-  <div ref="root" class="photogrid">
+  <div ref="root" class="photogrid" :style="{ height: gridHeight + 'px' }">
     <div
       v-for="tile in tiles"
       :key="tile.key"
@@ -179,10 +224,15 @@ onBeforeUnmount(() => {
 .photogrid {
   display: grid;
   grid-auto-flow: dense;
-  grid-template-columns: repeat(14, 1fr);
-  grid-auto-rows: 92px;
+  grid-template-columns: repeat(16, 1fr);
+  grid-auto-rows: 70px;
   gap: 3px;
   background: var(--body-bg, #0c0c0a);
+  /* height is set inline from the `gridHeight` computed — derived from the
+     actual tile sizes in play, not an average guess, so it never jumps on
+     load or drifts as tiles swap. overflow:hidden is just a cushion for the
+     dense-packing row estimate being off by a fraction of a row. */
+  overflow: hidden;
 }
 
 .photogrid__cell {

@@ -8,6 +8,7 @@ interface EventItem {
   summary: string | null
   coverR2Key: string | null
   eventDate: string | null
+  endDate: string | null
   location: string | null
   registerUrl: string | null
   publishedAt: string | null
@@ -41,7 +42,8 @@ useSeoMeta({
       <h1 class="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{{ ev.title }}</h1>
       <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-soft">
         <span v-if="ev.eventDate" class="inline-flex items-center gap-1">
-          <Icon name="heroicons:calendar-days" class="size-4" /> {{ formatDate(ev.eventDate) }}
+          <Icon name="heroicons:calendar-days" class="size-4" />
+          {{ formatDate(ev.eventDate) }}<template v-if="ev.endDate && ev.endDate !== ev.eventDate"> – {{ formatDate(ev.endDate) }}</template>
         </span>
         <span v-if="ev.location" class="inline-flex items-center gap-1">
           <Icon name="heroicons:map-pin" class="size-4" /> {{ ev.location }}

@@ -6,6 +6,7 @@ const bodySchema = z.object({
   summary: z.string().trim().optional(),
   body: z.string().optional(),
   eventDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
   location: z.string().trim().nullable().optional(),
   coverR2Key: z.string().nullable().optional(),
   registerUrl: z.string().trim().nullable().optional(),
@@ -22,6 +23,12 @@ export default defineEventHandler(async (event) => {
   const slug = await uniqueSlug(schema.events, data.slug || data.title)
   const status = data.status ?? 'draft'
 
+  const eventDate = data.eventDate ? new Date(data.eventDate) : null
+  const endDate = data.endDate ? new Date(data.endDate) : null
+  if (endDate && (!eventDate || endDate < eventDate)) {
+    throw createError({ statusCode: 400, message: 'วันสิ้นสุดต้องไม่มาก่อนวันเริ่มกิจกรรม' })
+  }
+
   const [created] = await db
     .insert(schema.events)
     .values({
@@ -29,7 +36,8 @@ export default defineEventHandler(async (event) => {
       slug,
       summary: data.summary ?? null,
       body: data.body ?? '',
-      eventDate: data.eventDate ? new Date(data.eventDate) : null,
+      eventDate,
+      endDate,
       location: data.location ?? null,
       coverR2Key: data.coverR2Key ?? null,
       registerUrl: data.registerUrl || null,

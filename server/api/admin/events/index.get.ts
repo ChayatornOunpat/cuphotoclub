@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
       summary: schema.events.summary,
       coverR2Key: schema.events.coverR2Key,
       eventDate: schema.events.eventDate,
+      endDate: schema.events.endDate,
       location: schema.events.location,
       registerUrl: schema.events.registerUrl,
       status: schema.events.status,

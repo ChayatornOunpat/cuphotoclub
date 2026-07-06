@@ -10,7 +10,9 @@ definePageMeta({ layout: false })
     <section class="section-pad">
       <div class="wrap">
         <h1>Live Photogrid bench</h1>
-        <LivePhotoGrid />
+        <ClientOnly>
+          <LivePhotoGrid />
+        </ClientOnly>
       </div>
     </section>
   </div>

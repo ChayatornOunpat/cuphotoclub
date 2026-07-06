@@ -84,6 +84,7 @@ export const events = sqliteTable('events', {
   summary: text('summary'),
   body: text('body').notNull().default(''), // markdown
   eventDate: integer('event_date', { mode: 'timestamp' }),
+  endDate: integer('end_date', { mode: 'timestamp' }), // optional last day for multi-day events
   location: text('location'),
   coverR2Key: text('cover_r2_key'),
   registerUrl: text('register_url'), // optional external sign-up link
