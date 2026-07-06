@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'site' })
 
+const { t } = useI18n()
 const { data: settings } = useSiteSettings()
 
 const form = reactive({ name: '', email: '', subject: '', message: '' })
@@ -18,7 +19,7 @@ async function submit() {
     })
     sent.value = true
   } catch (e) {
-    error.value = (e as { data?: { message?: string } })?.data?.message || 'ส่งข้อความไม่สำเร็จ'
+    error.value = (e as { data?: { message?: string } })?.data?.message || t('contact.sendFailed')
   } finally {
     sending.value = false
   }
@@ -32,15 +33,15 @@ const socials = computed(() =>
   ].filter(s => s.url)
 )
 
-useSeoMeta({ title: 'ติดต่อเรา', description: 'ติดต่อชมรมถ่ายภาพ' })
+useSeoMeta({ title: () => t('contact.title'), description: () => t('contact.metaDescription') })
 </script>
 
 <template>
   <div class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
     <div class="grid gap-12 lg:grid-cols-2">
       <div>
-        <h1 class="text-3xl font-bold tracking-tight text-ink sm:text-4xl">ติดต่อเรา</h1>
-        <p class="mt-3 text-ink-soft">มีคำถามหรือต้องการติดต่อชมรม ส่งข้อความถึงเราได้เลย</p>
+        <h1 class="text-3xl font-bold tracking-tight text-ink sm:text-4xl">{{ t('contact.title') }}</h1>
+        <p class="mt-3 text-ink-soft">{{ t('contact.lead') }}</p>
 
         <dl class="mt-8 space-y-4 text-sm">
           <div v-if="settings?.contactEmail" class="flex items-center gap-3">
@@ -59,24 +60,24 @@ useSeoMeta({ title: 'ติดต่อเรา', description: 'ติดต่
       <div class="rounded-lg border border-line bg-white p-6 sm:p-8">
         <div v-if="sent" class="flex h-full flex-col items-center justify-center py-8 text-center">
           <Icon name="heroicons:check-circle" class="size-12 text-green-500" />
-          <p class="mt-4 font-semibold text-ink">ส่งข้อความเรียบร้อยแล้ว</p>
-          <p class="mt-1 text-sm text-ink-soft">ขอบคุณที่ติดต่อเรา เราจะตอบกลับโดยเร็วที่สุด</p>
+          <p class="mt-4 font-semibold text-ink">{{ t('contact.sentTitle') }}</p>
+          <p class="mt-1 text-sm text-ink-soft">{{ t('contact.sentBody') }}</p>
         </div>
         <form v-else class="space-y-4" @submit.prevent="submit">
           <p v-if="error" class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-          <UiField label="ชื่อ" input-id="c-name">
+          <UiField :label="t('contact.name')" input-id="c-name">
             <UiInput id="c-name" v-model="form.name" required />
           </UiField>
-          <UiField label="อีเมล" input-id="c-email">
+          <UiField :label="t('contact.email')" input-id="c-email">
             <UiInput id="c-email" v-model="form.email" type="email" required />
           </UiField>
-          <UiField label="หัวข้อ" input-id="c-subject">
+          <UiField :label="t('contact.subject')" input-id="c-subject">
             <UiInput id="c-subject" v-model="form.subject" />
           </UiField>
-          <UiField label="ข้อความ" input-id="c-message">
+          <UiField :label="t('contact.message')" input-id="c-message">
             <UiTextarea id="c-message" v-model="form.message" :rows="5" />
           </UiField>
-          <UiButton type="submit" block :loading="sending">ส่งข้อความ</UiButton>
+          <UiButton type="submit" block :loading="sending">{{ t('contact.send') }}</UiButton>
         </form>
       </div>
     </div>

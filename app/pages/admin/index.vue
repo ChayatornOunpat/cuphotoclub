@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'admin', middleware: 'auth' })
+definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { t } = useI18n()
 const localePath = useLocalePath()

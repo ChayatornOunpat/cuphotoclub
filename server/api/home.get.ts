@@ -65,8 +65,11 @@ export default defineEventHandler(async () => {
     .orderBy(desc(schema.events.eventDate), desc(schema.events.createdAt))
     .limit(3)
 
-  const galleryAlbums = albumRows.map(({ explicitCoverKey, firstPhotoKey, ...a }) => ({
+  const galleryAlbums = albumRows.map(({ explicitCoverKey, firstPhotoKey, eventDate, ...a }) => ({
     ...a,
+    // Relational albums store eventDate as a Date; content albums use ISO strings.
+    // Normalize to string so the merged sort below can localeCompare safely.
+    eventDate: eventDate instanceof Date ? eventDate.toISOString().slice(0, 10) : eventDate,
     coverKey: explicitCoverKey ?? firstPhotoKey ?? null,
     source: 'gallery' as const
   }))

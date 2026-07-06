@@ -3,7 +3,7 @@
 ## Styling rules
 
 **Admin pages use scoped CSS + CSS variables — never Tailwind utilities.**
-All admin pages (`app/pages/admin/**`, `app/components/Admin*.vue`) use `<style scoped>` with BEM class names and CSS variables (`var(--dark)`, `var(--muted)`, `var(--subtle)`, `var(--paper)`, `var(--accent)`). Tailwind utility classes are used only on public-facing pages. If you write `text-ink`, `border-line`, or `bg-paper-soft` in an admin template, those classes don't exist — they'll silently break.
+All admin pages (`app/pages/admin/**`, `app/components/Admin*.vue`, `app/components/admin/**`) use `<style scoped>` with BEM class names and CSS variables (`var(--dark)`, `var(--muted)`, `var(--subtle)`, `var(--paper)`, `var(--accent)`). Tailwind utility classes are used only on public-facing pages. Note: theme utilities like `text-ink` / `border-line` / `bg-paper-soft` *do* exist (defined via `@theme` in `app/assets/css/main.css`) and render fine — the rule is a convention, not a breakage risk. A handful of older admin pages/components still use Tailwind; don't add more, and migrate them to scoped CSS when touching them.
 
 ## i18n rule
 
@@ -30,4 +30,4 @@ Use `admin-manage` / `requireManageUsers` only for user management and site sett
 
 ## Upload queue behaviour
 
-`R2ImageUploader` has a `pendingQueue` — dragging new files while an upload is running appends them; they process after the current batch finishes. Do not reset `total`/`done` counters on a concurrent call.
+`R2ImageUploader` has a `pendingQueue` — dragging new files while an upload is running appends them; they process after the current batch finishes. Do not reset `total`/`done` counters on a concurrent call. Queued files enter `total` only at the point they're queued (concurrent branch) — the drain loop must not re-count them. Files that can't be uploaded (limit reached / single-file mode) are surfaced via `skippedCount`, never dropped silently.

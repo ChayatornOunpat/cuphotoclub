@@ -43,6 +43,13 @@
       "when": 1783684800000,
       "tag": "0005_events_end_date",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1783343462017,
+      "tag": "0006_adorable_magma",
+      "breakpoints": true
     }
   ]
 }

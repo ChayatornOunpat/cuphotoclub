@@ -26,22 +26,6 @@ function addUsage(map: Map<string, ImageUsage[]>, key: string | null | undefined
   map.set(normalized, items)
 }
 
-function normalizeR2Key(value: string | null | undefined): string | null {
-  if (!value) return null
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  if (/^https?:\/\//i.test(trimmed)) {
-    try {
-      const url = new URL(trimmed)
-      const match = url.pathname.match(/\/images\/(.+)$/)
-      return match?.[1] ? decodeURIComponent(match[1]) : null
-    } catch {
-      return null
-    }
-  }
-  return trimmed.replace(/^\/images\//, '').replace(/^\/+/, '') || null
-}
-
 async function listImageBlobs(prefix?: string): Promise<BlobObject[]> {
   const blobs: BlobObject[] = []
   let cursor: string | undefined
@@ -135,12 +119,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const heroValue = heroRows[0]?.value
-  const heroImages: string[] = Array.isArray(heroValue)
-    ? heroValue
-    : typeof heroValue === 'string'
-      ? JSON.parse(heroValue || '[]')
-      : []
+  const heroImages = decodeHeroImages(heroRows[0]?.value)
   for (const key of heroImages) {
     addUsage(otherUsage, key, {
       kind: 'hero',

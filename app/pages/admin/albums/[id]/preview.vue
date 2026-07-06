@@ -3,7 +3,7 @@ import AlbumContact from '~/components/AlbumContact.vue'
 import AlbumEssay from '~/components/AlbumEssay.vue'
 import AlbumSticky from '~/components/AlbumSticky.vue'
 
-definePageMeta({ layout: 'site', middleware: 'auth' })
+definePageMeta({ layout: 'site', middleware: 'admin' })
 
 const route = useRoute()
 const id = route.params.id as string

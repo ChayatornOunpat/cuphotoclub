@@ -56,10 +56,9 @@ export default defineNuxtConfig({
     '/api/settings': { cache: { maxAge: 60 } }
   },
 
-  // Private (server-only) config. NUXT_ADMIN_PASSWORD overrides at runtime.
+  // Private (server-only) config.
   // Session secret comes from NUXT_SESSION_PASSWORD (nuxt-auth-utils).
   runtimeConfig: {
-    adminPassword: 'cuphoto1967',
     oauth: {
       google: { clientId: '', clientSecret: '' }
     },

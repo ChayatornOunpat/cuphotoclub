@@ -15,22 +15,22 @@ const mediaPrefix = computed(() => props.mediaPrefix || 'content-posts/drafts')
 // ─── Block palette ───────────────────────────────────────────────────────────
 
 const PALETTE = [
-  { type: 'text'       as PostBlockType, label: 'Paragraph',  group: 'Text',   description: 'Standard body text for running prose.' },
-  { type: 'lead'       as PostBlockType, label: 'Lead',        group: 'Text',   description: 'Opening paragraph with an accent-coloured left border to set the tone.' },
-  { type: 'heading'    as PostBlockType, label: 'Heading',     group: 'Text',   description: 'Large serif heading that marks a major new section.' },
-  { type: 'subheading' as PostBlockType, label: 'Subheading',  group: 'Text',   description: 'Smaller serif heading for sub-sections within a section.' },
-  { type: 'pullquote'  as PostBlockType, label: 'Pull Quote',  group: 'Text',   description: 'Large italic quote in accent colour with a left border — great for emphasis.' },
-  { type: 'blockquote' as PostBlockType, label: 'Blockquote',  group: 'Text',   description: 'Quoted text with optional attribution, tinted background, and accent border.' },
-  { type: 'inset'      as PostBlockType, label: 'Callout',     group: 'Text',   description: 'Highlighted box for asides, editorial notes, or sidebars.' },
-  { type: 'qanda'      as PostBlockType, label: 'Q & A',       group: 'Text',   description: 'Labelled question-and-answer pair — ideal for interview articles.' },
-  { type: 'image'      as PostBlockType, label: 'Image',       group: 'Visual', description: 'Inline photo with optional caption. Can break out wider than the text column.' },
-  { type: 'photo-full' as PostBlockType, label: 'Full Bleed',  group: 'Visual', description: 'Full viewport-width photograph for maximum visual impact.' },
-  { type: 'photo-pair' as PostBlockType, label: 'Photo Pair',  group: 'Visual', description: 'Two photos displayed side by side, spanning the full page width.' },
-  { type: 'divider'    as PostBlockType, label: 'Divider',     group: 'Visual', description: 'Centred dot-mark section break. Adds visual breathing room.' },
+  { type: 'text'       as PostBlockType, labelKey: 'adminPostForm.blockText',       group: 'Text',   descKey: 'adminPostForm.blockTextDesc' },
+  { type: 'lead'       as PostBlockType, labelKey: 'adminPostForm.blockLead',       group: 'Text',   descKey: 'adminPostForm.blockLeadDesc' },
+  { type: 'heading'    as PostBlockType, labelKey: 'adminPostForm.blockHeading',    group: 'Text',   descKey: 'adminPostForm.blockHeadingDesc' },
+  { type: 'subheading' as PostBlockType, labelKey: 'adminPostForm.blockSubheading', group: 'Text',   descKey: 'adminPostForm.blockSubheadingDesc' },
+  { type: 'pullquote'  as PostBlockType, labelKey: 'adminPostForm.blockPullquote',  group: 'Text',   descKey: 'adminPostForm.blockPullquoteDesc' },
+  { type: 'blockquote' as PostBlockType, labelKey: 'adminPostForm.blockBlockquote', group: 'Text',   descKey: 'adminPostForm.blockBlockquoteDesc' },
+  { type: 'inset'      as PostBlockType, labelKey: 'adminPostForm.blockInset',      group: 'Text',   descKey: 'adminPostForm.blockInsetDesc' },
+  { type: 'qanda'      as PostBlockType, labelKey: 'adminPostForm.blockQanda',      group: 'Text',   descKey: 'adminPostForm.blockQandaDesc' },
+  { type: 'image'      as PostBlockType, labelKey: 'adminPostForm.blockImage',      group: 'Visual', descKey: 'adminPostForm.blockImageDesc' },
+  { type: 'photo-full' as PostBlockType, labelKey: 'adminPostForm.blockPhotoFull',  group: 'Visual', descKey: 'adminPostForm.blockPhotoFullDesc' },
+  { type: 'photo-pair' as PostBlockType, labelKey: 'adminPostForm.blockPhotoPair',  group: 'Visual', descKey: 'adminPostForm.blockPhotoPairDesc' },
+  { type: 'divider'    as PostBlockType, labelKey: 'adminPostForm.blockDivider',    group: 'Visual', descKey: 'adminPostForm.blockDividerDesc' },
 ]
 
 const BLOCK_LABEL: Record<PostBlockType, string> = Object.fromEntries(
-  PALETTE.map(p => [p.type, p.label])
+  PALETTE.map(p => [p.type, p.labelKey])
 ) as Record<PostBlockType, string>
 
 function uid(): string {
@@ -55,17 +55,17 @@ function makeBlock(type: PostBlockType): PostBlock {
 
 // ─── Form state ──────────────────────────────────────────────────────────────
 
-const HERO_STYLES: { value: HeroStyle; label: string }[] = [
-  { value: 'standard',     label: 'Standard' },
-  { value: 'dark-full',    label: 'Dark Full Bleed' },
-  { value: 'split',        label: 'Split Hero' },
-  { value: 'minimal-dark', label: 'Minimal Dark' },
+const HERO_STYLES: { value: HeroStyle; labelKey: string }[] = [
+  { value: 'standard',     labelKey: 'adminPostForm.heroStandard' },
+  { value: 'dark-full',    labelKey: 'adminPostForm.heroDarkFull' },
+  { value: 'split',        labelKey: 'adminPostForm.heroSplit' },
+  { value: 'minimal-dark', labelKey: 'adminPostForm.heroMinimalDark' },
 ]
 
-const VISIBILITY_OPTIONS: { value: ContentStatus, label: string, description: string }[] = [
-  { value: 'draft', label: 'Draft', description: 'Admin only. Hidden from the public site and direct links.' },
-  { value: 'link-only', label: 'Link only', description: 'Direct URL works, but it is hidden from lists and the homepage.' },
-  { value: 'public', label: 'Public', description: 'Shown on the site and available by direct link.' }
+const VISIBILITY_OPTIONS: { value: ContentStatus, labelKey: string, descKey: string }[] = [
+  { value: 'draft', labelKey: 'adminPostForm.visDraft', descKey: 'adminPostForm.visDraftDesc' },
+  { value: 'link-only', labelKey: 'adminPostForm.visLinkOnly', descKey: 'adminPostForm.visLinkOnlyDesc' },
+  { value: 'public', labelKey: 'adminPostForm.visPublic', descKey: 'adminPostForm.visPublicDesc' }
 ]
 
 function blank(): PostInput {
@@ -171,15 +171,15 @@ function onDrop(toIndex: number) {
 // ─── Templates ───────────────────────────────────────────────────────────────
 
 interface Template {
-  name: string
-  description: string
+  nameKey: string
+  descKey: string
   blocks: () => PostBlock[]
 }
 
 const TEMPLATES: Template[] = [
   {
-    name: 'Essay',
-    description: 'Long-form editorial with pull quote and section breaks',
+    nameKey: 'adminPostForm.tplEssay',
+    descKey: 'adminPostForm.tplEssayDesc',
     blocks: () => [
       { id: uid(), type: 'lead', content: 'There is a particular kind of stillness that precedes a great photograph. It is not the stillness of waiting — it is the stillness of attention, of having quieted every thought except the one unfolding in front of you.' },
       { id: uid(), type: 'text', content: 'Most photographers will tell you the decisive moment is a matter of reflex. You see it, you press. But spend enough time with the craft and you begin to suspect the opposite: that the shutter is the last thing to happen, that everything important has already occurred by the time your finger moves.' },
@@ -193,8 +193,8 @@ const TEMPLATES: Template[] = [
     ],
   },
   {
-    name: 'Interview',
-    description: 'Q & A format with a portrait and a closing callout',
+    nameKey: 'adminPostForm.tplInterview',
+    descKey: 'adminPostForm.tplInterviewDesc',
     blocks: () => [
       { id: uid(), type: 'lead', content: 'Maya Osei has been shooting documentary work for twelve years, most recently along the Lake Erie shoreline. We sat down with her after her talk at the Spring Symposium to talk about process, patience, and why she still shoots film.' },
       { id: uid(), type: 'image', src: 'https://picsum.photos/seed/tpl_int_portrait/900/600', caption: 'Maya Osei at the CU Photo spring symposium, April 2026.', breakout: false },
@@ -208,8 +208,8 @@ const TEMPLATES: Template[] = [
     ],
   },
   {
-    name: 'Photo Essay',
-    description: 'Image-led story with full-bleed photos and minimal text',
+    nameKey: 'adminPostForm.tplPhotoEssay',
+    descKey: 'adminPostForm.tplPhotoEssayDesc',
     blocks: () => [
       { id: uid(), type: 'lead', content: 'The hour after a storm is unlike any other. The city empties of people but fills with light — reflections in standing water, steam rising from pavement, the particular blue of a sky that has just finished raining.' },
       { id: uid(), type: 'photo-full', src: 'https://picsum.photos/seed/tpl_pe_01/1600/900', caption: 'East 9th Street, 6:12 a.m., April 2026.' },
@@ -221,8 +221,8 @@ const TEMPLATES: Template[] = [
     ],
   },
   {
-    name: 'Exhibition Review',
-    description: 'Critical write-up with a featured image and quoted source',
+    nameKey: 'adminPostForm.tplReview',
+    descKey: 'adminPostForm.tplReviewDesc',
     blocks: () => [
       { id: uid(), type: 'lead', content: 'Decisive Moments, the new group exhibition at the Folger Gallery, takes its title from Cartier-Bresson but its spirit from somewhere more uncomfortable. These are not photographs of elegant convergence. They are photographs of friction — of things almost happening, of gestures caught between intention and consequence.' },
       { id: uid(), type: 'image', src: 'https://picsum.photos/seed/tpl_er_hero/1200/750', caption: 'Installation view, Decisive Moments, Folger Gallery. Through July 26, 2026.', breakout: true },
@@ -237,8 +237,8 @@ const TEMPLATES: Template[] = [
     ],
   },
   {
-    name: 'Event Recap',
-    description: 'Two-photo opener, recap body, and a highlight callout',
+    nameKey: 'adminPostForm.tplRecap',
+    descKey: 'adminPostForm.tplRecapDesc',
     blocks: () => [
       { id: uid(), type: 'lead', content: 'Forty-two members showed up to Riverside Park on Saturday, which surprised everyone including the organizers. The golden hour delivered. So did the backup pizza plan when the food truck didn\'t.' },
       { id: uid(), type: 'photo-pair', src1: 'https://picsum.photos/seed/tpl_ev_01/900/700', src2: 'https://picsum.photos/seed/tpl_ev_02/900/700', caption: 'Members shooting along the east bank. Photos by Jordan Kim.' },
@@ -258,7 +258,7 @@ function loadTemplate(tpl: Template) {
     const a = b as any
     return a.content || a.question || a.answer || a.src || a.src1
   })
-  if (hasContent && !confirm(`Replace current blocks with the "${tpl.name}" template?`)) return
+  if (hasContent && !confirm(t('adminPostForm.tplReplaceConfirm', { name: t(tpl.nameKey) }))) return
   form.blocks = tpl.blocks()
   showTemplates.value = false
   paletteOpen.value = false
@@ -298,10 +298,10 @@ function onSubmit() {
     <div class="editor__bar">
       <NuxtLink :to="localePath('/admin/posts')" class="btn-ghost">{{ t('admin.cancel') }}</NuxtLink>
       <button type="button" class="btn-tpl" :class="{ 'btn-tpl--active': showTemplates }" @click="showTemplates = !showTemplates; preview = false">
-        Templates
+        {{ t('adminPostForm.templates') }}
       </button>
       <button type="button" class="btn-toggle" :class="{ 'btn-toggle--active': preview }" @click="preview = !preview; showTemplates = false">
-        {{ preview ? 'Edit' : 'Preview' }}
+        {{ preview ? t('adminPostForm.edit') : t('admin.preview') }}
       </button>
       <button type="submit" class="btn-solid" :disabled="busy">
         {{ busy ? t('admin.saving') : (submitLabel || t('admin.save')) }}
@@ -310,18 +310,18 @@ function onSubmit() {
 
     <!-- Template picker -->
     <div v-if="showTemplates" class="tpl-picker">
-      <p class="tpl-picker__hint">Choose a starting structure. Existing blocks will be replaced.</p>
+      <p class="tpl-picker__hint">{{ t('adminPostForm.tplHint') }}</p>
       <div class="tpl-grid">
         <button
           v-for="tpl in TEMPLATES"
-          :key="tpl.name"
+          :key="tpl.nameKey"
           type="button"
           class="tpl-card"
           @click="loadTemplate(tpl)"
         >
-          <span class="tpl-card__name">{{ tpl.name }}</span>
-          <span class="tpl-card__desc">{{ tpl.description }}</span>
-          <span class="tpl-card__blocks">{{ tpl.blocks().length }} blocks</span>
+          <span class="tpl-card__name">{{ t(tpl.nameKey) }}</span>
+          <span class="tpl-card__desc">{{ t(tpl.descKey) }}</span>
+          <span class="tpl-card__blocks">{{ t('adminPostForm.blockCount', { count: tpl.blocks().length }) }}</span>
         </button>
       </div>
     </div>
@@ -330,7 +330,7 @@ function onSubmit() {
     <div v-if="!preview" class="top-dock">
       <div class="dock-fields">
         <div class="field field--span2">
-          <label>Title</label>
+          <label>{{ t('adminForm.title') }}</label>
           <textarea v-model="form.title" rows="2" :placeholder="t('adminPostForm.titlePlaceholder')" />
         </div>
         <div class="field">
@@ -346,8 +346,8 @@ function onSubmit() {
           <UiDateInput v-model="form.published" />
         </div>
         <div class="field field--span3 field--visibility">
-          <label>Visibility</label>
-          <div class="visibility-toggle" role="radiogroup" aria-label="Post visibility">
+          <label>{{ t('adminForm.visibility') }}</label>
+          <div class="visibility-toggle" role="radiogroup" :aria-label="t('adminPostForm.visibilityAria')">
             <button
               v-for="option in VISIBILITY_OPTIONS"
               :key="option.value"
@@ -358,8 +358,8 @@ function onSubmit() {
               role="radio"
               @click="form.visibility = option.value"
             >
-              <span>{{ option.label }}</span>
-              <small>{{ option.description }}</small>
+              <span>{{ t(option.labelKey) }}</span>
+              <small>{{ t(option.descKey) }}</small>
             </button>
           </div>
         </div>
@@ -376,21 +376,21 @@ function onSubmit() {
           </div>
         </div>
         <div class="field">
-          <label>Hero Style</label>
+          <label>{{ t('adminPostForm.heroStyle') }}</label>
           <select v-model="form.heroStyle">
-            <option v-for="s in HERO_STYLES" :key="s.value" :value="s.value">{{ s.label }}</option>
+            <option v-for="s in HERO_STYLES" :key="s.value" :value="s.value">{{ t(s.labelKey) }}</option>
           </select>
         </div>
         <div class="field field--span2">
-          <label>Author</label>
-          <input v-model="form.author" type="text" placeholder="e.g. Ananda K.">
+          <label>{{ t('adminPostForm.author') }}</label>
+          <input v-model="form.author" type="text" :placeholder="t('adminPostForm.authorPlaceholder')">
         </div>
         <div class="field field--span2">
-          <label>Author Bio</label>
-          <textarea v-model="form.authorBio" rows="2" placeholder="Short bio shown below the article..." />
+          <label>{{ t('adminPostForm.authorBio') }}</label>
+          <textarea v-model="form.authorBio" rows="2" :placeholder="t('adminPostForm.authorBioPlaceholder')" />
         </div>
         <div class="field">
-          <label>Author Avatar URL</label>
+          <label>{{ t('adminPostForm.authorAvatar') }}</label>
           <div class="field-img-row">
             <img v-if="form.authorAvatar" :src="form.authorAvatar" alt="" class="field-img-preview field-img-preview--round">
             <input v-model="form.authorAvatar" type="text" placeholder="https://...">
@@ -414,8 +414,8 @@ function onSubmit() {
         @drop.prevent="onDrop(i)"
         @dragend="onDragEnd"
       >
-        <div class="block-row__handle" title="Drag to reorder">⠿</div>
-        <div class="block-row__badge">{{ BLOCK_LABEL[block.type] }}</div>
+        <div class="block-row__handle" :title="t('adminPostForm.dragReorder')">⠿</div>
+        <div class="block-row__badge">{{ t(BLOCK_LABEL[block.type]) }}</div>
 
         <div class="block-row__fields">
 
@@ -425,7 +425,7 @@ function onSubmit() {
             :value="(block as any).content"
             rows="3"
             :class="['field-ta', `field-ta--${block.type}`]"
-            :placeholder="block.type === 'lead' ? 'Opening lead paragraph...' : block.type === 'pullquote' ? 'Pull quote text...' : block.type === 'inset' ? 'Callout / sidebar text...' : 'Paragraph text...'"
+            :placeholder="block.type === 'lead' ? t('adminPostForm.phLead') : block.type === 'pullquote' ? t('adminPostForm.phPullquote') : block.type === 'inset' ? t('adminPostForm.phInset') : t('adminPostForm.phText')"
             @input="(block as any).content = ($event.target as HTMLTextAreaElement).value"
           />
 
@@ -435,7 +435,7 @@ function onSubmit() {
             :value="(block as any).content"
             type="text"
             :class="['field-in', `field-in--${block.type}`]"
-            :placeholder="block.type === 'heading' ? 'Section heading...' : 'Sub-section heading...'"
+            :placeholder="block.type === 'heading' ? t('adminPostForm.phHeading') : t('adminPostForm.phSubheading')"
             @input="(block as any).content = ($event.target as HTMLInputElement).value"
           />
 
@@ -445,14 +445,14 @@ function onSubmit() {
               :value="(block as any).content"
               rows="3"
               class="field-ta field-ta--blockquote"
-              placeholder="Quote text..."
+              :placeholder="t('adminPostForm.phQuote')"
               @input="(block as any).content = ($event.target as HTMLTextAreaElement).value"
             />
             <input
               :value="(block as any).cite"
               type="text"
               class="field-in field-in--cite"
-              placeholder="— Attribution (optional)"
+              :placeholder="t('adminPostForm.phAttribution')"
               @input="(block as any).cite = ($event.target as HTMLInputElement).value"
             />
           </template>
@@ -461,13 +461,13 @@ function onSubmit() {
           <template v-else-if="block.type === 'image'">
             <div class="field-img-row">
               <img v-if="(block as any).src" :src="(block as any).src" alt="" class="field-img-preview">
-              <input :value="(block as any).src" type="text" class="field-in field-in--url" placeholder="Image URL" @input="(block as any).src = ($event.target as HTMLInputElement).value" />
+              <input :value="(block as any).src" type="text" class="field-in field-in--url" :placeholder="t('adminPostForm.phImageUrl')" @input="(block as any).src = ($event.target as HTMLInputElement).value" />
               <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
             </div>
-            <input :value="(block as any).caption" type="text" class="field-in field-in--cap" placeholder="Caption (optional)" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
+            <input :value="(block as any).caption" type="text" class="field-in field-in--cap" :placeholder="t('adminPostForm.phCaption')" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
             <label class="field-check">
               <input type="checkbox" :checked="(block as any).breakout" @change="(block as any).breakout = ($event.target as HTMLInputElement).checked" />
-              Breakout (wider than column)
+              {{ t('adminPostForm.breakout') }}
             </label>
           </template>
 
@@ -475,10 +475,10 @@ function onSubmit() {
           <template v-else-if="block.type === 'photo-full'">
             <div class="field-img-row">
               <img v-if="(block as any).src" :src="(block as any).src" alt="" class="field-img-preview">
-              <input :value="(block as any).src" type="text" class="field-in field-in--url" placeholder="Photo URL" @input="(block as any).src = ($event.target as HTMLInputElement).value" />
+              <input :value="(block as any).src" type="text" class="field-in field-in--url" :placeholder="t('adminPostForm.phPhotoUrl')" @input="(block as any).src = ($event.target as HTMLInputElement).value" />
               <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
             </div>
-            <input :value="(block as any).caption" type="text" class="field-in field-in--cap" placeholder="Caption (optional)" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
+            <input :value="(block as any).caption" type="text" class="field-in field-in--cap" :placeholder="t('adminPostForm.phCaption')" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
           </template>
 
           <!-- photo-pair -->
@@ -486,16 +486,16 @@ function onSubmit() {
             <div class="field-pair">
               <div class="field-img-row">
                 <img v-if="(block as any).src1" :src="(block as any).src1" alt="" class="field-img-preview">
-                <input :value="(block as any).src1" type="text" class="field-in field-in--url" placeholder="Left photo URL" @input="(block as any).src1 = ($event.target as HTMLInputElement).value" />
+                <input :value="(block as any).src1" type="text" class="field-in field-in--url" :placeholder="t('adminPostForm.phLeftPhotoUrl')" @input="(block as any).src1 = ($event.target as HTMLInputElement).value" />
                 <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src1' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
               </div>
               <div class="field-img-row">
                 <img v-if="(block as any).src2" :src="(block as any).src2" alt="" class="field-img-preview">
-                <input :value="(block as any).src2" type="text" class="field-in field-in--url" placeholder="Right photo URL" @input="(block as any).src2 = ($event.target as HTMLInputElement).value" />
+                <input :value="(block as any).src2" type="text" class="field-in field-in--url" :placeholder="t('adminPostForm.phRightPhotoUrl')" @input="(block as any).src2 = ($event.target as HTMLInputElement).value" />
                 <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src2' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
               </div>
             </div>
-            <input :value="(block as any).caption" type="text" class="field-in field-in--cap" placeholder="Shared caption (optional)" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
+            <input :value="(block as any).caption" type="text" class="field-in field-in--cap" :placeholder="t('adminPostForm.phSharedCaption')" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
           </template>
 
           <!-- divider -->
@@ -503,16 +503,16 @@ function onSubmit() {
 
           <!-- qanda -->
           <template v-else-if="block.type === 'qanda'">
-            <textarea :value="(block as any).question" rows="2" class="field-ta field-ta--q" placeholder="Question..." @input="(block as any).question = ($event.target as HTMLTextAreaElement).value" />
-            <textarea :value="(block as any).answer"   rows="3" class="field-ta field-ta--a" placeholder="Answer..."   @input="(block as any).answer   = ($event.target as HTMLTextAreaElement).value" />
+            <textarea :value="(block as any).question" rows="2" class="field-ta field-ta--q" :placeholder="t('adminPostForm.phQuestion')" @input="(block as any).question = ($event.target as HTMLTextAreaElement).value" />
+            <textarea :value="(block as any).answer"   rows="3" class="field-ta field-ta--a" :placeholder="t('adminPostForm.phAnswer')"   @input="(block as any).answer   = ($event.target as HTMLTextAreaElement).value" />
           </template>
 
         </div>
 
         <!-- Ops -->
         <div class="block-row__ops">
-          <button type="button" class="op-btn" title="Insert block after" @click.stop="openPalette(i)">+</button>
-          <button type="button" class="op-btn op-btn--del" title="Remove block" @click="removeBlock(i)">×</button>
+          <button type="button" class="op-btn" :title="t('adminPostForm.insertAfter')" @click.stop="openPalette(i)">+</button>
+          <button type="button" class="op-btn op-btn--del" :title="t('adminPostForm.removeBlock')" @click="removeBlock(i)">×</button>
         </div>
 
       </div>
@@ -520,7 +520,7 @@ function onSubmit() {
       <!-- Add block zone -->
       <div class="add-zone">
         <button type="button" class="add-btn" @click.stop="openPalette(null)">
-          + Add Block
+          {{ t('adminPostForm.addBlock') }}
         </button>
       </div>
 
@@ -534,7 +534,7 @@ function onSubmit() {
         <template v-if="(form.heroStyle ?? 'standard') === 'standard'">
           <header class="std-head">
             <p class="std-head__eyebrow">{{ form.tag }} · {{ form.date }}</p>
-            <h1 class="std-head__title">{{ form.title || 'Untitled' }}</h1>
+            <h1 class="std-head__title">{{ form.title || t('adminPostForm.untitled') }}</h1>
             <p v-if="form.excerpt" class="std-head__excerpt">{{ form.excerpt }}</p>
             <p v-if="form.author" class="std-head__author">{{ form.author }}</p>
           </header>
@@ -551,7 +551,7 @@ function onSubmit() {
           <div class="df-head__gradient" />
           <div class="df-head__inner">
             <p class="df-head__tag">{{ form.tag }}</p>
-            <h1 class="df-head__title">{{ form.title || 'Untitled' }}</h1>
+            <h1 class="df-head__title">{{ form.title || t('adminPostForm.untitled') }}</h1>
             <div class="df-head__meta">
               <span v-if="form.author" class="df-head__author">{{ form.author }}</span>
               <span v-if="form.author" class="df-head__sep" />
@@ -567,7 +567,7 @@ function onSubmit() {
           </div>
           <div class="sp-head__content">
             <p class="sp-head__tag">{{ form.tag }}</p>
-            <h1 class="sp-head__title">{{ form.title || 'Untitled' }}</h1>
+            <h1 class="sp-head__title">{{ form.title || t('adminPostForm.untitled') }}</h1>
             <p v-if="form.excerpt" class="sp-head__excerpt">{{ form.excerpt }}</p>
             <div class="sp-head__meta">
               <span v-if="form.author" class="sp-head__author">{{ form.author }}</span>
@@ -580,7 +580,7 @@ function onSubmit() {
         <!-- Minimal dark header -->
         <header v-else-if="form.heroStyle === 'minimal-dark'" class="md-head">
           <p class="md-head__tag">{{ form.tag }}</p>
-          <h1 class="md-head__title">{{ form.title || 'Untitled' }}</h1>
+          <h1 class="md-head__title">{{ form.title || t('adminPostForm.untitled') }}</h1>
           <p v-if="form.excerpt" class="md-head__sub">{{ form.excerpt }}</p>
           <div class="md-head__meta">
             <span v-if="form.author" class="md-head__author">{{ form.author }}</span>
@@ -627,7 +627,7 @@ function onSubmit() {
             <div class="post__tags">
               <span class="post__tag-pill">{{ form.tag }}</span>
             </div>
-            <button type="button" class="post__share">Share →</button>
+            <button type="button" class="post__share">{{ t('adminPostForm.share') }}</button>
           </div>
         </div>
 
@@ -651,16 +651,16 @@ function onSubmit() {
     <!-- Block picker modal -->
     <Teleport to="body">
       <div v-if="paletteOpen" class="bpm-overlay" @click.self="paletteOpen = false">
-        <div class="bpm-panel" role="dialog" aria-modal="true" aria-label="Add a block">
+        <div class="bpm-panel" role="dialog" aria-modal="true" :aria-label="t('adminPostForm.addBlockTitle')">
 
           <div class="bpm-header">
-            <span class="bpm-title">Add a Block</span>
+            <span class="bpm-title">{{ t('adminPostForm.addBlockTitle') }}</span>
             <button type="button" class="bpm-close" @click="paletteOpen = false">✕</button>
           </div>
 
           <div class="bpm-body">
             <div v-for="group in ['Text', 'Visual']" :key="group" class="bpm-group">
-              <div class="bpm-group-label">{{ group }}</div>
+              <div class="bpm-group-label">{{ group === 'Text' ? t('adminPostForm.groupText') : t('adminPostForm.groupVisual') }}</div>
               <div class="bpm-grid">
                 <button
                   v-for="item in PALETTE.filter(p => p.group === group)"
@@ -685,18 +685,18 @@ function onSubmit() {
                     </template>
 
                     <template v-else-if="item.type === 'heading'">
-                      <div class="bpv-heading">Section<br>Heading</div>
+                      <div class="bpv-heading">{{ t('adminPostForm.previewHeading') }}</div>
                     </template>
 
                     <template v-else-if="item.type === 'subheading'">
-                      <div class="bpv-subheading">Subsection heading</div>
+                      <div class="bpv-subheading">{{ t('adminPostForm.previewSubheading') }}</div>
                       <div class="bpv-lines" style="margin-top:8px">
                         <div class="bpv-l l-full" /><div class="bpv-l l-3q" />
                       </div>
                     </template>
 
                     <template v-else-if="item.type === 'pullquote'">
-                      <div class="bpv-pullquote">"A memorable phrase worth highlighting."</div>
+                      <div class="bpv-pullquote">{{ t('adminPostForm.previewPullquote') }}</div>
                     </template>
 
                     <template v-else-if="item.type === 'blockquote'">
@@ -744,8 +744,8 @@ function onSubmit() {
 
                   </div>
                   <div class="bpm-card-info">
-                    <span class="bpm-card-name">{{ item.label }}</span>
-                    <span class="bpm-card-desc">{{ (item as any).description }}</span>
+                    <span class="bpm-card-name">{{ t(item.labelKey) }}</span>
+                    <span class="bpm-card-desc">{{ t(item.descKey) }}</span>
                   </div>
                 </button>
               </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PostInput } from '~~/shared/types'
-definePageMeta({ layout: 'admin', middleware: 'auth' })
+definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { t } = useI18n()
 const localePath = useLocalePath()

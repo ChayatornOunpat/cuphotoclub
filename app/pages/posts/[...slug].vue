@@ -34,13 +34,14 @@ const isDark = computed(() => heroStyle.value === 'minimal-dark')
 const progress = ref(0)
 const parallaxY = ref(0)
 
-onMounted(() => {
-  window.addEventListener('scroll', () => {
-    const total = document.documentElement.scrollHeight - window.innerHeight
-    progress.value = total > 0 ? (window.scrollY / total) * 100 : 0
-    parallaxY.value = window.scrollY * 0.15
-  }, { passive: true })
-})
+function onScroll() {
+  const total = document.documentElement.scrollHeight - window.innerHeight
+  progress.value = total > 0 ? (window.scrollY / total) * 100 : 0
+  parallaxY.value = window.scrollY * 0.15
+}
+
+onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
+onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 async function handleShare() {
   try {

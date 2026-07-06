@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 const createdAt = integer('created_at', { mode: 'timestamp' })
   .notNull()
@@ -57,7 +57,11 @@ export const photos = sqliteTable('photos', {
   photographer: text('photographer'),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt
-})
+}, table => [
+  // SQLite doesn't index FKs automatically; album pages and the home feed all
+  // filter or join photos on album_id, so without this each read is a full scan.
+  index('photos_album_id_idx').on(table.albumId)
+])
 
 export const posts = sqliteTable('posts', {
   id: integer('id').primaryKey({ autoIncrement: true }),

@@ -132,8 +132,7 @@ useHead({
   meta: [
     {
       name: 'description',
-      content:
-        'The official photography club of Chulalongkorn University — documenting life, culture, and the human condition since 1967.'
+      content: () => t('home.metaDescription')
     }
   ]
 })
@@ -189,12 +188,12 @@ useHead({
         <div class="construction-notice__backdrop" @click="dismissConstructionNotice" />
         <section class="construction-notice__panel">
           <p class="construction-notice__kicker">CU PHOTOCLUB / NOTICE</p>
-          <h2 id="construction-title">เว็บไซต์อยู่ระหว่างปรับปรุง</h2>
+          <h2 id="construction-title">{{ t('home.constructionTitle') }}</h2>
           <p>
-            บางหน้าและข้อมูลอาจยังไม่สมบูรณ์ ขอบคุณที่แวะมาชมงานของชมรมระหว่างที่เราจัดวางเว็บไซต์ใหม่
+            {{ t('home.constructionBody') }}
           </p>
           <button type="button" class="construction-notice__button" @click="dismissConstructionNotice">
-            เข้าชมเว็บไซต์ต่อ
+            {{ t('home.constructionButton') }}
           </button>
         </section>
       </div>

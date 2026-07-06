@@ -4,6 +4,11 @@ import type { Role } from '../../shared/types'
 // Require a logged-in admin; returns the session user.
 export async function requireAdmin(event: H3Event) {
   const { user } = await requireUserSession(event)
+  // Reject sessions minted by the removed legacy password login ({ name: 'Admin' }
+  // with no id/email/role) — they break audit logging further down the line.
+  if (!user.id || !user.email || !user.role) {
+    throw createError({ statusCode: 401, message: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่' })
+  }
   return user
 }
 

@@ -8,10 +8,11 @@ interface SearchResult {
   events: { slug: string, title: string, summary: string | null, eventDate: string | null }[]
 }
 
+const { t } = useI18n()
 const route = useRoute()
 const q = ref(String(route.query.q || ''))
 
-const { data, refresh } = await useFetch<SearchResult>('/api/search', {
+const { data } = await useFetch<SearchResult>('/api/search', {
   query: { q },
   default: () => ({ query: '', albums: [], posts: [], events: [] })
 })
@@ -22,13 +23,15 @@ function submit() {
 
 const total = computed(() => (data.value ? data.value.albums.length + data.value.posts.length + data.value.events.length : 0))
 
-useSeoMeta({ title: 'ค้นหา', robots: 'noindex' })
-watch(() => route.query.q, () => { q.value = String(route.query.q || ''); refresh() })
+useSeoMeta({ title: () => t('search.title'), robots: 'noindex' })
+// Keep q in sync with the URL (back/forward). useFetch already refetches
+// reactively when q changes — no manual refresh, or every change fires twice.
+watch(() => route.query.q, () => { q.value = String(route.query.q || '') })
 </script>
 
 <template>
   <div class="mx-auto max-w-3xl px-4 py-12 sm:py-16">
-    <h1 class="text-2xl font-bold tracking-tight text-ink">ค้นหา</h1>
+    <h1 class="text-2xl font-bold tracking-tight text-ink">{{ t('search.title') }}</h1>
 
     <form class="mt-6 flex gap-2" @submit.prevent="submit">
       <div class="relative flex-1">
@@ -36,18 +39,18 @@ watch(() => route.query.q, () => { q.value = String(route.query.q || ''); refres
         <input
           v-model="q"
           type="search"
-          placeholder="ค้นหาอัลบั้ม บทความ หรือกิจกรรม…"
+          :placeholder="t('search.placeholder')"
           class="block w-full rounded-md bg-white py-2 pl-10 pr-3 text-sm text-ink outline-1 -outline-offset-1 outline-line focus:outline-2 focus:-outline-offset-2 focus:outline-accent"
         >
       </div>
-      <UiButton type="submit">ค้นหา</UiButton>
+      <UiButton type="submit">{{ t('search.button') }}</UiButton>
     </form>
 
     <div v-if="route.query.q" class="mt-10 space-y-10">
-      <p v-if="total === 0" class="text-ink-soft">ไม่พบผลลัพธ์สำหรับ “{{ route.query.q }}”</p>
+      <p v-if="total === 0" class="text-ink-soft">{{ t('search.noResults', { q: route.query.q }) }}</p>
 
       <section v-if="data?.albums.length">
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">แกลเลอรี</h2>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">{{ t('search.galleries') }}</h2>
         <ul class="mt-3 divide-y divide-line">
           <li v-for="a in data.albums" :key="a.slug">
             <NuxtLink :to="`/albums/${a.slug}`" class="flex items-center justify-between gap-4 py-3 hover:text-accent">
@@ -59,7 +62,7 @@ watch(() => route.query.q, () => { q.value = String(route.query.q || ''); refres
       </section>
 
       <section v-if="data?.posts.length">
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">บทความ</h2>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">{{ t('search.posts') }}</h2>
         <ul class="mt-3 divide-y divide-line">
           <li v-for="p in data.posts" :key="p.slug" class="py-3">
             <NuxtLink :to="`/blog/${p.slug}`" class="font-medium text-ink hover:text-accent">{{ p.title }}</NuxtLink>
@@ -69,7 +72,7 @@ watch(() => route.query.q, () => { q.value = String(route.query.q || ''); refres
       </section>
 
       <section v-if="data?.events.length">
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">กิจกรรม</h2>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">{{ t('search.events') }}</h2>
         <ul class="mt-3 divide-y divide-line">
           <li v-for="e in data.events" :key="e.slug" class="py-3">
             <NuxtLink :to="`/activities/${e.slug}`" class="font-medium text-ink hover:text-accent">{{ e.title }}</NuxtLink>

@@ -7,6 +7,7 @@ const props = defineProps<{
   }
 }>()
 
+const { t } = useI18n()
 const route = useRoute()
 const statusCode = computed(() => props.error?.statusCode ?? 500)
 const detail = computed(() => props.error?.statusMessage || props.error?.message || '')
@@ -16,15 +17,15 @@ const isChunkLoad = computed(() =>
 )
 
 const heading = computed(() => {
-  if (is404.value) return 'ไม่พบหน้านี้'
-  if (isChunkLoad.value) return 'หน้าเว็บโหลดไม่ครบ'
-  return 'เกิดข้อผิดพลาด'
+  if (is404.value) return t('errorPage.notFoundHeading')
+  if (isChunkLoad.value) return t('errorPage.chunkHeading')
+  return t('errorPage.genericHeading')
 })
 
 const lead = computed(() => {
-  if (is404.value) return 'หน้าที่คุณเปิดอาจถูกย้าย เปลี่ยนชื่อ หรือลบไปแล้ว'
-  if (isChunkLoad.value) return 'ไฟล์บางส่วนของหน้าเว็บยังโหลดไม่สำเร็จ ลองโหลดหน้าใหม่อีกครั้ง'
-  return 'ระบบสะดุดระหว่างเปิดหน้านี้ ลองโหลดใหม่ หรือกลับไปหน้าแรกก่อน'
+  if (is404.value) return t('errorPage.notFoundLead')
+  if (isChunkLoad.value) return t('errorPage.chunkLead')
+  return t('errorPage.genericLead')
 })
 
 const technicalDetail = computed(() => {
@@ -59,27 +60,27 @@ useHead({
         <h1 id="error-title">{{ heading }}</h1>
         <p class="error-lead">{{ lead }}</p>
 
-        <div class="error-actions" aria-label="Recovery actions">
+        <div class="error-actions" :aria-label="t('errorPage.recoveryActions')">
           <button type="button" class="error-btn error-btn--primary" @click="retry">
-            ลองใหม่
+            {{ t('errorPage.retry') }}
           </button>
           <button type="button" class="error-btn error-btn--ghost" @click="goHome">
-            กลับหน้าแรก
+            {{ t('errorPage.goHome') }}
           </button>
         </div>
       </div>
     </section>
 
-    <section class="error-detail" aria-label="Error detail">
+    <section class="error-detail" :aria-label="t('errorPage.errorDetail')">
       <div class="error-detail__inner">
-        <p class="error-detail__label">Status</p>
+        <p class="error-detail__label">{{ t('errorPage.status') }}</p>
         <p class="error-detail__code">{{ statusCode }}</p>
         <p class="error-detail__note">
-          หากยังเกิดปัญหาอยู่ กรุณาลองรีเฟรชอีกครั้ง หรือติดต่อผู้ดูแลเว็บไซต์พร้อมรหัสนี้
+          {{ t('errorPage.note') }}
         </p>
 
         <details v-if="technicalDetail" class="error-tech">
-          <summary>รายละเอียดทางเทคนิค</summary>
+          <summary>{{ t('errorPage.technicalDetail') }}</summary>
           <p>{{ technicalDetail }}</p>
         </details>
       </div>

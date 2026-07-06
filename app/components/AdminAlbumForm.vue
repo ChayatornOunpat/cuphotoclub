@@ -37,10 +37,10 @@ function normalizeInitialAlbum(input: AlbumInput): AlbumInput {
   return album
 }
 
-const VISIBILITY_OPTIONS: { value: ContentStatus, label: string, description: string }[] = [
-  { value: 'draft', label: 'Draft', description: 'Admin only. Hidden from the public site and direct links.' },
-  { value: 'link-only', label: 'Link only', description: 'Direct URL works, but it is hidden from album lists and the homepage.' },
-  { value: 'public', label: 'Public', description: 'Shown on the site and available by direct link.' }
+const VISIBILITY_OPTIONS: { value: ContentStatus, labelKey: string, descKey: string }[] = [
+  { value: 'draft', labelKey: 'adminForm.visDraft', descKey: 'adminForm.visDraftDesc' },
+  { value: 'link-only', labelKey: 'adminForm.visLinkOnly', descKey: 'adminForm.visLinkOnlyDesc' },
+  { value: 'public', labelKey: 'adminForm.visPublic', descKey: 'adminForm.visPublicDesc' }
 ]
 
 function blank(): AlbumInput {
@@ -1036,8 +1036,8 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           </label>
         </div>
         <div class="field field--visibility">
-          <label>Visibility</label>
-          <div class="visibility-toggle" role="radiogroup" aria-label="Album visibility">
+          <label>{{ t('adminForm.visibility') }}</label>
+          <div class="visibility-toggle" role="radiogroup" :aria-label="t('adminForm.visibilityAria')">
             <button
               v-for="option in VISIBILITY_OPTIONS"
               :key="option.value"
@@ -1048,8 +1048,8 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               role="radio"
               @click="form.visibility = option.value"
             >
-              <span>{{ option.label }}</span>
-              <small>{{ option.description }}</small>
+              <span>{{ t(option.labelKey) }}</span>
+              <small>{{ t(option.descKey) }}</small>
             </button>
           </div>
         </div>
@@ -1091,12 +1091,12 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       <!-- Media -->
       <div class="tray__section">
         <p class="tray__label">
-          Photos
+          {{ t('adminPhotoManager.title') }}
           <span class="tray__count">{{ mediaItems.length }}</span>
         </p>
         <button type="button" class="upload-btn" @click="photoManagerOpen = true">
           <Icon name="heroicons:arrow-up-tray" class="upload-btn__icon" />
-          <span>{{ hasMedia ? 'Manage Photos' : 'Upload Photos' }}</span>
+          <span>{{ hasMedia ? t('adminPicker.managePhotos') : t('adminForm.uploadPhotos') }}</span>
         </button>
         <button
           type="button"
@@ -1104,23 +1104,23 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           @click="bulkPickerOpen = true"
         >
           <Icon name="heroicons:squares-plus" class="bulk-fill-btn__icon" />
-          <span>Auto-fill Frames</span>
+          <span>{{ t('adminForm.autofillFrames') }}</span>
         </button>
         <label v-if="isEssay" class="smart-fill-toggle">
           <input v-model="smartFrameAutofill" type="checkbox">
           <span>
-            <strong>Smart layout</strong>
-            <small>Use image shape to choose essay rows</small>
+            <strong>{{ t('adminForm.smartLayout') }}</strong>
+            <small>{{ t('adminForm.smartLayoutHint') }}</small>
           </span>
         </label>
-        <p class="media-empty media-empty--hint">Select many uploaded photos and build rows automatically.</p>
+        <p class="media-empty media-empty--hint">{{ t('adminForm.autofillHint') }}</p>
       </div>
 
       <!-- Palette -->
       <div class="tray__section">
         <!-- Essay: full span palette -->
         <template v-if="isEssay">
-          <p class="tray__label">Image</p>
+          <p class="tray__label">{{ t('adminForm.cellTypeImage') }}</p>
           <div class="palette">
             <button
               v-for="s in SPANS"
@@ -1128,7 +1128,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               type="button"
               class="palette__chip palette__chip--image"
               draggable="true"
-              :title="`Add image cell · span ${s}`"
+              :title="t('adminForm.paletteAddImage', { span: s })"
               @click="addCellFromPalette('image', s)"
               @dragstart.stop="onPaletteDragStart('image', s)"
               @dragend.stop="onPaletteDragEnd"
@@ -1136,7 +1136,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               <span class="chip__type">img</span><span class="chip__span">{{ s }}</span>
             </button>
           </div>
-          <p class="tray__label tray__label--gap">Text</p>
+          <p class="tray__label tray__label--gap">{{ t('adminForm.cellTypeText') }}</p>
           <div class="palette">
             <button
               v-for="s in SPANS"
@@ -1144,7 +1144,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               type="button"
               class="palette__chip palette__chip--text"
               draggable="true"
-              :title="`Add text cell · span ${s}`"
+              :title="t('adminForm.paletteAddText', { span: s })"
               @click="addCellFromPalette('text', s)"
               @dragstart.stop="onPaletteDragStart('text', s)"
               @dragend.stop="onPaletteDragEnd"
@@ -1152,7 +1152,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               <span class="chip__type">txt</span><span class="chip__span">{{ s }}</span>
             </button>
           </div>
-          <p class="tray__label tray__label--gap">Pad</p>
+          <p class="tray__label tray__label--gap">{{ t('adminForm.palettePad') }}</p>
           <div class="palette">
             <button
               v-for="s in SPANS"
@@ -1160,7 +1160,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               type="button"
               class="palette__chip palette__chip--pad"
               draggable="true"
-              :title="`Add padding · span ${s}`"
+              :title="t('adminForm.paletteAddPad', { span: s })"
               @click="addCellFromPalette('pad', s)"
               @dragstart.stop="onPaletteDragStart('pad', s)"
               @dragend.stop="onPaletteDragEnd"
@@ -1172,16 +1172,16 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 
         <!-- Sticky / Contact: fixed layout, no spans -->
         <template v-else>
-          <p class="tray__label">Add</p>
+          <p class="tray__label">{{ t('adminForm.paletteAdd') }}</p>
           <div class="palette palette--fixed">
-            <button type="button" class="palette__chip palette__chip--image" title="Add image" @click="addCellFromPalette('image', 6)">
-              <span class="chip__type">Image</span>
+            <button type="button" class="palette__chip palette__chip--image" :title="t('adminForm.paletteAddImageFixed')" @click="addCellFromPalette('image', 6)">
+              <span class="chip__type">{{ t('adminForm.cellTypeImage') }}</span>
             </button>
-            <button type="button" class="palette__chip palette__chip--text" title="Add text block" @click="addCellFromPalette('text', 6)">
-              <span class="chip__type">Text</span>
+            <button type="button" class="palette__chip palette__chip--text" :title="t('adminForm.paletteAddTextFixed')" @click="addCellFromPalette('text', 6)">
+              <span class="chip__type">{{ t('adminForm.cellTypeText') }}</span>
             </button>
-            <button type="button" class="palette__chip palette__chip--pad" title="Add spacer" @click="addCellFromPalette('pad', 6)">
-              <span class="chip__type">Spacer</span>
+            <button type="button" class="palette__chip palette__chip--pad" :title="t('adminForm.paletteAddSpacer')" @click="addCellFromPalette('pad', 6)">
+              <span class="chip__type">{{ t('adminForm.cellTypePad') }}</span>
             </button>
           </div>
         </template>
@@ -1190,7 +1190,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       <!-- Row List -->
       <div class="tray__section tray__section--grow">
         <p class="tray__label">
-          Rows
+          {{ t('adminForm.rows') }}
           <span class="tray__count">{{ form.rows.length }}</span>
         </p>
 
@@ -1221,12 +1221,12 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               @dragend.stop="onRowDragEnd"
             >
               <span class="row-item__drag">⠿</span>
-              <span class="row-item__label">Row {{ ri + 1 }}</span>
+              <span class="row-item__label">{{ t('adminForm.rowN', { n: ri + 1 }) }}</span>
               <span v-if="isEssay" class="row-item__usage" :class="{ full: rowUsed(row) >= 6 }">{{ rowUsed(row) }}/6</span>
               <button
                 type="button"
                 class="row-item__del"
-                :aria-label="`Remove row ${ri + 1}`"
+                :aria-label="t('adminForm.removeRowN', { n: ri + 1 })"
                 @click.stop="removeRow(ri)"
               >×</button>
             </div>
@@ -1257,11 +1257,11 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
                 <button
                   type="button"
                   class="cell-chip__del"
-                  aria-label="Remove cell"
+                  :aria-label="t('adminForm.removeCell')"
                   @click.stop="removeCell(ri, ci)"
                 >×</button>
               </div>
-              <div v-if="row.cells.length === 0" class="row-item__empty" style="grid-column: 1 / -1">drop cells here</div>
+              <div v-if="row.cells.length === 0" class="row-item__empty" style="grid-column: 1 / -1">{{ t('adminForm.dropCellsHere') }}</div>
             </div>
           </div>
 
@@ -1270,11 +1270,11 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
             class="row-list__empty"
             :class="{ 'is-drop-target': draggingFromPalette !== null }"
           >
-            Click palette chips or drag here
+            {{ t('adminForm.rowListEmpty') }}
           </div>
         </div>
 
-        <button type="button" class="row-add-btn" @click="addRow">+ New Row</button>
+        <button type="button" class="row-add-btn" @click="addRow">{{ t('adminForm.newRow') }}</button>
       </div>
     </aside>
 
@@ -1283,11 +1283,11 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       class="tray-resize-handle"
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize editor tray"
+      :aria-label="t('adminForm.resizeTray')"
       :aria-valuemin="TRAY_MIN_WIDTH"
       :aria-valuemax="TRAY_MAX_WIDTH"
       :aria-valuenow="trayWidth"
-      title="Resize editor tray"
+      :title="t('adminForm.resizeTray')"
       @pointerdown="startTrayResize"
       @keydown="onTrayResizeKeydown"
     >
@@ -1346,25 +1346,25 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           <textarea ref="excerptInput" v-model="form.excerpt" rows="4" :placeholder="t('adminForm.excerptPlaceholder')" @focus="activeField = 'excerpt'" />
         </div>
         <div class="field field--cover">
-          <label>Cover <span class="opt">choose from uploaded photos</span></label>
+          <label>{{ t('adminForm.coverLabel') }} <span class="opt">{{ t('adminForm.coverChooseHint') }}</span></label>
           <div class="cover-dock">
             <button
               type="button"
               class="cover-preview"
               :class="{ 'is-empty': !form.coverSrc }"
-              :title="form.coverSrc ? 'Clear cover' : 'No cover selected'"
+              :title="form.coverSrc ? t('adminForm.clearCover') : t('adminForm.noCoverSelected')"
               :disabled="!form.coverSrc"
               @click="form.coverSrc = ''"
             >
               <img :src="form.coverSrc || PLACEHOLDER_IMG" alt="">
-              <span>{{ form.coverSrc ? 'Clear' : 'No image selected' }}</span>
+              <span>{{ form.coverSrc ? t('adminForm.clear') : t('adminForm.noImageSelected') }}</span>
             </button>
 
             <button type="button" class="cover-pick" :disabled="!hasMedia && !mediaLoading" @click="coverPickerOpen = true">
               {{ t('adminPicker.chooseFromLibrary') }}
             </button>
-            <p v-if="!hasMedia && mediaLoading" class="media-empty">Loading photos…</p>
-            <p v-else-if="!hasMedia" class="media-empty">Upload photos from the sidebar first.</p>
+            <p v-if="!hasMedia && mediaLoading" class="media-empty">{{ t('adminForm.loadingPhotos') }}</p>
+            <p v-else-if="!hasMedia" class="media-empty">{{ t('adminForm.uploadFirst') }}</p>
           </div>
         </div>
       </div>
@@ -1393,7 +1393,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       v-model="bulkPickerOpen"
       :prefix="mediaPrefix"
       multiple
-      title="Auto-fill album frames"
+      :title="t('adminForm.autofillModalTitle')"
       @select="onBulkPick"
     />
 
@@ -1463,7 +1463,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               type="button"
               class="span-btn"
               :class="{ active: selectedCellData?.span === s, disabled: !spanFits(s) }"
-              :title="`Span ${s}`"
+              :title="t('adminForm.spanTitle', { n: s })"
               @click="setSpan(s)"
             >{{ s }}</button>
           </div>
@@ -1558,7 +1558,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               type="button"
               class="span-btn"
               :class="{ active: selectedCellData?.span === s, disabled: !spanFits(s) }"
-              :title="`Span ${s}`"
+              :title="t('adminForm.spanTitle', { n: s })"
               @click="setSpan(s)"
             >{{ s }}</button>
           </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const { t } = useI18n()
 const props = withDefaults(defineProps<{
   prefix?: string
   multiple?: boolean
@@ -24,6 +25,7 @@ const dragOver = ref(false)
 const total = ref(0)
 const done = ref(0)
 const errorCount = ref(0)
+const skippedCount = ref(0)
 const pendingQueue = ref<File[]>([])
 
 const COMPRESS_MAX_DIM = 3040
@@ -62,26 +64,35 @@ async function upload(files: File[]) {
   const images = files.filter(file => file.type.startsWith('image/'))
   if (!images.length) return
 
-  // While an upload is already running, queue and update the counter
+  // While an upload is already running, queue and update the counter. The drain
+  // loop below counts only what it pulls off the queue, so this is the single
+  // place queued files enter `total` (no double count). Single-file mode never
+  // drains the queue, so concurrent drops are ignored rather than stranded.
   if (uploading.value) {
-    pendingQueue.value.push(...images)
-    total.value += images.length
+    if (props.multiple) {
+      pendingQueue.value.push(...images)
+      total.value += images.length
+    }
     return
   }
 
   uploading.value = true
   errorCount.value = 0
+  skippedCount.value = 0
+  total.value = images.length
 
   let batch = images
   const allUploadedKeys: string[] = []
 
   while (batch.length) {
-    const slotsLeft = props.maxFiles ? Math.max(props.maxFiles - model.value.length, 0) : batch.length
+    // model isn't updated until after the loop, so count this run's uploads too.
+    const used = model.value.length + allUploadedKeys.length
+    const slotsLeft = props.maxFiles ? Math.max(props.maxFiles - used, 0) : batch.length
     const toProcess = batch.slice(0, props.multiple ? slotsLeft : 1)
 
-    if (!toProcess.length) { pendingQueue.value = []; break }
+    if (!toProcess.length) break
 
-    total.value += toProcess.length
+    batch = batch.slice(toProcess.length)
 
     for (const file of toProcess) {
       const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
@@ -105,7 +116,15 @@ async function upload(files: File[]) {
     if (!props.multiple) break
 
     // Drain anything queued while this batch was running
-    batch = pendingQueue.value.splice(0)
+    if (!batch.length) batch = pendingQueue.value.splice(0)
+  }
+
+  // Whatever is left (limit reached, or extra files in single mode) was not
+  // uploaded — say so instead of dropping it silently.
+  const skipped = batch.length + pendingQueue.value.length
+  if (skipped) {
+    skippedCount.value = skipped
+    pendingQueue.value = []
   }
 
   if (allUploadedKeys.length) {
@@ -160,36 +179,37 @@ function onDrop(e: DragEvent) {
           <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
         </svg>
         <p class="r2up__label">
-          Drag photos here or
-          <button type="button" class="r2up__pick" @click="chooseFiles">browse</button>
+          {{ t('uploader.dragHere') }}
+          <button type="button" class="r2up__pick" @click="chooseFiles">{{ t('uploader.browse') }}</button>
         </p>
-        <p class="r2up__hint">JPG · PNG · WebP · HEIC — up to 50 MB per file</p>
+        <p class="r2up__hint">{{ t('uploader.hintR2') }}</p>
       </template>
-      <p v-else class="r2up__full">Upload limit reached</p>
+      <p v-else class="r2up__full">{{ t('uploader.limitReached') }}</p>
 
       <input ref="fileInput" type="file" accept="image/*" :multiple="multiple" class="r2up__input" @change="onPick">
     </div>
 
     <!-- Compress toggle -->
     <div class="r2up__compress">
-      <span class="r2up__compress-label">Auto-compress</span>
+      <span class="r2up__compress-label">{{ t('uploader.autoCompress') }}</span>
       <div class="r2up__compress-toggle">
-        <button type="button" class="r2up__compress-btn" :class="{ active: autoCompress }" @click="autoCompress = true">On</button>
-        <button type="button" class="r2up__compress-btn" :class="{ active: !autoCompress }" @click="autoCompress = false">Off</button>
+        <button type="button" class="r2up__compress-btn" :class="{ active: autoCompress }" @click="autoCompress = true">{{ t('uploader.on') }}</button>
+        <button type="button" class="r2up__compress-btn" :class="{ active: !autoCompress }" @click="autoCompress = false">{{ t('uploader.off') }}</button>
       </div>
       <span class="r2up__compress-detail">
-        {{ autoCompress ? `Originals never stored · resized to ${COMPRESS_MAX_DIM}px · JPEG ${Math.round(COMPRESS_QUALITY * 100)}%` : 'Original file uploaded as-is — no compression' }}
+        {{ autoCompress ? t('uploader.compressOn', { dim: COMPRESS_MAX_DIM, quality: Math.round(COMPRESS_QUALITY * 100) }) : t('uploader.compressOff') }}
       </span>
     </div>
 
     <!-- Status -->
-    <p v-if="!uploading && errorCount" class="r2up__error">{{ errorCount }} file{{ errorCount === 1 ? '' : 's' }} failed to upload</p>
+    <p v-if="!uploading && errorCount" class="r2up__error">{{ t('uploader.failed', errorCount, { n: errorCount }) }}</p>
+    <p v-if="!uploading && skippedCount" class="r2up__error">{{ t('uploader.skipped', skippedCount, { n: skippedCount }) }}</p>
 
     <!-- Previews -->
     <div v-if="showPreviews && model.length" class="r2up__previews">
       <div v-for="key in model" :key="key" class="r2up__thumb">
         <img :src="`/images/${key}`" alt="" loading="lazy">
-        <button type="button" class="r2up__remove" title="ลบ" @click="removeKey(key)">
+        <button type="button" class="r2up__remove" :title="t('admin.delete')" @click="removeKey(key)">
           <Icon name="heroicons:trash" />
         </button>
       </div>

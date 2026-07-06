@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const { t } = useI18n()
 const props = defineProps<{ albumId: number }>()
 const emit = defineEmits<{ uploaded: [] }>()
 
@@ -68,18 +69,18 @@ function onDrop(e: DragEvent) {
     >
       <Icon name="heroicons:photo" class="size-9 text-ink-soft" />
       <p class="mt-3 text-sm text-ink-soft">
-        ลากรูปภาพมาวาง หรือ
-        <button type="button" class="font-semibold text-accent hover:underline" @click="fileInput?.click()">เลือกไฟล์</button>
+        {{ t('uploader.dragHere') }}
+        <button type="button" class="font-semibold text-accent hover:underline" @click="fileInput?.click()">{{ t('uploader.browse') }}</button>
       </p>
-      <p class="mt-1 text-xs text-ink-soft/70">รองรับ JPG, PNG, WebP — สูงสุด 15MB ต่อไฟล์</p>
+      <p class="mt-1 text-xs text-ink-soft/70">{{ t('uploader.hint15') }}</p>
       <input ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onPick">
     </div>
 
     <div v-if="uploading || errorCount" class="mt-3 text-sm">
       <p v-if="uploading" class="flex items-center gap-2 text-ink-soft">
-        <UiSpinner /> กำลังอัปโหลด {{ done }}/{{ total }}…
+        <UiSpinner /> {{ t('uploader.uploading', { done, total }) }}
       </p>
-      <p v-else-if="errorCount" class="text-red-600">อัปโหลดไม่สำเร็จ {{ errorCount }} ไฟล์</p>
+      <p v-else-if="errorCount" class="text-red-600">{{ t('uploader.failed', errorCount, { n: errorCount }) }}</p>
     </div>
   </div>
 </template>

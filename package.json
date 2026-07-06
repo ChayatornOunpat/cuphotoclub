@@ -2,6 +2,7 @@
   "name": "cuphotoclub",
   "type": "module",
   "private": true,
+  "packageManager": "pnpm@10.7.1",
   "scripts": {
     "build": "nuxt build --preset=cloudflare-pages",
     "build:node": "nuxt build",
