@@ -8,10 +8,10 @@
 // produce different results than the client, causing a hydration mismatch.
 //
 // Bandwidth strategy: the server only ever hands us a bounded random sample,
-// never the whole catalog. We swap one block at a time on a stagger timer
-// (so download rate stays flat regardless of catalog size), and only fetch a
-// fresh sample when the current one runs low. Everything pauses when the
-// grid is offscreen or the tab is hidden.
+// never the whole catalog. We swap a small, fixed number of blocks per tick
+// on a stagger timer (so download rate stays flat regardless of catalog
+// size), and only fetch a fresh sample when the current one runs low.
+// Everything pauses when the grid is offscreen or the tab is hidden.
 //
 // Layout: a fixed rows x cols occupancy grid (per breakpoint) is what makes
 // the wall's pixel height constant — it never depends on which shapes happen
@@ -23,6 +23,7 @@
 // neither move is possible, we just crossfade in place.
 
 const SWAP_INTERVAL_MS = 3500
+const SWAPS_PER_TICK = 3
 const REFILL_THRESHOLD = 20
 const BATCH_COUNT = 250
 
@@ -290,7 +291,7 @@ function performSwap() {
 
 function tick() {
   if (!visible) return
-  performSwap()
+  for (let i = 0; i < SWAPS_PER_TICK; i++) performSwap()
   void refillIfLow()
 }
 
