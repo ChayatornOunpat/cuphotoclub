@@ -9,6 +9,7 @@ const id = route.params.id as string
 
 const { data: post } = await useFetch(`/api/admin/posts/${id}`)
 if (!post.value) throw createError({ statusCode: 404, statusMessage: 'Post not found', fatal: true })
+const mediaPrefix = `content-posts/${id}`
 
 const busy = ref(false)
 const postTitle = ref(post.value?.title ?? '')
@@ -39,7 +40,14 @@ useHead({ title: () => `Edit ${post.value?.title} - Admin` })
     <p class="meta">
       Created by {{ actorName(post.createdBy) }} · Last edited by {{ actorName(post.updatedBy) }}
     </p>
-    <AdminPostForm :initial="post" :submit-label="t('admin.saveChanges')" :busy="busy" @submit="save" @update:title="v => postTitle = v" />
+    <AdminPostForm
+      :initial="post"
+      :media-prefix="mediaPrefix"
+      :submit-label="t('admin.saveChanges')"
+      :busy="busy"
+      @submit="save"
+      @update:title="v => postTitle = v"
+    />
   </div>
 </template>
 

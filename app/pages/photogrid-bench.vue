@@ -7,8 +7,12 @@ definePageMeta({ layout: false })
 
 <template>
   <div class="bench">
-    <h1>Live Photogrid bench</h1>
-    <LivePhotoGrid />
+    <section class="section-pad">
+      <div class="wrap">
+        <h1>Live Photogrid bench</h1>
+        <LivePhotoGrid />
+      </div>
+    </section>
   </div>
 </template>
 
@@ -17,7 +21,6 @@ definePageMeta({ layout: false })
   min-height: 100vh;
   background: #0c0c0a;
   color: #f5f4f0;
-  padding: 2rem;
 }
 h1 {
   font-size: 1rem;

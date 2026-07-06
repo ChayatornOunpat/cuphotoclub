@@ -8,14 +8,32 @@
 // and only fetch a fresh sample when the current one runs low. Everything
 // pauses when the grid is offscreen or the tab is hidden.
 
-const TILE_COUNT = 56
-const SWAP_INTERVAL_MS = 750
+const TILE_COUNT = 120
+const SWAP_INTERVAL_MS = 3500
 const REFILL_THRESHOLD = 20
 const BATCH_COUNT = 250
 
+type SizeClass = 'sm' | 'wide' | 'tall' | 'big'
+const SPANS: Record<SizeClass, { col: number, row: number }> = {
+  sm: { col: 1, row: 1 },
+  wide: { col: 2, row: 1 },
+  tall: { col: 1, row: 2 },
+  big: { col: 2, row: 2 }
+}
+
+function pickSize(): SizeClass {
+  const r = Math.random()
+  if (r < 0.55) return 'sm'
+  if (r < 0.75) return 'wide'
+  if (r < 0.92) return 'tall'
+  return 'big'
+}
+
 interface Tile {
-  src: string
-  fadeKey: number
+  key: number
+  size: SizeClass
+  layers: [string, string]
+  activeLayer: 0 | 1
 }
 
 const root = ref<HTMLElement | null>(null)
@@ -23,7 +41,7 @@ const tiles = ref<Tile[]>([])
 const queue = ref<string[]>([])
 const shown = new Set<string>()
 
-let fadeCounter = 0
+let tileKeyCounter = 0
 let intervalId: ReturnType<typeof setInterval> | null = null
 let observer: IntersectionObserver | null = null
 let visible = false
@@ -66,8 +84,11 @@ function swapRandomTile() {
   const preload = new Image()
   preload.onload = () => {
     const idx = Math.floor(Math.random() * tiles.value.length)
-    fadeCounter++
-    tiles.value[idx] = { src, fadeKey: fadeCounter }
+    const tile = tiles.value[idx]!
+    const nextLayer: 0 | 1 = tile.activeLayer === 0 ? 1 : 0
+    const layers: [string, string] = [...tile.layers]
+    layers[nextLayer] = src
+    tiles.value[idx] = { ...tile, size: pickSize(), layers, activeLayer: nextLayer }
   }
   preload.src = src
 }
@@ -102,8 +123,8 @@ onMounted(async () => {
   for (let i = 0; i < TILE_COUNT; i++) {
     const src = nextImage()
     if (!src) break
-    fadeCounter++
-    initial.push({ src, fadeKey: fadeCounter })
+    tileKeyCounter++
+    initial.push({ key: tileKeyCounter, size: pickSize(), layers: [src, ''], activeLayer: 0 })
   }
   tiles.value = initial
 
@@ -129,16 +150,26 @@ onBeforeUnmount(() => {
 <template>
   <div ref="root" class="photogrid">
     <div
-      v-for="(tile, i) in tiles"
-      :key="i"
+      v-for="tile in tiles"
+      :key="tile.key"
       class="photogrid__cell"
+      :style="{ gridColumn: `span ${SPANS[tile.size].col}`, gridRow: `span ${SPANS[tile.size].row}` }"
     >
       <img
-        :key="tile.fadeKey"
-        :src="tile.src"
+        v-if="tile.layers[0]"
+        :src="tile.layers[0]"
         alt=""
         loading="lazy"
         class="photogrid__img"
+        :class="{ 'is-active': tile.activeLayer === 0 }"
+      >
+      <img
+        v-if="tile.layers[1]"
+        :src="tile.layers[1]"
+        alt=""
+        loading="lazy"
+        class="photogrid__img"
+        :class="{ 'is-active': tile.activeLayer === 1 }"
       >
     </div>
   </div>
@@ -147,9 +178,10 @@ onBeforeUnmount(() => {
 <style scoped>
 .photogrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  grid-auto-rows: 100px;
-  gap: 2px;
+  grid-auto-flow: dense;
+  grid-template-columns: repeat(14, 1fr);
+  grid-auto-rows: 92px;
+  gap: 3px;
   background: var(--body-bg, #0c0c0a);
 }
 
@@ -165,11 +197,24 @@ onBeforeUnmount(() => {
   height: 100%;
   object-fit: cover;
   display: block;
-  animation: photogrid-fade 0.6s ease;
+  opacity: 0;
+  transform: scale(1.08);
+  transition:
+    opacity 1.1s ease,
+    transform 1.8s ease;
+}
+.photogrid__img.is-active {
+  opacity: 1;
+  transform: scale(1);
 }
 
-@keyframes photogrid-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@media (max-width: 1100px) {
+  .photogrid { grid-template-columns: repeat(10, 1fr); grid-auto-rows: 80px; }
+}
+@media (max-width: 700px) {
+  .photogrid { grid-template-columns: repeat(6, 1fr); grid-auto-rows: 70px; }
+}
+@media (max-width: 460px) {
+  .photogrid { grid-template-columns: repeat(4, 1fr); grid-auto-rows: 64px; }
 }
 </style>

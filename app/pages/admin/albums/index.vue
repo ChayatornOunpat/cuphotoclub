@@ -24,7 +24,7 @@ function visibilityClass(value?: string) {
 }
 
 function previewPath(album: NonNullable<typeof albums.value>[number]) {
-  return album.visibility === 'draft' ? `/admin/albums/${album.id}/preview` : `/albums/${album.id}`
+  return `/admin/albums/${album.id}/preview`
 }
 
 const visibleAlbums = computed(() => {

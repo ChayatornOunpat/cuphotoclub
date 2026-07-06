@@ -5,10 +5,12 @@ const props = defineProps<{
   initial?: PostInput | null
   submitLabel?: string
   busy?: boolean
+  mediaPrefix?: string
 }>()
 const emit = defineEmits<{ submit: [value: PostInput]; 'update:title': [value: string] }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
+const mediaPrefix = computed(() => props.mediaPrefix || 'content-posts/drafts')
 
 // ─── Block palette ───────────────────────────────────────────────────────────
 
@@ -108,6 +110,34 @@ function addBlock(type: PostBlockType) {
 function removeBlock(index: number) {
   form.blocks.splice(index, 1)
   if (!form.blocks.length) form.blocks.push(makeBlock('text'))
+}
+
+// ─── Image picker — "Choose from library" for hero, avatar, and block images ───
+// Text inputs are kept alongside this (rather than replaced) because post
+// images can legitimately be external URLs (see TEMPLATES above), not just
+// uploads — the picker is a shortcut, not the only way in.
+
+type ImageTarget = { kind: 'hero' } | { kind: 'avatar' } | { kind: 'block', index: number, field: 'src' | 'src1' | 'src2' }
+
+const imagePickerOpen = ref(false)
+const imagePickerTarget = ref<ImageTarget | null>(null)
+
+function openImagePicker(target: ImageTarget) {
+  imagePickerTarget.value = target
+  imagePickerOpen.value = true
+}
+
+function onImagePick(keys: string[]) {
+  const target = imagePickerTarget.value
+  const key = keys[0]
+  if (!target || !key) return
+  const path = `/images/${key}`
+  if (target.kind === 'hero') form.image = path
+  else if (target.kind === 'avatar') form.authorAvatar = path
+  else {
+    const block = form.blocks[target.index] as Record<string, unknown>
+    block[target.field] = path
+  }
 }
 
 function onPaletteKey(e: KeyboardEvent) {
@@ -309,7 +339,7 @@ function onSubmit() {
         </div>
         <div class="field">
           <label>{{ t('adminForm.dateDisplay') }}</label>
-          <input v-model="form.date" type="text" :placeholder="t('adminForm.datePlaceholder')">
+          <UiDateInput v-model="form.date" />
         </div>
         <div class="field">
           <label>{{ t('adminForm.publishedSort') }}</label>
@@ -335,11 +365,15 @@ function onSubmit() {
         </div>
         <div class="field field--span3">
           <label>{{ t('adminPostForm.excerptPlaceholder') }}</label>
-          <textarea v-model="form.excerpt" rows="2" :placeholder="t('adminPostForm.excerptPlaceholder')" />
+          <textarea v-model="form.excerpt" rows="4" :placeholder="t('adminPostForm.excerptPlaceholder')" />
         </div>
         <div class="field field--span3">
           <label>{{ t('adminPostForm.image') }}</label>
-          <input v-model="form.image" type="text" :placeholder="t('adminPostForm.imagePlaceholder')">
+          <div class="field-img-row">
+            <img v-if="form.image" :src="form.image" alt="" class="field-img-preview">
+            <input v-model="form.image" type="text" :placeholder="t('adminPostForm.imagePlaceholder')">
+            <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'hero' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
+          </div>
         </div>
         <div class="field">
           <label>Hero Style</label>
@@ -357,7 +391,11 @@ function onSubmit() {
         </div>
         <div class="field">
           <label>Author Avatar URL</label>
-          <input v-model="form.authorAvatar" type="text" placeholder="https://...">
+          <div class="field-img-row">
+            <img v-if="form.authorAvatar" :src="form.authorAvatar" alt="" class="field-img-preview field-img-preview--round">
+            <input v-model="form.authorAvatar" type="text" placeholder="https://...">
+            <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'avatar' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
+          </div>
         </div>
       </div>
     </div>
@@ -421,7 +459,11 @@ function onSubmit() {
 
           <!-- image -->
           <template v-else-if="block.type === 'image'">
-            <input :value="(block as any).src"     type="text" class="field-in field-in--url" placeholder="Image URL" @input="(block as any).src = ($event.target as HTMLInputElement).value" />
+            <div class="field-img-row">
+              <img v-if="(block as any).src" :src="(block as any).src" alt="" class="field-img-preview">
+              <input :value="(block as any).src" type="text" class="field-in field-in--url" placeholder="Image URL" @input="(block as any).src = ($event.target as HTMLInputElement).value" />
+              <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
+            </div>
             <input :value="(block as any).caption" type="text" class="field-in field-in--cap" placeholder="Caption (optional)" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
             <label class="field-check">
               <input type="checkbox" :checked="(block as any).breakout" @change="(block as any).breakout = ($event.target as HTMLInputElement).checked" />
@@ -431,15 +473,27 @@ function onSubmit() {
 
           <!-- photo-full -->
           <template v-else-if="block.type === 'photo-full'">
-            <input :value="(block as any).src"     type="text" class="field-in field-in--url" placeholder="Photo URL" @input="(block as any).src = ($event.target as HTMLInputElement).value" />
+            <div class="field-img-row">
+              <img v-if="(block as any).src" :src="(block as any).src" alt="" class="field-img-preview">
+              <input :value="(block as any).src" type="text" class="field-in field-in--url" placeholder="Photo URL" @input="(block as any).src = ($event.target as HTMLInputElement).value" />
+              <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
+            </div>
             <input :value="(block as any).caption" type="text" class="field-in field-in--cap" placeholder="Caption (optional)" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
           </template>
 
           <!-- photo-pair -->
           <template v-else-if="block.type === 'photo-pair'">
             <div class="field-pair">
-              <input :value="(block as any).src1" type="text" class="field-in field-in--url" placeholder="Left photo URL" @input="(block as any).src1 = ($event.target as HTMLInputElement).value" />
-              <input :value="(block as any).src2" type="text" class="field-in field-in--url" placeholder="Right photo URL" @input="(block as any).src2 = ($event.target as HTMLInputElement).value" />
+              <div class="field-img-row">
+                <img v-if="(block as any).src1" :src="(block as any).src1" alt="" class="field-img-preview">
+                <input :value="(block as any).src1" type="text" class="field-in field-in--url" placeholder="Left photo URL" @input="(block as any).src1 = ($event.target as HTMLInputElement).value" />
+                <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src1' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
+              </div>
+              <div class="field-img-row">
+                <img v-if="(block as any).src2" :src="(block as any).src2" alt="" class="field-img-preview">
+                <input :value="(block as any).src2" type="text" class="field-in field-in--url" placeholder="Right photo URL" @input="(block as any).src2 = ($event.target as HTMLInputElement).value" />
+                <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src2' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
+              </div>
             </div>
             <input :value="(block as any).caption" type="text" class="field-in field-in--cap" placeholder="Shared caption (optional)" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
           </template>
@@ -702,6 +756,13 @@ function onSubmit() {
       </div>
     </Teleport>
 
+    <AdminImagePickerModal
+      v-model="imagePickerOpen"
+      :prefix="mediaPrefix"
+      :title="t('adminPicker.chooseFromLibrary')"
+      @select="onImagePick"
+    />
+
   </form>
 </template>
 
@@ -738,6 +799,32 @@ function onSubmit() {
 .field input:focus,
 .field select:focus,
 .field textarea:focus { border-color: var(--accent); }
+.field :deep(.ui-date-input__text) {
+  border: 1px solid var(--subtle);
+  border-radius: 0;
+  background: #fff;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  padding: 0.52rem 0.65rem;
+  outline: none;
+}
+.field :deep(.ui-date-input__text:focus) { border-color: var(--accent); }
+
+.field-img-row { display: flex; align-items: center; gap: 0.5rem; }
+.field-img-row input { flex: 1; min-width: 0; }
+.field-img-preview {
+  flex-shrink: 0; width: 2.4rem; height: 2.4rem; object-fit: cover;
+  border: 1px solid var(--subtle); background: var(--paper);
+}
+.field-img-preview--round { border-radius: 50%; }
+.field-img-pick {
+  flex-shrink: 0; border: 1px solid var(--subtle); background: none; color: var(--dark);
+  padding: 0.5rem 0.7rem; font-family: var(--font-sans); font-size: 0.56rem;
+  letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.field-img-pick:hover { border-color: var(--accent); color: var(--accent); }
 
 .visibility-toggle {
   display: grid;

@@ -7,10 +7,24 @@ const localePath = useLocalePath()
 const busy = ref(false)
 const postTitle = ref('')
 
+const draftMediaPrefix = useState('draft-post-media-prefix', () => `content-posts/drafts/${crypto.randomUUID()}`)
+const draftMediaStorageKey = 'cu-photo-draft-post-media-prefix'
+
+onMounted(() => {
+  const savedPrefix = localStorage.getItem(draftMediaStorageKey)
+  if (savedPrefix?.startsWith('content-posts/drafts/')) {
+    draftMediaPrefix.value = savedPrefix
+  } else {
+    localStorage.setItem(draftMediaStorageKey, draftMediaPrefix.value)
+  }
+})
+
 async function save(value: PostInput) {
   busy.value = true
   try {
     await $fetch('/api/admin/posts', { method: 'POST', body: value })
+    localStorage.removeItem(draftMediaStorageKey)
+    draftMediaPrefix.value = `content-posts/drafts/${crypto.randomUUID()}`
     await navigateTo(localePath('/admin/posts'))
   } catch (e) {
     alert((e as { data?: { statusMessage?: string } })?.data?.statusMessage || t('admin.saveFailed'))
@@ -26,7 +40,13 @@ useHead({ title: () => `${t('admin.newPost')} - Admin` })
   <div class="admin-wrap">
     <NuxtLink :to="localePath('/admin/posts')" class="back">{{ t('admin.posts') }}</NuxtLink>
     <h1 class="title">{{ postTitle.trim() || 'Untitled' }}</h1>
-    <AdminPostForm :submit-label="t('admin.createPost')" :busy="busy" @submit="save" @update:title="v => postTitle = v" />
+    <AdminPostForm
+      :media-prefix="draftMediaPrefix"
+      :submit-label="t('admin.createPost')"
+      :busy="busy"
+      @submit="save"
+      @update:title="v => postTitle = v"
+    />
   </div>
 </template>
 
