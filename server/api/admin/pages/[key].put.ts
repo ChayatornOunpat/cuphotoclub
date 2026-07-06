@@ -21,5 +21,15 @@ export default defineEventHandler(async (event) => {
       set: { title: data.title, body: data.body ?? '', updatedBy: actor.id, updatedAt: new Date() }
     })
 
+  await recordAdminAudit(actor, {
+    action: 'update',
+    entityType: 'page',
+    entityId: key,
+    entityTitle: data.title,
+    metadata: {
+      key
+    }
+  })
+
   return { ok: true }
 })

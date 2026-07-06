@@ -27,7 +27,20 @@
     "featuredWork": "Featured Work",
     "latest": "Latest",
     "ourHistory": "Our History",
-    "aboutUs": "About Us"
+    "aboutUs": "About Us",
+    "missionBanner": "CU Photo Club is Chulalongkorn University's photography society — open to every student, camera or no experience required.",
+    "whoWeAreEyebrow": "Who we are",
+    "missionBody": "Founded in 1967, we're a student-run photography club documenting campus life, culture, and the city around us — weekly meetups, workshops, and an archive that keeps growing.",
+    "statsLead": "A student photography club at Chulalongkorn University, running since 1967.",
+    "statFoundedValue": "1967",
+    "statFoundedLabel": "Founded",
+    "statYearsValue": "50+",
+    "statYearsLabel": "Years archiving",
+    "statOpenValue": "Open",
+    "statOpenLabel": "To all students",
+    "introLead": "We're just a bunch of students who really like cameras.",
+    "introBody": "Since 1967 we've been meeting up, teaching each other, and shooting everything from campus life to street corners of Bangkok — no experience needed, just curiosity.",
+    "introLink": "Come shoot with us →"
   },
   "site": {
     "hero": {

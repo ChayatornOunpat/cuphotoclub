@@ -11,7 +11,7 @@ const bodySchema = z.object({
 })
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const actor = await requireAdmin(event)
 
   const result = await readValidatedBody(event, bodySchema.safeParse)
   if (!result.success) throw createError({ statusCode: 400, message: 'ข้อมูลไม่ถูกต้อง' })
@@ -29,6 +29,18 @@ export default defineEventHandler(async (event) => {
       sortOrder:  d.sortOrder ?? 0
     })
     .returning()
+
+  await recordAdminAudit(actor, {
+    action: 'create',
+    entityType: 'member',
+    entityId: created.id,
+    entityTitle: created.nickname,
+    metadata: {
+      active: created.active,
+      schoolYear: created.schoolYear,
+      position: created.position
+    }
+  })
 
   return created
 })

@@ -2,7 +2,7 @@ const MAX_BYTES = 15 * 1024 * 1024
 
 // Generic single-image upload → returns { key }. Used for post/event cover images.
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const actor = await requireAdmin(event)
 
   const form = await readMultipartFormData(event)
   const file = form?.find(p => p.name === 'file' && p.filename)
@@ -17,5 +17,16 @@ export default defineEventHandler(async (event) => {
   const key = `${prefix}/${crypto.randomUUID()}.${ext}`
 
   await blob.put(key, file.data, { contentType: type })
+  await recordAdminAudit(actor, {
+    action: 'create',
+    entityType: 'media',
+    entityId: key,
+    entityTitle: file.filename ?? key,
+    metadata: {
+      prefix,
+      contentType: type,
+      size: file.data.length
+    }
+  })
   return { key }
 })

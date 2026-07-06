@@ -17,7 +17,7 @@ function normalizeR2Key(value: string | null | undefined): string | null {
 }
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const actor = await requireAdmin(event)
 
   const body = await readBody<{ key?: string; force?: boolean }>(event)
   const key = normalizeR2Key(body?.key)
@@ -56,5 +56,15 @@ export default defineEventHandler(async (event) => {
   }
 
   await blob.delete(key)
+  await recordAdminAudit(actor, {
+    action: 'delete',
+    entityType: 'media',
+    entityId: key,
+    entityTitle: key.split('/').at(-1) ?? key,
+    metadata: {
+      forced: !!body?.force,
+      inUse
+    }
+  })
   return { ok: true }
 })

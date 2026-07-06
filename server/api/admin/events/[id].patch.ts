@@ -14,7 +14,7 @@ const bodySchema = z.object({
 })
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const actor = await requireAdmin(event)
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id)) throw createError({ statusCode: 400, message: 'รหัสไม่ถูกต้อง' })
 
@@ -43,5 +43,17 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.update(schema.events).set(updates).where(eq(schema.events.id, id))
+  await recordAdminAudit(actor, {
+    action: 'update',
+    entityType: 'event',
+    entityId: id,
+    entityTitle: String(updates.title ?? row.title),
+    metadata: {
+      previousTitle: row.title,
+      previousStatus: row.status,
+      nextStatus: updates.status ?? row.status,
+      changed: Object.keys(updates).filter(key => key !== 'updatedAt')
+    }
+  })
   return { ok: true }
 })

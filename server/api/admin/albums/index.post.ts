@@ -5,7 +5,7 @@ type CreateAlbumBody = AlbumInput & {
 }
 
 export default defineEventHandler(async (event) => {
-  await requireUserSession(event)
+  const { user } = await requireUserSession(event)
   const body = await readBody<CreateAlbumBody>(event)
   const draftMediaPrefix = normalizeDraftMediaPrefix(body.draftMediaPrefix)
   delete body.draftMediaPrefix
@@ -18,13 +18,26 @@ export default defineEventHandler(async (event) => {
   body.visibility ??= 'draft'
 
   const album = await albumStore.create(body)
+  let savedAlbum = album
 
-  if (!draftMediaPrefix) return album
+  if (draftMediaPrefix) {
+    const migrated = await migrateDraftMediaToAlbum(draftMediaPrefix, album.id, body)
+    if (migrated.changed) savedAlbum = await albumStore.update(album.id, migrated.album) ?? album
+  }
 
-  const migrated = await migrateDraftMediaToAlbum(draftMediaPrefix, album.id, body)
-  if (!migrated.changed) return album
+  await recordAdminAudit(user, {
+    action: 'create',
+    entityType: 'album',
+    entityId: savedAlbum.id,
+    entityTitle: savedAlbum.title,
+    metadata: {
+      visibility: savedAlbum.visibility,
+      published: savedAlbum.published,
+      style: savedAlbum.style
+    }
+  })
 
-  return await albumStore.update(album.id, migrated.album) ?? album
+  return savedAlbum
 })
 
 function normalizeDraftMediaPrefix(value: string | undefined) {

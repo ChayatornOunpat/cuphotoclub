@@ -4,7 +4,7 @@ import { z } from 'zod'
 const bodySchema = z.object({ images: z.array(z.string()) })
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const actor = await requireAdmin(event)
   const result = await readValidatedBody(event, bodySchema.safeParse)
   if (!result.success) throw createError({ statusCode: 400, message: 'ข้อมูลไม่ถูกต้อง' })
 
@@ -13,6 +13,16 @@ export default defineEventHandler(async (event) => {
     .insert(schema.settings)
     .values({ key: 'heroImages', value })
     .onConflictDoUpdate({ target: schema.settings.key, set: { value, updatedAt: new Date() } })
+
+  await recordAdminAudit(actor, {
+    action: 'update',
+    entityType: 'settings',
+    entityId: 'heroImages',
+    entityTitle: 'Hero images',
+    metadata: {
+      count: value.length
+    }
+  })
 
   return { images: value }
 })

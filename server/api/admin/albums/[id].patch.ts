@@ -11,7 +11,7 @@ const bodySchema = z.object({
 })
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const actor = await requireAdmin(event)
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id)) throw createError({ statusCode: 400, message: 'รหัสไม่ถูกต้อง' })
 
@@ -34,5 +34,18 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.update(schema.albums).set(updates).where(eq(schema.albums.id, id))
+  await recordAdminAudit(actor, {
+    action: 'update',
+    entityType: 'gallery',
+    entityId: id,
+    entityTitle: String(updates.title ?? album.title),
+    metadata: {
+      previousTitle: album.title,
+      previousStatus: album.status,
+      nextStatus: updates.status ?? album.status,
+      slug: updates.slug ?? album.slug,
+      changed: Object.keys(updates).filter(key => key !== 'updatedAt')
+    }
+  })
   return { ok: true }
 })

@@ -4,11 +4,11 @@ const MAX_BYTES = 15 * 1024 * 1024 // 15MB
 
 // Single-file upload (the uploader posts one file at a time, with client-measured dimensions).
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const actor = await requireAdmin(event)
   const albumId = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(albumId)) throw createError({ statusCode: 400, message: 'รหัสไม่ถูกต้อง' })
 
-  const [album] = await db.select({ id: schema.albums.id, slug: schema.albums.slug }).from(schema.albums).where(eq(schema.albums.id, albumId)).limit(1)
+  const [album] = await db.select({ id: schema.albums.id, slug: schema.albums.slug, title: schema.albums.title }).from(schema.albums).where(eq(schema.albums.id, albumId)).limit(1)
   if (!album) throw createError({ statusCode: 404, message: 'ไม่พบอัลบั้ม' })
 
   const form = await readMultipartFormData(event)
@@ -37,5 +37,18 @@ export default defineEventHandler(async (event) => {
     .returning()
 
   await db.update(schema.albums).set({ updatedAt: new Date() }).where(eq(schema.albums.id, albumId))
+  await recordAdminAudit(actor, {
+    action: 'create',
+    entityType: 'photo',
+    entityId: created.id,
+    entityTitle: file.filename ?? key,
+    metadata: {
+      albumId,
+      albumTitle: album.title,
+      r2Key: key,
+      width,
+      height
+    }
+  })
   return created
 })

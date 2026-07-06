@@ -5,6 +5,7 @@ definePageMeta({ layout: 'site' })
 
 const site = ref(defaultSite)
 const { t } = useI18n()
+const localePath = useLocalePath()
 const localizedPath = useLocalizedContentPath()
 const localizedSite = useLocalizedSite(site)
 
@@ -149,6 +150,26 @@ useHead({
     <!-- Signature pink line: dark → light transition -->
     <div class="cut-line" />
 
+    <section class="intro-photos">
+      <div class="intro-photos__inner">
+        <div class="intro-photos__pile">
+          <div
+            v-for="(a, i) in featuredAlbums.slice(0, 3)"
+            :key="i"
+            class="intro-photos__photo"
+            :style="{ '--r': `${(i - 1) * 6}deg` }"
+          >
+            <AppImg :src="a.cover" :alt="a.title" sizes="120px" />
+          </div>
+        </div>
+        <div class="intro-photos__text">
+          <p class="intro-photos__lead">{{ t('home.introLead') }}</p>
+          <p class="intro-photos__body">{{ t('home.introBody') }}</p>
+          <NuxtLink :to="localePath('/contact')" class="intro-photos__link">{{ t('home.introLink') }}</NuxtLink>
+        </div>
+      </div>
+    </section>
+
     <FeaturedWork :albums="featuredAlbums" :seed="featuredSeed" />
 
     <StoriesSection :lead="leadStory" :items="smallStories" />
@@ -182,6 +203,32 @@ useHead({
 </template>
 
 <style scoped>
+.intro-photos { background: var(--body-bg); padding: 4rem 3rem; }
+.intro-photos__inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 3.5rem; }
+.intro-photos__pile { display: flex; flex-shrink: 0; }
+.intro-photos__photo {
+  width: 120px; height: 120px; margin-left: -28px; border: 6px solid #fff;
+  box-shadow: 0 0.6rem 1.6rem rgba(12, 12, 10, 0.18); background: var(--paper);
+  overflow: hidden; transform: rotate(var(--r)); transition: transform 0.2s ease;
+}
+.intro-photos__photo:first-child { margin-left: 0; }
+.intro-photos__photo :deep(img) { width: 100%; height: 100%; object-fit: cover; display: block; }
+.intro-photos__pile:hover .intro-photos__photo { transform: rotate(0deg) translateY(-4px); }
+.intro-photos__text { max-width: 480px; }
+.intro-photos__lead {
+  font-family: var(--font-serif); font-size: clamp(1.4rem, 2.6vw, 2rem); font-weight: 300;
+  line-height: 1.3; color: var(--dark); margin-bottom: 1rem;
+}
+.intro-photos__body { font-size: 0.85rem; line-height: 1.85; color: var(--muted); margin-bottom: 1.25rem; }
+.intro-photos__link { color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 500; }
+.intro-photos__link:hover { text-decoration: underline; }
+
+@media (max-width: 720px) {
+  .intro-photos { padding: 3rem 1.5rem; }
+  .intro-photos__inner { flex-direction: column; align-items: flex-start; gap: 2rem; }
+  .intro-photos__pile { align-self: center; }
+}
+
 #progress {
   position: fixed;
   top: 0; left: 0;

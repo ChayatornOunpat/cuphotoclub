@@ -12,7 +12,7 @@ const bodySchema = z.object({
 })
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event)
+  const actor = await requireAdmin(event)
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id)) throw createError({ statusCode: 400, message: 'รหัสไม่ถูกต้อง' })
 
@@ -38,5 +38,19 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.update(schema.members).set(updates).where(eq(schema.members.id, id))
+  if (Object.keys(updates).length) {
+    await recordAdminAudit(actor, {
+      action: 'update',
+      entityType: 'member',
+      entityId: id,
+      entityTitle: String(updates.nickname ?? row.nickname),
+      metadata: {
+        previousNickname: row.nickname,
+        previousActive: row.active,
+        nextActive: updates.active ?? row.active,
+        changed: Object.keys(updates)
+      }
+    })
+  }
   return { ok: true }
 })

@@ -68,6 +68,7 @@ const photoManagerOpen = ref(false)
 const coverPickerOpen = ref(false)
 const cellPickerOpen = ref(false)
 const bulkPickerOpen = ref(false)
+const smartFrameAutofill = ref(true)
 
 // Editing state
 const selectedRow = ref<number | null>(null)
@@ -298,7 +299,22 @@ function onCellPick(keys: string[]) {
   }
 }
 
-const ESSAY_BULK_PATTERNS: CellSpan[][] = [
+type BulkImageOrientation = 'wide' | 'square' | 'tall' | 'unknown'
+type BulkPendingImage = { key: string, src: string, aspect: number | null, orientation: BulkImageOrientation }
+
+const ESSAY_ROW_TEMPLATES: CellSpan[][] = [
+  [6],
+  [4],
+  [3],
+  [3, 3],
+  [4, 2],
+  [2, 4],
+  [2, 2, 2],
+  [3, 2],
+  [2, 3]
+]
+
+const ESSAY_SEQUENTIAL_PATTERNS: CellSpan[][] = [
   [6],
   [3, 3],
   [4, 2],
@@ -310,14 +326,165 @@ function makeImageCell(src: string, span: CellSpan): AlbumCell {
   return { type: 'image', span, src, caption: '' }
 }
 
-function appendAutoFrames(keys: string[]) {
+const imageAspectCache = new Map<string, Promise<number | null>>()
+
+function imageAspect(src: string): Promise<number | null> {
+  if (imageAspectCache.has(src)) return imageAspectCache.get(src)!
+  const promise = new Promise<number | null>((resolve) => {
+    if (typeof Image === 'undefined') {
+      resolve(null)
+      return
+    }
+    const img = new Image()
+    const finish = (aspect: number | null) => {
+      window.clearTimeout(timer)
+      img.onload = null
+      img.onerror = null
+      resolve(aspect)
+    }
+    const timer = window.setTimeout(() => finish(null), 2500)
+    img.onload = () => {
+      const width = img.naturalWidth || img.width
+      const height = img.naturalHeight || img.height
+      finish(width > 0 && height > 0 ? width / height : null)
+    }
+    img.onerror = () => finish(null)
+    img.src = src
+  })
+  imageAspectCache.set(src, promise)
+  return promise
+}
+
+function classifyAspect(aspect: number | null): BulkImageOrientation {
+  if (!aspect) return 'unknown'
+  if (aspect >= 1.35) return 'wide'
+  if (aspect < 0.8) return 'tall'
+  return 'square'
+}
+
+async function mapLimited<T, U>(items: T[], limit: number, mapper: (item: T) => Promise<U>): Promise<U[]> {
+  const output = new Array<U>(items.length)
+  let cursor = 0
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++
+      output[index] = await mapper(items[index]!)
+    }
+  }))
+  return output
+}
+
+function spanAspectPenalty(span: CellSpan, orientation: BulkImageOrientation) {
+  if (orientation === 'wide') {
+    if (span === 6) return 0
+    if (span === 4) return 0.25
+    if (span === 3) return 1.6
+    return 3.2
+  }
+  if (orientation === 'tall') {
+    if (span === 2) return 0
+    if (span === 3) return 0.45
+    if (span === 4) return 2.2
+    return 3.6
+  }
+  if (orientation === 'square') {
+    if (span === 3) return 0
+    if (span === 4) return 0.6
+    if (span === 2) return 0.8
+    return 1.4
+  }
+  if (span === 3) return 0.25
+  if (span === 4 || span === 2) return 0.7
+  return 1
+}
+
+function rowSignature(spans: CellSpan[]) {
+  return spans.join('-')
+}
+
+function lastEssayRowSignature(plannedRows: CellSpan[][]) {
+  const planned = plannedRows.at(-1)
+  if (planned) return rowSignature(planned)
+  const lastRow = form.rows.at(-1)
+  if (!lastRow?.cells.length) return ''
+  return rowSignature(lastRow.cells.map(cell => cell.span))
+}
+
+function scoreEssayTemplate(
+  template: CellSpan[],
+  images: BulkPendingImage[],
+  cursor: number,
+  plannedRows: CellSpan[][]
+) {
+  let score = 0
+  for (let i = 0; i < template.length; i++) {
+    score += spanAspectPenalty(template[i]!, images[cursor + i]!.orientation)
+  }
+
+  const used = template.reduce((sum, span) => sum + span, 0)
+  const remainingAfter = images.length - cursor - template.length
+  const signature = rowSignature(template)
+  const previousSignature = lastEssayRowSignature(plannedRows)
+
+  if (used < 6 && remainingAfter > 0) score += 0.55
+  if (remainingAfter === 1 && images.length > 2) score += 1.1
+  if (template.length === 1 && remainingAfter > 1) score += template[0] === 6 ? 1.1 : 0.6
+  if (signature === previousSignature) score += 1.3
+  if (signature === '6' && previousSignature === '6') score += 2.4
+  if (signature === '2-2-2' && previousSignature === '2-2-2') score += 1.8
+  if (template.length === 3 && images.slice(cursor, cursor + 3).every(image => image.orientation === 'wide')) score += 2
+  if (template[0] === 6 && images[cursor]!.orientation === 'tall') score += 2.2
+
+  return score
+}
+
+function chooseEssayTemplate(images: BulkPendingImage[], cursor: number, plannedRows: CellSpan[][]) {
+  const remaining = images.length - cursor
+  return ESSAY_ROW_TEMPLATES
+    .filter(template => template.length <= remaining)
+    .map(template => ({ template, score: scoreEssayTemplate(template, images, cursor, plannedRows) }))
+    .sort((a, b) => a.score - b.score || b.template.length - a.template.length)[0]!.template
+}
+
+function planEssayRows(images: BulkPendingImage[]) {
+  const rows: CellSpan[][] = []
+  let cursor = 0
+  while (cursor < images.length) {
+    const template = chooseEssayTemplate(images, cursor, rows)
+    rows.push(template)
+    cursor += template.length
+  }
+  return rows
+}
+
+function planSequentialEssayRows(images: BulkPendingImage[]) {
+  const rows: CellSpan[][] = []
+  let cursor = 0
+  let patternIndex = 0
+  while (cursor < images.length) {
+    const pattern = ESSAY_SEQUENTIAL_PATTERNS[patternIndex % ESSAY_SEQUENTIAL_PATTERNS.length]!
+    rows.push(pattern.slice(0, images.length - cursor))
+    cursor += pattern.length
+    patternIndex++
+  }
+  return rows
+}
+
+async function appendAutoFrames(keys: string[]) {
   const existingFrameSources = collectFrameImageSources()
   const uniqueKeys = [...new Set(keys)]
-  const pending = uniqueKeys
+  const pendingInput = uniqueKeys
     .map(key => ({ key, src: keyToSrc(key) }))
     .filter(item => !existingFrameSources.has(item.src))
 
-  if (!pending.length) return
+  if (!pendingInput.length) return
+
+  const pending = smartFrameAutofill.value
+    ? await mapLimited(pendingInput, 6, async item => {
+        const aspect = await imageAspect(item.src)
+        return { ...item, aspect, orientation: classifyAspect(aspect) }
+      })
+    : pendingInput.map(item => ({ ...item, aspect: null, orientation: 'unknown' as const }))
 
   mergeMediaKeys(pending.map(item => item.key))
   if (!form.coverSrc) form.coverSrc = pending[0]!.src
@@ -329,10 +496,9 @@ function appendAutoFrames(keys: string[]) {
       form.rows.push({ cells: [makeImageCell(item.src, 6)] })
     }
   } else {
+    const plannedRows = smartFrameAutofill.value ? planEssayRows(pending) : planSequentialEssayRows(pending)
     let cursor = 0
-    let patternIndex = 0
-    while (cursor < pending.length) {
-      const pattern = ESSAY_BULK_PATTERNS[patternIndex % ESSAY_BULK_PATTERNS.length]!
+    for (const pattern of plannedRows) {
       const cells: AlbumCell[] = []
       for (const span of pattern) {
         const item = pending[cursor]
@@ -341,7 +507,6 @@ function appendAutoFrames(keys: string[]) {
         cursor++
       }
       form.rows.push({ cells })
-      patternIndex++
     }
   }
 
@@ -941,6 +1106,13 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           <Icon name="heroicons:squares-plus" class="bulk-fill-btn__icon" />
           <span>Auto-fill Frames</span>
         </button>
+        <label v-if="isEssay" class="smart-fill-toggle">
+          <input v-model="smartFrameAutofill" type="checkbox">
+          <span>
+            <strong>Smart layout</strong>
+            <small>Use image shape to choose essay rows</small>
+          </span>
+        </label>
         <p class="media-empty media-empty--hint">Select many uploaded photos and build rows automatically.</p>
       </div>
 
@@ -1633,6 +1805,43 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   background: color-mix(in srgb, var(--dark) 4%, transparent);
 }
 .bulk-fill-btn__icon { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
+
+.smart-fill-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  margin-top: 0.55rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--subtle);
+  background: color-mix(in srgb, var(--paper) 65%, transparent);
+  cursor: pointer;
+}
+.smart-fill-toggle input {
+  width: 0.86rem;
+  height: 0.86rem;
+  margin: 0.12rem 0 0;
+  accent-color: var(--accent);
+}
+.smart-fill-toggle span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.smart-fill-toggle strong {
+  font-size: 0.52rem;
+  line-height: 1.1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--dark);
+}
+.smart-fill-toggle small {
+  font-size: 0.58rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
 
 .media-label {
   margin: 0.65rem 0 0.35rem;
