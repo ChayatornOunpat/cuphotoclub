@@ -429,33 +429,35 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="root" class="photogrid" :style="{ height: gridHeight + 'px' }">
-    <div
-      v-for="block in blocks"
-      :key="block.id"
-      class="photogrid__cell"
-      :style="{
-        gridColumn: `${block.col + 1} / span ${DIMS[block.shape].w}`,
-        gridRow: `${block.row + 1} / span ${DIMS[block.shape].h}`
-      }"
-    >
-      <div class="cube" :class="{ 'is-flipped': block.activeLayer === 1 }">
-        <img
-          v-if="block.layers[0]"
-          :src="block.layers[0]"
-          alt=""
-          loading="lazy"
-          class="cube__face cube__face--front"
-        >
-        <img
-          v-if="block.layers[1]"
-          :src="block.layers[1]"
-          alt=""
-          loading="lazy"
-          class="cube__face cube__face--back"
-        >
+  <div ref="root" :style="{ height: gridHeight + 'px' }">
+    <TransitionGroup tag="div" name="tile" class="photogrid">
+      <div
+        v-for="block in blocks"
+        :key="block.id"
+        class="photogrid__cell"
+        :style="{
+          gridColumn: `${block.col + 1} / span ${DIMS[block.shape].w}`,
+          gridRow: `${block.row + 1} / span ${DIMS[block.shape].h}`
+        }"
+      >
+        <div class="cube" :class="{ 'is-flipped': block.activeLayer === 1 }">
+          <img
+            v-if="block.layers[0]"
+            :src="block.layers[0]"
+            alt=""
+            loading="lazy"
+            class="cube__face cube__face--front"
+          >
+          <img
+            v-if="block.layers[1]"
+            :src="block.layers[1]"
+            alt=""
+            loading="lazy"
+            class="cube__face cube__face--back"
+          >
+        </div>
       </div>
-    </div>
+    </TransitionGroup>
   </div>
 </template>
 
@@ -503,6 +505,28 @@ onBeforeUnmount(() => {
 }
 .cube__face--back {
   transform: rotateY(180deg);
+}
+
+/* Tiles created/destroyed by a reshape (merge/split) don't have a "before"
+   state to crossfade from via the cube flip — without this, they used to
+   just pop in/out instantly. TransitionGroup gives them a real enter/leave
+   animation instead. */
+.tile-enter-active,
+.tile-leave-active {
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.tile-enter-from {
+  opacity: 0;
+  transform: scale(0.85);
+}
+.tile-leave-to {
+  opacity: 0;
+  transform: scale(0.85);
+}
+.tile-leave-active {
+  /* Grid items are explicitly placed (grid-column/row), so a leaving tile
+     can safely stay in flow while it fades — no reflow risk of siblings. */
+  z-index: 0;
 }
 
 @media (max-width: 1100px) {

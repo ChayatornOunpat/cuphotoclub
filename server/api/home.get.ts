@@ -19,7 +19,7 @@ export default defineEventHandler(async () => {
     .leftJoin(cover, eq(cover.id, schema.albums.coverPhotoId))
     .where(eq(schema.albums.status, 'published'))
     .orderBy(desc(schema.albums.eventDate), desc(schema.albums.createdAt))
-    .limit(6)
+    .limit(10)
 
   // "Lego-grid" albums built in the canvas editor (schema.contentAlbums, via albumStore) are a
   // separate system from the relational galleries above (schema.albums/photos) — merge both so
@@ -76,7 +76,7 @@ export default defineEventHandler(async () => {
 
   const albums = [...galleryAlbums, ...contentAlbums]
     .sort((a, b) => (b.eventDate ?? '').localeCompare(a.eventDate ?? ''))
-    .slice(0, 6)
+    .slice(0, 10)
 
   return {
     albums,

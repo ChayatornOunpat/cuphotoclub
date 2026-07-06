@@ -62,10 +62,8 @@ const tiles = computed<Tile[]>(() => {
     return pool.map(a => ({ ...a, col: '1 / span 4', row: '1 / span 1' }))
   }
 
-  // Pick how many to show: a little variety, capped at what we have.
-  const maxN = Math.min(pool.length, 12)
-  const minN = Math.min(8, maxN)
-  const count = minN + Math.floor(rand() * (maxN - minN + 1))
+  // Show up to 10 works; the layout (not the count) is what varies per seed.
+  const count = Math.min(pool.length, 10)
   const picks = pool.slice(0, count)
 
   // Choose a random set of units whose slot counts sum EXACTLY to `count`.
