@@ -59,6 +59,11 @@ const monthTitle = computed(() =>
     .format(new Date(viewYear.value, viewMonth.value, 1))
 )
 
+const yearTitle = computed(() =>
+  new Intl.DateTimeFormat(intlLocale.value, { year: 'numeric' })
+    .format(new Date(viewYear.value, 6, 1))
+)
+
 // Sunday-first weekday header labels.
 const weekdayLabels = computed(() => {
   const fmt = new Intl.DateTimeFormat(intlLocale.value, { weekday: 'short', timeZone: 'UTC' })
@@ -109,21 +114,35 @@ const weeks = computed<DayCell[][]>(() => {
   return rows
 })
 
-// Events overlapping the visible month, for the list under the calendar.
-const monthEvents = computed(() => {
-  const monthStart = new Date(Date.UTC(viewYear.value, viewMonth.value, 1))
-  const monthEnd = new Date(Date.UTC(viewYear.value, viewMonth.value + 1, 0))
+// All dated events touching the calendar's current year, for the card grid.
+const yearEvents = computed(() => {
+  const yearStart = new Date(Date.UTC(viewYear.value, 0, 1))
+  const yearEnd = new Date(Date.UTC(viewYear.value, 11, 31))
   return (events.value ?? [])
     .filter((ev) => {
       if (!ev.eventDate) return false
       const start = new Date(ev.eventDate)
       const end = ev.endDate ? new Date(ev.endDate) : start
-      return start <= monthEnd && end >= monthStart
+      return start <= yearEnd && end >= yearStart
     })
     .sort((a, b) => new Date(a.eventDate!).getTime() - new Date(b.eventDate!).getTime())
 })
 
 const undatedEvents = computed(() => (events.value ?? []).filter(ev => !ev.eventDate))
+
+// ── Selected event (clicked on the calendar) ─────────────────────────────────
+const selectedEvent = ref<EventRow | null>(null)
+const selectedCardEl = ref<HTMLElement | null>(null)
+
+function selectEvent(ev: EventRow) {
+  selectedEvent.value = ev
+  nextTick(() => selectedCardEl.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
+}
+
+// On mobile the chips collapse to dots, so tapping the day selects its first event.
+function selectDay(cell: DayCell) {
+  if (cell.events.length) selectEvent(cell.events[0]!)
+}
 
 function formatRange(ev: EventRow) {
   const fmt = new Intl.DateTimeFormat(intlLocale.value, { day: 'numeric', month: 'short', timeZone: 'UTC' })
@@ -131,160 +150,575 @@ function formatRange(ev: EventRow) {
   if (!ev.endDate || ev.endDate === ev.eventDate) return start
   return `${start} – ${fmt.format(new Date(ev.endDate))}`
 }
-
-function dayNumber(ev: EventRow) {
-  return new Date(ev.eventDate!).getUTCDate()
-}
-function monthShort(ev: EventRow) {
-  return new Intl.DateTimeFormat(intlLocale.value, { month: 'short', timeZone: 'UTC' }).format(new Date(ev.eventDate!))
-}
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
-    <header class="max-w-2xl">
-      <h1 class="text-3xl font-bold tracking-tight text-ink">{{ t('activities.pageTitle') }}</h1>
-      <p class="mt-3 text-ink-soft">{{ t('activities.pageLead') }}</p>
+  <div class="activities-page">
+
+    <!-- Page header -->
+    <header class="page-head">
+      <p class="page-head__kicker">{{ t('activities.kicker') }}</p>
+      <h1 class="page-head__title">{{ t('activities.pageTitle') }}</h1>
+      <p class="page-head__lead">{{ t('activities.pageLead') }}</p>
     </header>
 
-    <!-- Calendar -->
-    <section class="mt-10 overflow-hidden rounded-lg border border-line bg-white" :aria-label="t('activities.calendarLabel')">
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
-        <h2 class="text-lg font-semibold capitalize text-ink">{{ monthTitle }}</h2>
-        <div class="flex items-center gap-1">
-          <button
-            type="button"
-            class="flex size-8 items-center justify-center rounded-md text-ink-soft hover:bg-paper-soft hover:text-ink"
-            :aria-label="t('activities.prevMonth')"
-            @click="shiftMonth(-1)"
-          >
-            <Icon name="heroicons:chevron-left" class="size-5" />
-          </button>
-          <button
-            type="button"
-            class="rounded-md px-3 py-1.5 text-sm text-ink-soft hover:bg-paper-soft hover:text-ink"
-            @click="goToday"
-          >
-            {{ t('activities.today') }}
-          </button>
-          <button
-            type="button"
-            class="flex size-8 items-center justify-center rounded-md text-ink-soft hover:bg-paper-soft hover:text-ink"
-            :aria-label="t('activities.nextMonth')"
-            @click="shiftMonth(1)"
-          >
-            <Icon name="heroicons:chevron-right" class="size-5" />
-          </button>
-        </div>
-      </div>
+    <div class="activities-body">
 
-      <div class="grid grid-cols-7 border-b border-line bg-paper-soft text-center">
-        <div v-for="label in weekdayLabels" :key="label" class="py-2 text-xs font-medium uppercase tracking-wide text-ink-soft">
-          {{ label }}
-        </div>
-      </div>
+      <!-- Calendar -->
+      <div class="eyebrow"><span class="num">01</span> {{ t('activities.calendarLabel') }}</div>
 
-      <div class="grid grid-cols-7">
-        <template v-for="(week, wi) in weeks" :key="wi">
-          <div
-            v-for="cell in week"
-            :key="cell.key"
-            class="min-h-16 border-b border-r border-line p-1 last:border-r-0 sm:min-h-24 sm:p-1.5 [&:nth-child(7n)]:border-r-0"
-            :class="cell.inMonth ? 'bg-white' : 'bg-paper-soft/60'"
-          >
-            <span
-              class="inline-flex size-6 items-center justify-center rounded-full text-xs sm:text-sm"
-              :class="[
-                cell.isToday ? 'bg-accent font-semibold text-white' : '',
-                !cell.isToday && cell.inMonth ? 'text-ink' : '',
-                !cell.isToday && !cell.inMonth ? 'text-ink-soft/50' : ''
-              ]"
+      <section class="cal-section" :aria-label="t('activities.calendarLabel')">
+        <div class="cal-toolbar">
+          <h2 class="cal-toolbar__month">{{ monthTitle }}</h2>
+          <div class="cal-toolbar__controls">
+            <button type="button" class="cal-nav" :aria-label="t('activities.prevMonth')" @click="shiftMonth(-1)">
+              <Icon name="heroicons:chevron-left" class="cal-nav__icon" />
+            </button>
+            <button type="button" class="cal-nav cal-nav--today" @click="goToday">{{ t('activities.today') }}</button>
+            <button type="button" class="cal-nav" :aria-label="t('activities.nextMonth')" @click="shiftMonth(1)">
+              <Icon name="heroicons:chevron-right" class="cal-nav__icon" />
+            </button>
+          </div>
+        </div>
+
+        <div class="cal">
+          <div class="cal__weekdays">
+            <span v-for="label in weekdayLabels" :key="label">{{ label }}</span>
+          </div>
+          <div v-for="(week, wi) in weeks" :key="wi" class="cal__week">
+            <div
+              v-for="cell in week"
+              :key="cell.key"
+              class="cal__day"
+              :class="{ 'cal__day--out': !cell.inMonth, 'cal__day--today': cell.isToday, 'cal__day--has-events': cell.events.length }"
+              @click="selectDay(cell)"
             >
-              {{ cell.day }}
-            </span>
+              <span class="cal__num">{{ cell.day }}</span>
 
-            <!-- Pills on ≥sm, dots on mobile -->
-            <div class="mt-0.5 hidden space-y-0.5 sm:block">
-              <NuxtLink
-                v-for="ev in cell.events.slice(0, 3)"
-                :key="ev.id"
-                :to="localePath(`/activities/${ev.slug}`)"
-                class="block truncate rounded bg-accent-soft px-1.5 py-0.5 text-xs font-medium text-accent hover:bg-accent hover:text-white"
-                :title="ev.title"
-              >
-                {{ ev.title }}
-              </NuxtLink>
-              <p v-if="cell.events.length > 3" class="px-1.5 text-xs text-ink-soft">
-                {{ t('activities.moreCount', { count: cell.events.length - 3 }) }}
-              </p>
-            </div>
-            <div v-if="cell.events.length" class="mt-1 flex justify-center gap-0.5 sm:hidden">
-              <span v-for="ev in cell.events.slice(0, 3)" :key="ev.id" class="size-1.5 rounded-full bg-accent" />
+              <div class="cal__chips">
+                <button
+                  v-for="ev in cell.events.slice(0, 3)"
+                  :key="ev.id"
+                  type="button"
+                  class="cal__chip"
+                  :class="{ 'cal__chip--active': selectedEvent?.id === ev.id }"
+                  :title="ev.title"
+                  @click.stop="selectEvent(ev)"
+                >
+                  {{ ev.title }}
+                </button>
+                <p v-if="cell.events.length > 3" class="cal__more">
+                  {{ t('activities.moreCount', { count: cell.events.length - 3 }) }}
+                </p>
+              </div>
+
+              <div v-if="cell.events.length" class="cal__dots">
+                <span v-for="ev in cell.events.slice(0, 3)" :key="ev.id" class="cal__dot" />
+              </div>
             </div>
           </div>
-        </template>
-      </div>
-    </section>
+        </div>
 
-    <!-- Events in the visible month -->
-    <section class="mt-10">
-      <h2 class="text-xl font-semibold text-ink">{{ t('activities.monthEvents') }}</h2>
-
-      <div v-if="monthEvents.length" class="mt-4 divide-y divide-line overflow-hidden rounded-lg border border-line bg-white">
-        <NuxtLink
-          v-for="ev in monthEvents"
-          :key="ev.id"
-          :to="localePath(`/activities/${ev.slug}`)"
-          class="group flex items-center gap-4 p-4 hover:bg-paper-soft"
-        >
-          <div class="flex w-14 shrink-0 flex-col items-center rounded-md border border-line py-1.5">
-            <span class="text-lg font-bold leading-tight text-ink">{{ dayNumber(ev) }}</span>
-            <span class="text-xs uppercase text-ink-soft">{{ monthShort(ev) }}</span>
+        <!-- Card for the event clicked on the calendar -->
+        <article v-if="selectedEvent" ref="selectedCardEl" class="selected-card">
+          <button type="button" class="selected-card__close" :aria-label="t('activities.close')" @click="selectedEvent = null">
+            ×
+          </button>
+          <div v-if="selectedEvent.coverR2Key" class="selected-card__media">
+            <img :src="`/images/${selectedEvent.coverR2Key}`" :alt="selectedEvent.title">
           </div>
-          <div class="min-w-0 flex-1">
-            <h3 class="truncate font-semibold text-ink group-hover:text-accent">{{ ev.title }}</h3>
-            <p class="mt-0.5 truncate text-sm text-ink-soft">
-              {{ formatRange(ev) }}<span v-if="ev.location"> · {{ ev.location }}</span>
+          <div class="selected-card__body">
+            <p class="selected-card__meta">
+              <template v-if="selectedEvent.eventDate">{{ formatRange(selectedEvent) }}</template>
+              <template v-else>{{ t('activities.comingSoon') }}</template>
+              <span v-if="selectedEvent.location"> · {{ selectedEvent.location }}</span>
             </p>
-            <p v-if="ev.summary" class="mt-1 line-clamp-1 text-sm text-ink-soft">{{ ev.summary }}</p>
+            <h3 class="selected-card__title">{{ selectedEvent.title }}</h3>
+            <p v-if="selectedEvent.summary" class="selected-card__summary">{{ selectedEvent.summary }}</p>
+            <NuxtLink :to="localePath(`/activities/${selectedEvent.slug}`)" class="selected-card__link">
+              {{ t('activities.viewEvent') }}
+            </NuxtLink>
           </div>
-          <img
-            v-if="ev.coverR2Key"
-            :src="`/images/${ev.coverR2Key}`"
-            class="hidden h-16 w-24 shrink-0 rounded-md object-cover sm:block"
-            alt=""
-            loading="lazy"
-          >
-          <Icon name="heroicons:chevron-right" class="size-4 shrink-0 text-ink-soft/50" />
-        </NuxtLink>
-      </div>
+        </article>
+      </section>
 
-      <div v-else class="mt-4 rounded-lg border border-dashed border-line bg-white p-10 text-center text-ink-soft">
-        <Icon name="heroicons:calendar-days" class="mx-auto size-10 text-ink-soft/30" />
-        <p class="mt-3 text-sm">{{ t('activities.emptyMonth') }}</p>
-      </div>
-    </section>
+      <!-- All event cards this year -->
+      <div class="eyebrow"><span class="num">02</span> {{ t('activities.eventsInYear', { year: yearTitle }) }}</div>
 
-    <!-- Announced but not yet scheduled -->
-    <section v-if="undatedEvents.length" class="mt-10">
-      <h2 class="text-xl font-semibold text-ink">{{ t('activities.dateTba') }}</h2>
-      <div class="mt-4 divide-y divide-line overflow-hidden rounded-lg border border-line bg-white">
+      <section v-if="yearEvents.length" class="cards" :aria-label="t('activities.eventsInYear', { year: yearTitle })">
         <NuxtLink
-          v-for="ev in undatedEvents"
+          v-for="ev in yearEvents"
           :key="ev.id"
           :to="localePath(`/activities/${ev.slug}`)"
-          class="group flex items-center gap-4 p-4 hover:bg-paper-soft"
+          class="card"
+          :class="{ 'card--active': selectedEvent?.id === ev.id }"
         >
-          <div class="flex size-12 shrink-0 items-center justify-center rounded-md border border-line text-ink-soft/50">
-            <Icon name="heroicons:calendar" class="size-5" />
+          <div class="card__media">
+            <img v-if="ev.coverR2Key" :src="`/images/${ev.coverR2Key}`" :alt="ev.title" loading="lazy">
+            <div v-else class="card__placeholder">
+              <Icon name="heroicons:calendar-days" />
+            </div>
           </div>
-          <div class="min-w-0 flex-1">
-            <h3 class="truncate font-semibold text-ink group-hover:text-accent">{{ ev.title }}</h3>
-            <p class="truncate text-sm text-ink-soft">{{ t('activities.comingSoon') }}<span v-if="ev.location"> · {{ ev.location }}</span></p>
-          </div>
-          <Icon name="heroicons:chevron-right" class="size-4 shrink-0 text-ink-soft/50" />
+          <p class="card__meta">
+            {{ formatRange(ev) }}<span v-if="ev.location"> · {{ ev.location }}</span>
+          </p>
+          <h3 class="card__title">{{ ev.title }}</h3>
+          <p v-if="ev.summary" class="card__summary">{{ ev.summary }}</p>
         </NuxtLink>
+      </section>
+
+      <div v-else class="empty">
+        <Icon name="heroicons:calendar-days" />
+        <p>{{ t('activities.emptyYear', { year: yearTitle }) }}</p>
       </div>
-    </section>
+
+      <!-- Announced but not yet scheduled -->
+      <template v-if="undatedEvents.length">
+        <div class="eyebrow"><span class="num">03</span> {{ t('activities.dateTba') }}</div>
+        <section class="cards" :aria-label="t('activities.dateTba')">
+          <NuxtLink
+            v-for="ev in undatedEvents"
+            :key="ev.id"
+            :to="localePath(`/activities/${ev.slug}`)"
+            class="card"
+          >
+            <div class="card__media">
+              <img v-if="ev.coverR2Key" :src="`/images/${ev.coverR2Key}`" :alt="ev.title" loading="lazy">
+              <div v-else class="card__placeholder">
+                <Icon name="heroicons:calendar" />
+              </div>
+            </div>
+            <p class="card__meta">
+              {{ t('activities.comingSoon') }}<span v-if="ev.location"> · {{ ev.location }}</span>
+            </p>
+            <h3 class="card__title">{{ ev.title }}</h3>
+            <p v-if="ev.summary" class="card__summary">{{ ev.summary }}</p>
+          </NuxtLink>
+        </section>
+      </template>
+
+    </div>
   </div>
 </template>
+
+<style scoped>
+/* ── Layout ── */
+.activities-page {
+  min-height: 100vh;
+}
+
+/* ── Page header ── */
+.page-head {
+  padding: 10rem 3rem 5rem;
+  max-width: 1380px;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--subtle);
+}
+.page-head__kicker {
+  font-size: 0.54rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1.5rem;
+}
+.page-head__title {
+  font-family: var(--font-serif);
+  font-size: clamp(3rem, 7vw, 7rem);
+  font-weight: 200;
+  line-height: 0.98;
+  letter-spacing: -0.01em;
+  color: var(--dark);
+  margin-bottom: 1.5rem;
+}
+.page-head__lead {
+  font-size: 0.9rem;
+  color: var(--muted);
+  max-width: 480px;
+  line-height: 1.8;
+}
+
+/* ── Body wrapper ── */
+.activities-body {
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 4rem 3rem 8rem;
+}
+
+/* ── Calendar toolbar ── */
+.cal-section {
+  margin-bottom: 5rem;
+}
+
+.cal-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.cal-toolbar__month {
+  font-family: var(--font-serif);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 200;
+  color: var(--dark);
+  text-transform: capitalize;
+}
+
+.cal-toolbar__controls {
+  display: flex;
+  border: 1px solid var(--subtle);
+}
+
+.cal-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  border: 0;
+  border-left: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--muted);
+  padding: 0.55rem 0.7rem;
+  font-family: var(--font-sans);
+  font-size: 0.54rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.cal-nav:first-child { border-left: 0; }
+.cal-nav:hover {
+  background: var(--dark);
+  color: #F5F4F0;
+}
+.cal-nav__icon {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+/* ── Calendar grid ── */
+.cal {
+  border: 1px solid var(--subtle);
+  border-bottom: 0;
+}
+
+.cal__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid var(--subtle);
+  background: color-mix(in srgb, var(--paper) 45%, transparent);
+}
+.cal__weekdays span {
+  padding: 0.6rem;
+  color: var(--muted);
+  font-size: 0.5rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.cal__week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.cal__day {
+  min-height: 7rem;
+  padding: 0.45rem;
+  border-right: 1px solid var(--subtle);
+  border-bottom: 1px solid var(--subtle);
+}
+.cal__day:last-child { border-right: 0; }
+.cal__day--out {
+  background: color-mix(in srgb, var(--paper) 40%, transparent);
+}
+.cal__day--out .cal__num { opacity: 0.38; }
+
+.cal__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  color: var(--dark);
+  font-size: 0.7rem;
+}
+.cal__day--today .cal__num {
+  background: var(--accent);
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 500;
+}
+
+.cal__chips {
+  margin-top: 0.15rem;
+}
+
+.cal__chip {
+  display: block;
+  width: 100%;
+  margin-top: 0.24rem;
+  border: 0;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--dark);
+  padding: 0.26rem 0.45rem;
+  font-family: var(--font-sans);
+  font-size: 0.64rem;
+  line-height: 1.3;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.cal__chip:hover,
+.cal__chip--active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.cal__more {
+  margin-top: 0.2rem;
+  padding: 0 0.45rem;
+  color: var(--muted);
+  font-size: 0.58rem;
+}
+
+.cal__dots {
+  display: none;
+}
+
+/* ── Selected event card ── */
+.selected-card {
+  position: relative;
+  display: flex;
+  gap: 0;
+  margin-top: 1.5rem;
+  border: 1px solid var(--subtle);
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--paper) 30%, transparent);
+}
+
+.selected-card__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.6rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.selected-card__close:hover { color: var(--dark); }
+
+.selected-card__media {
+  width: 16rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+.selected-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.selected-card__body {
+  flex: 1;
+  min-width: 0;
+  padding: 1.5rem 2.4rem 1.5rem 1.6rem;
+}
+
+.selected-card__meta {
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.selected-card__title {
+  margin-top: 0.5rem;
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 300;
+  line-height: 1.2;
+  color: var(--dark);
+}
+
+.selected-card__summary {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.selected-card__link {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dark);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent);
+  padding-bottom: 0.2rem;
+  transition: color 0.15s;
+}
+.selected-card__link:hover { color: var(--accent); }
+
+/* ── Event cards ── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 2rem 1.5rem;
+  margin-bottom: 5rem;
+}
+
+.card {
+  display: block;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.card:hover { opacity: 0.85; }
+.card--active .card__title { color: var(--accent); }
+
+.card__media {
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: var(--paper);
+  margin-bottom: 0.9rem;
+}
+.card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+.card:hover .card__media img { transform: scale(1.03); }
+
+.card__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--subtle);
+}
+.card__placeholder svg,
+.card__placeholder :deep(svg) {
+  width: 2rem;
+  height: 2rem;
+}
+
+.card__meta {
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.card__title {
+  margin-top: 0.4rem;
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 400;
+  line-height: 1.25;
+  color: var(--dark);
+  transition: color 0.15s;
+}
+.card:hover .card__title { color: var(--accent); }
+
+.card__summary {
+  margin-top: 0.4rem;
+  font-size: 0.76rem;
+  line-height: 1.65;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Empty state ── */
+.empty {
+  border: 1px dashed var(--subtle);
+  padding: 4rem 2rem;
+  margin-bottom: 5rem;
+  text-align: center;
+  color: var(--muted);
+}
+.empty svg,
+.empty :deep(svg) {
+  width: 2.2rem;
+  height: 2.2rem;
+  opacity: 0.4;
+}
+.empty p {
+  margin-top: 0.9rem;
+  font-size: 0.78rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 760px) {
+  .page-head {
+    padding: 7rem 1.25rem 3rem;
+  }
+  .activities-body {
+    padding: 2.5rem 1.25rem 5rem;
+  }
+
+  .cal-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cal__day {
+    min-height: 3.4rem;
+    padding: 0.25rem;
+  }
+  .cal__day--has-events { cursor: pointer; }
+  .cal__num {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.62rem;
+  }
+  .cal__chips { display: none; }
+  .cal__dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.2rem;
+    margin-top: 0.2rem;
+  }
+  .cal__dot {
+    width: 0.32rem;
+    height: 0.32rem;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .selected-card {
+    flex-direction: column;
+  }
+  .selected-card__media {
+    width: 100%;
+    aspect-ratio: 3 / 2;
+  }
+  .selected-card__body {
+    padding: 1.1rem 2.2rem 1.3rem 1.1rem;
+  }
+
+  .cards {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem 1rem;
+  }
+}
+</style>

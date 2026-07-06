@@ -2,93 +2,145 @@
 // Museum-wall photogrid: a dense wall of small thumbnails randomly sourced
 // from published albums, that keep crossfading to new photos over time.
 //
-// Bandwidth strategy (see plan): the server only ever hands us a bounded
-// random sample, never the whole catalog. We swap one tile at a time on a
-// stagger timer (so download rate stays flat regardless of catalog size),
-// and only fetch a fresh sample when the current one runs low. Everything
-// pauses when the grid is offscreen or the tab is hidden.
+// This component is only ever rendered client-side (wrap usage in
+// <ClientOnly>) — its content depends on the browser (image aspect ratios,
+// window size) and re-running the same random layout logic during SSR would
+// produce different results than the client, causing a hydration mismatch.
+//
+// Bandwidth strategy: the server only ever hands us a bounded random sample,
+// never the whole catalog. We swap one block at a time on a stagger timer
+// (so download rate stays flat regardless of catalog size), and only fetch a
+// fresh sample when the current one runs low. Everything pauses when the
+// grid is offscreen or the tab is hidden.
+//
+// Layout: a fixed rows x cols occupancy grid (per breakpoint) is what makes
+// the wall's pixel height constant — it never depends on which shapes happen
+// to be in play. Each block owns 1, 2, or 4 cells. When a swapped-in photo's
+// real aspect ratio calls for more room than its block has, we try to merge
+// it with neighboring 1x1 blocks (their photos go back into rotation, not
+// discarded). When it calls for less room, the block breaks down into 1x1
+// blocks and pulls fresh photos to fill the freed cells immediately. If
+// neither move is possible, we just crossfade in place.
 
-const TILE_COUNT = 70
 const SWAP_INTERVAL_MS = 3500
 const REFILL_THRESHOLD = 20
 const BATCH_COUNT = 250
 
 type SizeClass = 'sm' | 'wide' | 'tall' | 'big'
-const SPANS: Record<SizeClass, { col: number, row: number }> = {
-  sm: { col: 1, row: 1 },
-  wide: { col: 2, row: 1 },
-  tall: { col: 1, row: 2 },
-  big: { col: 2, row: 2 }
+const DIMS: Record<SizeClass, { w: number, h: number }> = {
+  sm: { w: 1, h: 1 },
+  wide: { w: 2, h: 1 },
+  tall: { w: 1, h: 2 },
+  big: { w: 2, h: 2 }
 }
 
-function pickSize(): SizeClass {
-  const r = Math.random()
-  if (r < 0.55) return 'sm'
-  if (r < 0.75) return 'wide'
-  if (r < 0.92) return 'tall'
-  return 'big'
-}
-
-interface Tile {
-  key: number
-  size: SizeClass
+interface Block {
+  id: number
+  row: number
+  col: number
+  shape: SizeClass
   layers: [string, string]
   activeLayer: 0 | 1
 }
 
-// Breakpoints mirrored from the CSS below — kept in sync so the JS height
-// calculation matches whatever column count/row height is actually in effect.
-const BREAKPOINTS = [
-  { maxWidth: 460, columns: 4, rowHeight: 64 },
-  { maxWidth: 700, columns: 6, rowHeight: 70 },
-  { maxWidth: 1100, columns: 10, rowHeight: 80 },
-  { maxWidth: Infinity, columns: 16, rowHeight: 70 }
-]
+interface GridConfig { cols: number, rows: number, rowHeight: number }
 const GAP = 3
 
-let tileKeyCounter = 0
+function currentGridConfig(): GridConfig {
+  const w = window.innerWidth
+  if (w <= 460) return { cols: 4, rows: 9, rowHeight: 64 }
+  if (w <= 700) return { cols: 6, rows: 8, rowHeight: 70 }
+  if (w <= 1100) return { cols: 10, rows: 7, rowHeight: 80 }
+  return { cols: 16, rows: 8, rowHeight: 70 }
+}
 
-// Sizes are rolled up front, synchronously, so the grid's real footprint is
-// known and reserved before any image has loaded — the placeholder tiles
-// ARE the final layout, just with empty <img> layers filled in later.
-function makePlaceholderTiles(): Tile[] {
-  const out: Tile[] = []
-  for (let i = 0; i < TILE_COUNT; i++) {
-    tileKeyCounter++
-    out.push({ key: tileKeyCounter, size: pickSize(), layers: ['', ''], activeLayer: 0 })
-  }
-  return out
+// Picks a target shape from a photo's real aspect ratio (width / height).
+function shapeForRatio(ratio: number): SizeClass {
+  if (ratio >= 1.35) return 'wide'
+  if (ratio <= 0.74) return 'tall'
+  return Math.random() < 0.25 ? 'big' : 'sm'
 }
 
 const root = ref<HTMLElement | null>(null)
-const tiles = ref<Tile[]>(makePlaceholderTiles())
+const gridConfig = ref<GridConfig>(currentGridConfig())
+const blocks = ref<Block[]>([])
 const queue = ref<string[]>([])
 const shown = new Set<string>()
-// Defaults to "no media query active" (desktop) to match the CSS's own
-// default rule, since we don't know the real viewport until mount.
-const viewportWidth = ref(Infinity)
 
+let rows = 0
+let cols = 0
+let occupancy: number[][] = []
+let nextBlockId = 0
 let intervalId: ReturnType<typeof setInterval> | null = null
 let observer: IntersectionObserver | null = null
 let visible = false
 let refilling = false
 
-const activeBreakpoint = computed(() =>
-  BREAKPOINTS.find(bp => viewportWidth.value <= bp.maxWidth) ?? BREAKPOINTS[BREAKPOINTS.length - 1]!
-)
-
-// Exact height for the CURRENT set of tile sizes (not a statistical average),
-// recomputed whenever tiles change size (swap) or the viewport breakpoint
-// changes — this is what keeps the container from ever jumping.
 const gridHeight = computed(() => {
-  const { columns, rowHeight } = activeBreakpoint.value
-  const totalArea = tiles.value.reduce((sum, t) => sum + SPANS[t.size].col * SPANS[t.size].row, 0)
-  const rows = Math.max(1, Math.ceil(totalArea / columns))
-  return rows * rowHeight + (rows - 1) * GAP
+  const { rows: r, rowHeight } = gridConfig.value
+  return r * rowHeight + (r - 1) * GAP
 })
 
-function updateViewportWidth() {
-  viewportWidth.value = window.innerWidth
+function fits(r: number, c: number, w: number, h: number): boolean {
+  if (r + h > rows || c + w > cols) return false
+  for (let rr = r; rr < r + h; rr++) {
+    for (let cc = c; cc < c + w; cc++) {
+      if (occupancy[rr]![cc] !== -1) return false
+    }
+  }
+  return true
+}
+
+function markOccupancy(r: number, c: number, w: number, h: number, id: number) {
+  for (let rr = r; rr < r + h; rr++) {
+    for (let cc = c; cc < c + w; cc++) {
+      occupancy[rr]![cc] = id
+    }
+  }
+}
+
+// First-fit greedy fill: guarantees full coverage with no holes, since 'sm'
+// (1x1) always fits the current cell in a row-major scan.
+function buildLayout(): Block[] {
+  occupancy = Array.from({ length: rows }, () => Array(cols).fill(-1))
+  const out: Block[] = []
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (occupancy[r]![c] !== -1) continue
+      const roll = Math.random()
+      const candidates: SizeClass[] =
+        roll < 0.5 ? ['sm']
+        : roll < 0.7 ? ['wide', 'sm']
+        : roll < 0.9 ? ['tall', 'sm']
+        : ['big', 'sm']
+
+      for (const shape of candidates) {
+        const { w, h } = DIMS[shape]
+        if (fits(r, c, w, h)) {
+          const id = nextBlockId++
+          out.push({ id, row: r, col: c, shape, layers: ['', ''], activeLayer: 0 })
+          markOccupancy(r, c, w, h, id)
+          break
+        }
+      }
+    }
+  }
+  return out
+}
+
+function rebuildLayout() {
+  rows = gridConfig.value.rows
+  cols = gridConfig.value.cols
+  blocks.value = buildLayout()
+}
+
+function fillEmptyBlocks() {
+  for (const block of blocks.value) {
+    if (block.layers[block.activeLayer]) continue
+    const src = nextImage()
+    if (!src) break
+    block.layers[block.activeLayer] = src
+  }
 }
 
 async function fetchBatch(): Promise<string[]> {
@@ -120,26 +172,125 @@ function nextImage(): string | null {
   return src
 }
 
-function swapRandomTile() {
-  if (!tiles.value.length) return
+function crossfadeInPlace(block: Block, src: string) {
+  const idx = blocks.value.findIndex(b => b.id === block.id)
+  if (idx === -1) return
+  const nextLayer: 0 | 1 = block.activeLayer === 0 ? 1 : 0
+  const layers: [string, string] = [...block.layers]
+  layers[nextLayer] = src
+  blocks.value[idx] = { ...block, layers, activeLayer: nextLayer }
+}
+
+// Absorbs neighboring 'sm' blocks so `anchor` can grow into `targetShape`.
+// Only starts from an 'sm' anchor — merging out of an already-bigger block
+// is out of scope. Absorbed blocks' current photos go back to the front of
+// the queue instead of being discarded.
+function tryMerge(anchor: Block, targetShape: SizeClass, src: string): boolean {
+  if (anchor.shape !== 'sm') return false
+  const { w, h } = DIMS[targetShape]
+  if (w === 1 && h === 1) return false
+  if (anchor.row + h > rows || anchor.col + w > cols) return false
+
+  const neighbors: Block[] = []
+  for (let rr = anchor.row; rr < anchor.row + h; rr++) {
+    for (let cc = anchor.col; cc < anchor.col + w; cc++) {
+      if (rr === anchor.row && cc === anchor.col) continue
+      const id = occupancy[rr]![cc]
+      const nb = blocks.value.find(b => b.id === id)
+      if (!nb || nb.shape !== 'sm' || nb.row !== rr || nb.col !== cc) return false
+      neighbors.push(nb)
+    }
+  }
+
+  const absorbed = [anchor, ...neighbors]
+  for (const b of absorbed) {
+    const shownSrc = b.layers[b.activeLayer]
+    if (shownSrc) {
+      shown.delete(shownSrc)
+      queue.value.unshift(shownSrc)
+    }
+  }
+
+  const absorbedIds = new Set(absorbed.map(b => b.id))
+  blocks.value = blocks.value.filter(b => !absorbedIds.has(b.id))
+
+  const merged: Block = {
+    id: nextBlockId++,
+    row: anchor.row,
+    col: anchor.col,
+    shape: targetShape,
+    layers: [src, ''],
+    activeLayer: 0
+  }
+  blocks.value.push(merged)
+  markOccupancy(anchor.row, anchor.col, w, h, merged.id)
+  return true
+}
+
+// Breaks `block` down into 1x1 'sm' blocks, giving the triggering photo to
+// the anchor cell and pulling additional photos from the queue to fill the
+// other freed cells immediately (best effort — any still empty get filled
+// on the next few ticks like normal).
+function trySplit(block: Block, src: string): boolean {
+  const { w, h } = DIMS[block.shape]
+  if (w * h <= 1) return false
+
+  const cells: Array<{ r: number, c: number }> = []
+  for (let rr = block.row; rr < block.row + h; rr++) {
+    for (let cc = block.col; cc < block.col + w; cc++) {
+      cells.push({ r: rr, c: cc })
+    }
+  }
+
+  blocks.value = blocks.value.filter(b => b.id !== block.id)
+  markOccupancy(block.row, block.col, w, h, -1)
+
+  const pulled: string[] = [src]
+  for (let i = 1; i < cells.length; i++) pulled.push(nextImage() ?? '')
+
+  const created: Block[] = cells.map((cell, i) => {
+    const id = nextBlockId++
+    markOccupancy(cell.r, cell.c, 1, 1, id)
+    return { id, row: cell.r, col: cell.c, shape: 'sm', layers: [pulled[i] ?? '', ''], activeLayer: 0 }
+  })
+  blocks.value.push(...created)
+  return true
+}
+
+function applySwap(src: string, targetShape: SizeClass) {
+  if (!blocks.value.length) return
+  const block = blocks.value[Math.floor(Math.random() * blocks.value.length)]!
+
+  if (block.shape === targetShape) {
+    crossfadeInPlace(block, src)
+    return
+  }
+
+  const targetArea = DIMS[targetShape].w * DIMS[targetShape].h
+  const blockArea = DIMS[block.shape].w * DIMS[block.shape].h
+
+  if (targetArea > blockArea && tryMerge(block, targetShape, src)) return
+  if (targetArea < blockArea && trySplit(block, src)) return
+
+  // Same area but different shape (wide <-> tall), or no compatible
+  // neighbors to merge with — just crossfade in the existing slot.
+  crossfadeInPlace(block, src)
+}
+
+function performSwap() {
   const src = nextImage()
   if (!src) return
-
   const preload = new Image()
   preload.onload = () => {
-    const idx = Math.floor(Math.random() * tiles.value.length)
-    const tile = tiles.value[idx]!
-    const nextLayer: 0 | 1 = tile.activeLayer === 0 ? 1 : 0
-    const layers: [string, string] = [...tile.layers]
-    layers[nextLayer] = src
-    tiles.value[idx] = { ...tile, size: pickSize(), layers, activeLayer: nextLayer }
+    const ratio = preload.naturalWidth / preload.naturalHeight || 1
+    applySwap(src, shapeForRatio(ratio))
   }
   preload.src = src
 }
 
 function tick() {
   if (!visible) return
-  swapRandomTile()
+  performSwap()
   void refillIfLow()
 }
 
@@ -159,9 +310,18 @@ function handleVisibilityChange() {
   else if (visible) start()
 }
 
+function handleResize() {
+  const cfg = currentGridConfig()
+  if (cfg.cols === gridConfig.value.cols && cfg.rows === gridConfig.value.rows) return
+  gridConfig.value = cfg
+  rebuildLayout()
+  fillEmptyBlocks()
+  void refillIfLow()
+}
+
 onMounted(async () => {
-  updateViewportWidth()
-  window.addEventListener('resize', updateViewportWidth)
+  rebuildLayout()
+  window.addEventListener('resize', handleResize)
 
   if (root.value) {
     observer = new IntersectionObserver(([entry]) => {
@@ -173,21 +333,15 @@ onMounted(async () => {
   }
   document.addEventListener('visibilitychange', handleVisibilityChange)
 
-  // Placeholder tiles (and thus the grid's real height) already exist —
-  // this just fills their first image in, without changing any sizes.
   const batch = await fetchBatch()
   enqueueUnseen(batch)
-  for (const tile of tiles.value) {
-    const src = nextImage()
-    if (!src) break
-    tile.layers[0] = src
-  }
+  fillEmptyBlocks()
 })
 
 onBeforeUnmount(() => {
   stop()
   observer?.disconnect()
-  window.removeEventListener('resize', updateViewportWidth)
+  window.removeEventListener('resize', handleResize)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
@@ -195,27 +349,30 @@ onBeforeUnmount(() => {
 <template>
   <div ref="root" class="photogrid" :style="{ height: gridHeight + 'px' }">
     <div
-      v-for="tile in tiles"
-      :key="tile.key"
+      v-for="block in blocks"
+      :key="block.id"
       class="photogrid__cell"
-      :style="{ gridColumn: `span ${SPANS[tile.size].col}`, gridRow: `span ${SPANS[tile.size].row}` }"
+      :style="{
+        gridColumn: `${block.col + 1} / span ${DIMS[block.shape].w}`,
+        gridRow: `${block.row + 1} / span ${DIMS[block.shape].h}`
+      }"
     >
-      <img
-        v-if="tile.layers[0]"
-        :src="tile.layers[0]"
-        alt=""
-        loading="lazy"
-        class="photogrid__img"
-        :class="{ 'is-active': tile.activeLayer === 0 }"
-      >
-      <img
-        v-if="tile.layers[1]"
-        :src="tile.layers[1]"
-        alt=""
-        loading="lazy"
-        class="photogrid__img"
-        :class="{ 'is-active': tile.activeLayer === 1 }"
-      >
+      <div class="cube" :class="{ 'is-flipped': block.activeLayer === 1 }">
+        <img
+          v-if="block.layers[0]"
+          :src="block.layers[0]"
+          alt=""
+          loading="lazy"
+          class="cube__face cube__face--front"
+        >
+        <img
+          v-if="block.layers[1]"
+          :src="block.layers[1]"
+          alt=""
+          loading="lazy"
+          class="cube__face cube__face--back"
+        >
+      </div>
     </div>
   </div>
 </template>
@@ -223,39 +380,47 @@ onBeforeUnmount(() => {
 <style scoped>
 .photogrid {
   display: grid;
-  grid-auto-flow: dense;
   grid-template-columns: repeat(16, 1fr);
   grid-auto-rows: 70px;
   gap: 3px;
   background: var(--body-bg, #0c0c0a);
-  /* height is set inline from the `gridHeight` computed — derived from the
-     actual tile sizes in play, not an average guess, so it never jumps on
-     load or drifts as tiles swap. overflow:hidden is just a cushion for the
-     dense-packing row estimate being off by a fraction of a row. */
+  /* Height is a pure function of rows/rowHeight (see gridHeight) — it never
+     depends on which shapes happen to be in play, so merges/splits never
+     move the container's footprint. overflow:hidden is a cushion in case a
+     resize briefly leaves stale content before rebuildLayout() repaints. */
   overflow: hidden;
 }
 
 .photogrid__cell {
   position: relative;
   overflow: hidden;
+  perspective: 800px;
 }
 
-.photogrid__img {
+.cube {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 1s cubic-bezier(0.65, 0, 0.35, 1);
+}
+.cube.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.cube__face {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  opacity: 0;
-  transform: scale(1.08);
-  transition:
-    opacity 1.1s ease,
-    transform 1.8s ease;
+  backface-visibility: hidden;
 }
-.photogrid__img.is-active {
-  opacity: 1;
-  transform: scale(1);
+.cube__face--front {
+  transform: rotateY(0deg);
+}
+.cube__face--back {
+  transform: rotateY(180deg);
 }
 
 @media (max-width: 1100px) {

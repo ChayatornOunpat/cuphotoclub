@@ -153,14 +153,17 @@
     "notFound": "ไม่พบกิจกรรม",
     "interested": "สนใจเข้าร่วมกิจกรรมนี้?",
     "register": "ลงทะเบียนเข้าร่วม",
+    "kicker": "CU Photo Club · กิจกรรม",
     "calendarLabel": "ปฏิทินกิจกรรม",
     "prevMonth": "เดือนก่อนหน้า",
     "nextMonth": "เดือนถัดไป",
     "today": "วันนี้",
     "moreCount": "+{count} รายการ",
-    "monthEvents": "กิจกรรมในเดือนนี้",
-    "emptyMonth": "ไม่มีกิจกรรมในเดือนนี้",
-    "dateTba": "ยังไม่กำหนดวัน"
+    "eventsInYear": "กิจกรรมในปี {year}",
+    "emptyYear": "ไม่มีกิจกรรมในปี {year}",
+    "dateTba": "ยังไม่กำหนดวัน",
+    "viewEvent": "ดูรายละเอียด →",
+    "close": "ปิด"
   },
   "adminActivities": {
     "title": "กิจกรรม",

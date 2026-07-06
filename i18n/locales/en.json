@@ -153,14 +153,17 @@
     "notFound": "Activity not found",
     "interested": "Interested in joining this event?",
     "register": "Register to join",
+    "kicker": "CU Photo Club · Activities",
     "calendarLabel": "Activities calendar",
     "prevMonth": "Previous month",
     "nextMonth": "Next month",
     "today": "Today",
     "moreCount": "+{count} more",
-    "monthEvents": "Events this month",
-    "emptyMonth": "No activities this month",
-    "dateTba": "Date to be announced"
+    "eventsInYear": "Events in {year}",
+    "emptyYear": "No activities in {year}",
+    "dateTba": "Date to be announced",
+    "viewEvent": "View event →",
+    "close": "Close"
   },
   "adminActivities": {
     "title": "Activities",
