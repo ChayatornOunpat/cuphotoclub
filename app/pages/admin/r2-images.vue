@@ -86,6 +86,47 @@ function usageLabel(item: ImageUsage) {
 }
 
 const deletingKey = ref<string | null>(null)
+const deleteProgress = reactive({
+  active: false,
+  title: '',
+  current: '',
+  done: 0,
+  total: 0,
+  failed: 0,
+  blocked: 0
+})
+const deleteProgressPercent = computed(() =>
+  deleteProgress.total
+    ? Math.min(100, Math.round((deleteProgress.done / deleteProgress.total) * 100))
+    : 0
+)
+
+function beginDeleteProgress(title: string, total: number) {
+  deleteProgress.active = true
+  deleteProgress.title = title
+  deleteProgress.current = ''
+  deleteProgress.done = 0
+  deleteProgress.total = Math.max(1, total)
+  deleteProgress.failed = 0
+  deleteProgress.blocked = 0
+}
+
+function extendDeleteProgress(count: number) {
+  deleteProgress.total += count
+}
+
+function stepDeleteProgress(key: string, status: 'deleted' | 'failed' | 'blocked' = 'deleted') {
+  deleteProgress.current = key
+  deleteProgress.done = Math.min(deleteProgress.done + 1, deleteProgress.total)
+  if (status === 'failed') deleteProgress.failed++
+  if (status === 'blocked') deleteProgress.blocked++
+}
+
+async function finishDeleteProgress() {
+  if (!deleteProgress.active) return
+  await new Promise(resolve => setTimeout(resolve, 320))
+  deleteProgress.active = false
+}
 
 async function requestDelete(key: string, force = false) {
   await $fetch('/api/admin/r2-images/delete', {
@@ -94,22 +135,34 @@ async function requestDelete(key: string, force = false) {
   })
 }
 
-async function deleteImage(image: R2Image, force = false) {
+async function deleteImage(image: R2Image) {
   deletingKey.value = image.key
+  beginDeleteProgress('Deleting image', 1)
   try {
-    await requestDelete(image.key, force)
+    await requestDelete(image.key)
+    stepDeleteProgress(image.key)
     await refresh()
   } catch (err: any) {
-    if (err?.statusCode === 409 && !force) {
+    if (err?.statusCode === 409) {
+      stepDeleteProgress(image.key, 'blocked')
       if (confirm(`${err.data?.message || 'This image is still referenced elsewhere.'}\n\nDelete it anyway?`)) {
-        await deleteImage(image, true)
-        return
+        extendDeleteProgress(1)
+        try {
+          await requestDelete(image.key, true)
+          stepDeleteProgress(image.key)
+          await refresh()
+        } catch (forceErr: any) {
+          stepDeleteProgress(image.key, 'failed')
+          alert(forceErr?.data?.message || 'Could not delete image.')
+        }
       }
     } else {
+      stepDeleteProgress(image.key, 'failed')
       alert(err?.data?.message || 'Could not delete image.')
     }
   } finally {
     deletingKey.value = null
+    await finishDeleteProgress()
   }
 }
 
@@ -187,31 +240,58 @@ function goToPage(n: number) {
   if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+const DELETE_CONCURRENCY = 5
+
+async function runDeletePool(keys: string[], worker: (key: string) => Promise<void>) {
+  let next = 0
+  await Promise.all(
+    Array.from({ length: Math.min(DELETE_CONCURRENCY, keys.length) }, async () => {
+      while (next < keys.length) {
+        const key = keys[next++]!
+        await worker(key)
+      }
+    })
+  )
+}
+
 async function bulkDelete() {
   const keys = [...selected.value]
   if (!keys.length) return
   if (!confirm(`Delete ${keys.length} image${keys.length === 1 ? '' : 's'} from R2? This cannot be undone.`)) return
 
   bulkDeleting.value = true
+  beginDeleteProgress(`Deleting ${keys.length} image${keys.length === 1 ? '' : 's'}`, keys.length)
   const blocked: string[] = []
   const failed: string[] = []
   try {
-    for (const key of keys) {
+    await runDeletePool(keys, async (key) => {
       try {
         await requestDelete(key)
+        stepDeleteProgress(key)
       } catch (err: any) {
-        if (err?.statusCode === 409) blocked.push(key)
-        else failed.push(key)
+        if (err?.statusCode === 409) {
+          blocked.push(key)
+          stepDeleteProgress(key, 'blocked')
+        } else {
+          failed.push(key)
+          stepDeleteProgress(key, 'failed')
+        }
       }
-    }
+    })
 
     if (blocked.length && confirm(
       `${blocked.length} of the selected images are still referenced elsewhere. Delete them anyway?`
     )) {
-      for (const key of blocked) {
-        try { await requestDelete(key, true) }
-        catch { failed.push(key) }
-      }
+      extendDeleteProgress(blocked.length)
+      await runDeletePool(blocked, async (key) => {
+        try {
+          await requestDelete(key, true)
+          stepDeleteProgress(key)
+        } catch {
+          failed.push(key)
+          stepDeleteProgress(key, 'failed')
+        }
+      })
     }
 
     clearSelection()
@@ -222,12 +302,47 @@ async function bulkDelete() {
     }
   } finally {
     bulkDeleting.value = false
+    await finishDeleteProgress()
   }
 }
 </script>
 
 <template>
   <div class="r2">
+    <Teleport to="body">
+      <Transition name="delete-modal">
+        <div v-if="deleteProgress.active" class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-progress-title">
+          <div class="delete-modal__backdrop" />
+          <div class="delete-modal__panel">
+            <div class="delete-modal__mark" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <p class="delete-modal__kicker">R2 operation</p>
+            <h2 id="delete-progress-title">{{ deleteProgress.title }}</h2>
+            <p class="delete-modal__copy">
+              Removing objects from storage. Keep this page open until the progress completes.
+            </p>
+            <div class="delete-modal__meter" role="progressbar" :aria-valuenow="deleteProgressPercent" aria-valuemin="0" aria-valuemax="100">
+              <span :style="{ transform: `scaleX(${deleteProgressPercent / 100})` }" />
+            </div>
+            <div class="delete-modal__meta">
+              <span>{{ deleteProgress.done }} / {{ deleteProgress.total }}</span>
+              <strong>{{ deleteProgressPercent }}%</strong>
+            </div>
+            <p class="delete-modal__current">
+              {{ deleteProgress.current || 'Preparing delete queue' }}
+            </p>
+            <div v-if="deleteProgress.failed || deleteProgress.blocked" class="delete-modal__notes">
+              <span v-if="deleteProgress.blocked">{{ deleteProgress.blocked }} referenced</span>
+              <span v-if="deleteProgress.failed">{{ deleteProgress.failed }} failed</span>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <header class="r2__head">
       <div>
         <p class="r2__kicker">Admin inventory</p>
@@ -294,13 +409,13 @@ async function bulkDelete() {
     <template v-else>
       <div class="r2__bulk">
         <label class="r2__select-all">
-          <input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAllFiltered">
+          <input type="checkbox" :checked="allFilteredSelected" :disabled="bulkDeleting" @change="toggleSelectAllFiltered">
           <span class="r2__select-box" aria-hidden="true" />
           <span>Select all shown</span>
         </label>
         <div v-if="selected.size" class="r2__bulk-actions">
           <span>{{ selected.size }} selected</span>
-          <button type="button" class="r2__bulk-clear" @click="clearSelection">Clear</button>
+          <button type="button" class="r2__bulk-clear" :disabled="bulkDeleting" @click="clearSelection">Clear</button>
           <button type="button" class="r2__bulk-delete" :disabled="bulkDeleting" @click="bulkDelete">
             <Icon name="heroicons:trash" />
             {{ bulkDeleting ? 'Deleting…' : `Delete ${selected.size}` }}
@@ -312,7 +427,7 @@ async function bulkDelete() {
         <article v-for="(image, index) in pagedImages" :key="image.key" class="image-row" :class="{ 'is-selected': isSelected(image.key) }">
           <div class="image-row__thumb">
             <label class="image-row__check">
-              <input type="checkbox" :checked="isSelected(image.key)" @click="onCheckboxClick($event, image.key, index)">
+              <input type="checkbox" :checked="isSelected(image.key)" :disabled="bulkDeleting" @click="onCheckboxClick($event, image.key, index)">
               <span class="image-row__check-box" aria-hidden="true">
                 {{ selectionOrder(image.key) || '' }}
               </span>
@@ -329,7 +444,7 @@ async function bulkDelete() {
                 <button
                   type="button"
                   class="image-row__delete"
-                  :disabled="deletingKey === image.key"
+                  :disabled="!!deletingKey || bulkDeleting"
                   @click="confirmDelete(image)"
                 >
                   <Icon name="heroicons:trash" />
@@ -396,6 +511,173 @@ async function bulkDelete() {
 </template>
 
 <style scoped>
+.delete-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.delete-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(12, 12, 10, 0.78), rgba(12, 12, 10, 0.78)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(245, 244, 240, 0.08) 0,
+      rgba(245, 244, 240, 0.08) 1px,
+      transparent 1px,
+      transparent 4.4rem
+    );
+}
+
+.delete-modal__panel {
+  position: relative;
+  width: min(100%, 30rem);
+  border: 1px solid var(--subtle);
+  border-top: 2px solid var(--accent);
+  background: var(--body-bg);
+  padding: 1.15rem;
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.28);
+}
+
+.delete-modal__mark {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.22rem;
+  height: 1.6rem;
+  margin-bottom: 1.2rem;
+}
+
+.delete-modal__mark span {
+  display: block;
+  width: 0.32rem;
+  height: 0.65rem;
+  background: var(--accent);
+  transform-origin: bottom;
+  animation: deletePulse 0.85s ease-in-out infinite;
+}
+
+.delete-modal__mark span:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.delete-modal__mark span:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+.delete-modal__kicker {
+  margin-bottom: 0.45rem;
+  color: var(--accent);
+  font-size: 0.5rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.delete-modal h2 {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 200;
+  line-height: 0.95;
+  color: var(--dark);
+}
+
+.delete-modal__copy {
+  max-width: 24rem;
+  margin-top: 0.85rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.65;
+}
+
+.delete-modal__meter {
+  height: 0.42rem;
+  margin-top: 1.35rem;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.delete-modal__meter span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease-out;
+}
+
+.delete-modal__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.delete-modal__meta strong {
+  color: var(--dark);
+  font-weight: 500;
+}
+
+.delete-modal__current {
+  margin-top: 1rem;
+  border-top: 1px solid var(--subtle);
+  padding-top: 0.75rem;
+  color: var(--dark);
+  font-size: 0.66rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.delete-modal__notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.delete-modal__notes span {
+  border: 1px solid var(--subtle);
+  padding: 0.28rem 0.45rem;
+  color: #b0243c;
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.delete-modal-enter-active,
+.delete-modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.delete-modal-enter-active .delete-modal__panel,
+.delete-modal-leave-active .delete-modal__panel {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.delete-modal-enter-from,
+.delete-modal-leave-to {
+  opacity: 0;
+}
+
+.delete-modal-enter-from .delete-modal__panel,
+.delete-modal-leave-to .delete-modal__panel {
+  opacity: 0;
+  transform: translateY(0.5rem);
+}
+
+@keyframes deletePulse {
+  0%, 100% { transform: scaleY(0.45); opacity: 0.55; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
 .r2 {
   max-width: 1180px;
   margin: 0 auto;
@@ -599,6 +881,10 @@ async function bulkDelete() {
 .r2__select-all:hover .r2__select-box {
   border-color: var(--accent);
 }
+.r2__select-all:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.55;
+}
 .r2__select-all input:focus-visible + .r2__select-box {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -628,6 +914,7 @@ async function bulkDelete() {
   cursor: pointer;
 }
 .r2__bulk-clear:hover { color: var(--dark); }
+.r2__bulk-clear:disabled { opacity: 0.55; cursor: wait; }
 
 .r2__bulk-delete {
   display: inline-flex;

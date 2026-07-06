@@ -26,13 +26,60 @@ const total = ref(0)
 const done = ref(0)
 const errorCount = ref(0)
 const skippedCount = ref(0)
+const duplicateCount = ref(0)
 const pendingQueue = ref<File[]>([])
+const failedUploads = ref<Array<{ file: File, name: string, reason: string }>>([])
+const completedSignatures = new Set<string>()
 
 const COMPRESS_MAX_DIM = 3040
 const COMPRESS_QUALITY = 0.90
 const COMPRESS_MIN_BYTES = 200_000
+const UPLOAD_CONCURRENCY = 4
 
 const autoCompress = ref(true)
+
+function fileSignature(file: File) {
+  return `${file.name}:${file.size}:${file.lastModified}`
+}
+
+async function contentHash(file: File) {
+  const buffer = await file.arrayBuffer()
+  const digest = await crypto.subtle.digest('SHA-256', buffer)
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function uploadErrorMessage(err: any) {
+  const data = err?.data
+  const raw = typeof data === 'string'
+    ? data
+    : data?.message || data?.statusMessage || err?.message || ''
+
+  if (/Worker exceeded resource limits|Error 1102/i.test(raw)) {
+    return 'Cloudflare Worker exceeded resource limits. Retry the failed files in a smaller batch.'
+  }
+  if (/Failed to fetch|fetch failed|NetworkError/i.test(raw)) {
+    return 'Network request failed. Retry this file.'
+  }
+  if (err?.statusCode === 413 || /too large|ใหญ่เกิน/i.test(raw)) {
+    return 'File is too large after compression.'
+  }
+  return raw ? String(raw).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220) : 'Upload failed without a server message.'
+}
+
+function uniqueUncompleted(files: File[]) {
+  const seen = new Set<string>()
+  const out: File[] = []
+  for (const file of files) {
+    const signature = fileSignature(file)
+    if (seen.has(signature) || completedSignatures.has(signature)) {
+      duplicateCount.value++
+      continue
+    }
+    seen.add(signature)
+    out.push(file)
+  }
+  return out
+}
 
 async function compressImage(file: File): Promise<File> {
   const bmp = await createImageBitmap(file)
@@ -56,12 +103,68 @@ async function compressImage(file: File): Promise<File> {
 
 const canAddMore = computed(() => !props.maxFiles || model.value.length < props.maxFiles)
 
+const progressPercent = computed(() =>
+  total.value ? Math.min(100, Math.round((done.value / total.value) * 100)) : 0
+)
+
+// Warn before closing/refreshing the tab while an upload is in flight.
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (!uploading.value) return
+  e.preventDefault()
+  e.returnValue = ''
+}
+onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload))
+
 function chooseFiles() {
   if (!uploading.value && canAddMore.value) fileInput.value?.click()
 }
 
-async function upload(files: File[]) {
-  const images = files.filter(file => file.type.startsWith('image/'))
+async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set<string>) {
+  const signature = fileSignature(file)
+  try {
+    const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
+    const hash = await contentHash(toUpload)
+    const fd = new FormData()
+    fd.append('file', toUpload)
+    fd.append('prefix', props.prefix)
+    fd.append('hash', hash)
+
+    const { key } = await $fetch<{ key: string }>('/api/admin/upload', {
+      method: 'POST',
+      body: fd
+    })
+    if (!model.value.includes(key) && !uploadedKeySet.has(key)) {
+      uploadedKeySet.add(key)
+      uploadedKeys.push(key)
+    }
+    completedSignatures.add(signature)
+  } catch (err) {
+    errorCount.value++
+    failedUploads.value.push({
+      file,
+      name: file.name,
+      reason: uploadErrorMessage(err)
+    })
+  } finally {
+    done.value++
+  }
+}
+
+async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet: Set<string>) {
+  const queue = [...files]
+  const workers = Array.from({ length: Math.min(UPLOAD_CONCURRENCY, queue.length) }, async () => {
+    while (queue.length) {
+      const file = queue.shift()
+      if (file) await uploadOne(file, uploadedKeys, uploadedKeySet)
+    }
+  })
+  await Promise.all(workers)
+}
+
+async function upload(files: File[], retry = false) {
+  duplicateCount.value = 0
+  const images = uniqueUncompleted(files.filter(file => file.type.startsWith('image/')))
   if (!images.length) return
 
   // While an upload is already running, queue and update the counter. The drain
@@ -79,10 +182,12 @@ async function upload(files: File[]) {
   uploading.value = true
   errorCount.value = 0
   skippedCount.value = 0
+  if (!retry) failedUploads.value = []
   total.value = images.length
 
   let batch = images
   const allUploadedKeys: string[] = []
+  const uploadedKeySet = new Set<string>()
 
   while (batch.length) {
     // model isn't updated until after the loop, so count this run's uploads too.
@@ -94,24 +199,7 @@ async function upload(files: File[]) {
 
     batch = batch.slice(toProcess.length)
 
-    for (const file of toProcess) {
-      const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
-      const fd = new FormData()
-      fd.append('file', toUpload)
-      fd.append('prefix', props.prefix)
-
-      try {
-        const { key } = await $fetch<{ key: string }>('/api/admin/upload', {
-          method: 'POST',
-          body: fd
-        })
-        allUploadedKeys.push(key)
-      } catch {
-        errorCount.value++
-      } finally {
-        done.value++
-      }
-    }
+    await uploadMany(toProcess, allUploadedKeys, uploadedKeySet)
 
     if (!props.multiple) break
 
@@ -128,7 +216,7 @@ async function upload(files: File[]) {
   }
 
   if (allUploadedKeys.length) {
-    model.value = props.multiple ? [...model.value, ...allUploadedKeys] : allUploadedKeys.slice(0, 1)
+    model.value = props.multiple ? [...new Set([...model.value, ...allUploadedKeys])] : allUploadedKeys.slice(0, 1)
     emit('uploaded', allUploadedKeys)
   }
 
@@ -136,6 +224,13 @@ async function upload(files: File[]) {
   total.value = 0
   done.value = 0
   if (fileInput.value) fileInput.value.value = ''
+}
+
+function retryFailed() {
+  if (uploading.value || !failedUploads.value.length) return
+  const files = failedUploads.value.map(item => item.file)
+  failedUploads.value = []
+  upload(files, true)
 }
 
 function removeKey(key: string) {
@@ -169,8 +264,19 @@ function onDrop(e: DragEvent) {
       @drop.prevent="onDrop"
     >
       <div v-if="uploading" class="r2up__uploading">
-        <UiSpinner />
-        <span class="r2up__progress">{{ done }}&thinsp;/&thinsp;{{ total }}</span>
+        <div class="r2up__uploading-mark" aria-hidden="true">
+          <span /><span /><span />
+        </div>
+        <p class="r2up__uploading-kicker">{{ t('uploader.uploadingKicker') }}</p>
+        <p class="r2up__uploading-count">
+          <strong>{{ done }}</strong>
+          <span class="r2up__uploading-sep">/</span>
+          {{ total }}
+        </p>
+        <div class="r2up__uploading-meter" role="progressbar" :aria-valuenow="progressPercent" aria-valuemin="0" aria-valuemax="100">
+          <span :style="{ transform: `scaleX(${progressPercent / 100})` }" />
+        </div>
+        <p class="r2up__uploading-stay">{{ t('uploader.stayOnPage') }}</p>
       </div>
       <template v-else-if="canAddMore">
         <svg class="r2up__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">
@@ -202,8 +308,25 @@ function onDrop(e: DragEvent) {
     </div>
 
     <!-- Status -->
-    <p v-if="!uploading && errorCount" class="r2up__error">{{ t('uploader.failed', errorCount, { n: errorCount }) }}</p>
-    <p v-if="!uploading && skippedCount" class="r2up__error">{{ t('uploader.skipped', skippedCount, { n: skippedCount }) }}</p>
+      <p v-if="!uploading && errorCount" class="r2up__error">{{ t('uploader.failed', errorCount, { n: errorCount }) }}</p>
+      <p v-if="!uploading && skippedCount" class="r2up__error">{{ t('uploader.skipped', skippedCount, { n: skippedCount }) }}</p>
+      <p v-if="!uploading && duplicateCount" class="r2up__note">{{ t('uploader.duplicatesSkipped', duplicateCount, { n: duplicateCount }) }}</p>
+
+      <div v-if="!uploading && failedUploads.length" class="r2up__failures">
+        <div class="r2up__failures-head">
+          <span>{{ t('uploader.failedListTitle', failedUploads.length, { n: failedUploads.length }) }}</span>
+          <button type="button" class="r2up__retry" @click="retryFailed">{{ t('uploader.retryFailed') }}</button>
+        </div>
+        <ul>
+          <li v-for="item in failedUploads.slice(0, 8)" :key="`${item.name}-${item.file.size}-${item.file.lastModified}`">
+            <span>{{ item.name }}</span>
+            <small>{{ item.reason }}</small>
+          </li>
+        </ul>
+        <p v-if="failedUploads.length > 8" class="r2up__more">
+          {{ t('uploader.moreFailed', failedUploads.length - 8, { n: failedUploads.length - 8 }) }}
+        </p>
+      </div>
 
     <!-- Previews -->
     <div v-if="showPreviews && model.length" class="r2up__previews">
@@ -290,14 +413,84 @@ function onDrop(e: DragEvent) {
 /* Uploading state */
 .r2up__uploading {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
+  width: min(100%, 15rem);
+  cursor: default;
 }
-.r2up__progress {
+
+.r2up__uploading-mark {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.22rem;
+  height: 1.1rem;
+  margin-bottom: 0.65rem;
+}
+.r2up__uploading-mark span {
+  display: block;
+  width: 0.28rem;
+  height: 0.55rem;
+  background: var(--accent);
+  transform-origin: bottom;
+  animation: r2upPulse 0.85s ease-in-out infinite;
+}
+.r2up__uploading-mark span:nth-child(2) { animation-delay: 0.12s; }
+.r2up__uploading-mark span:nth-child(3) { animation-delay: 0.24s; }
+
+.r2up__uploading-kicker {
   font-family: var(--font-sans);
-  font-size: 0.58rem;
-  letter-spacing: 0.12em;
+  font-size: 0.5rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.r2up__uploading-count {
+  margin-top: 0.3rem;
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  font-weight: 200;
+  line-height: 1;
   color: var(--muted);
+}
+.r2up__uploading-count strong {
+  font-weight: 300;
+  color: var(--dark);
+}
+.r2up__uploading-sep {
+  margin: 0 0.18em;
+  opacity: 0.5;
+}
+
+.r2up__uploading-meter {
+  width: 100%;
+  height: 0.3rem;
+  margin-top: 0.85rem;
+  background: color-mix(in srgb, var(--subtle) 45%, transparent);
+  overflow: hidden;
+}
+.r2up__uploading-meter span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease-out;
+}
+
+.r2up__uploading-stay {
+  margin-top: 0.7rem;
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@keyframes r2upPulse {
+  0%, 100% { transform: scaleY(0.45); opacity: 0.55; }
+  50% { transform: scaleY(1); opacity: 1; }
 }
 
 /* Full state */
@@ -358,6 +551,82 @@ function onDrop(e: DragEvent) {
   font-size: 0.58rem;
   letter-spacing: 0.06em;
   color: #b0243c;
+}
+
+.r2up__note {
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.r2up__failures {
+  border: 1px solid color-mix(in srgb, #b0243c 38%, var(--subtle));
+  border-top: 2px solid #b0243c;
+  background: color-mix(in srgb, #b0243c 4%, var(--body-bg));
+}
+
+.r2up__failures-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid color-mix(in srgb, #b0243c 25%, var(--subtle));
+  color: #b0243c;
+  font-family: var(--font-sans);
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.r2up__retry {
+  flex-shrink: 0;
+  border: 1px solid #b0243c;
+  background: #b0243c;
+  color: #F5F4F0;
+  padding: 0.38rem 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.48rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.r2up__retry:hover { background: #8f1c30; border-color: #8f1c30; }
+
+.r2up__failures ul {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: color-mix(in srgb, #b0243c 20%, var(--subtle));
+}
+
+.r2up__failures li {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+  padding: 0.52rem 0.65rem;
+  background: color-mix(in srgb, var(--body-bg) 70%, white);
+}
+
+.r2up__failures li span {
+  color: var(--dark);
+  font-size: 0.62rem;
+  overflow-wrap: anywhere;
+}
+
+.r2up__failures li small,
+.r2up__more {
+  color: #8f1c30;
+  font-size: 0.54rem;
+  line-height: 1.45;
+}
+
+.r2up__more {
+  margin: 0;
+  padding: 0.52rem 0.65rem;
 }
 
 /* Hidden input */

@@ -103,6 +103,36 @@ function markOccupancy(r: number, c: number, w: number, h: number, id: number) {
   }
 }
 
+function mergeOriginsFor(block: Block, w: number, h: number): Array<{ row: number, col: number }> {
+  const rowsToTry = Array.from({ length: h }, (_, i) => block.row - (h - 1 - i))
+  const colsToTry = Array.from({ length: w }, (_, i) => block.col - (w - 1 - i))
+  const out: Array<{ row: number, col: number }> = []
+
+  for (const row of rowsToTry) {
+    for (const col of colsToTry) {
+      if (row < 0 || col < 0 || row + h > rows || col + w > cols) continue
+      out.push({ row, col })
+    }
+  }
+
+  return out
+}
+
+function blockCells(block: Block): Array<{ row: number, col: number }> {
+  const { w, h } = DIMS[block.shape]
+  const cells: Array<{ row: number, col: number }> = []
+  for (let rr = block.row; rr < block.row + h; rr++) {
+    for (let cc = block.col; cc < block.col + w; cc++) {
+      cells.push({ row: rr, col: cc })
+    }
+  }
+  return cells
+}
+
+function cellKey(row: number, col: number) {
+  return `${row}:${col}`
+}
+
 // First-fit greedy fill: guarantees full coverage with no holes, since 'sm'
 // (1x1) always fits the current cell in a row-major scan.
 function buildLayout(): Block[] {
@@ -185,50 +215,86 @@ function crossfadeInPlace(block: Block, src: string) {
   blocks.value[idx] = { ...block, layers, activeLayer: nextLayer }
 }
 
-// Absorbs neighboring 'sm' blocks so `anchor` can grow into `targetShape`.
-// Only starts from an 'sm' anchor — merging out of an already-bigger block
-// is out of scope. Absorbed blocks' current photos go back to the front of
-// the queue instead of being discarded.
-function tryMerge(anchor: Block, targetShape: SizeClass, src: string): boolean {
-  if (anchor.shape !== 'sm') return false
+// Reshapes `block` into `targetShape`, even when the needed cells are owned by
+// larger neighboring blocks. Any displaced footprint is split back into fresh
+// 1x1 cells so a portrait can force the cell above it to update and the
+// leftovers do not keep stale cropped fragments.
+function tryReshape(block: Block, targetShape: SizeClass, src: string): boolean {
   const { w, h } = DIMS[targetShape]
   if (w === 1 && h === 1) return false
-  if (anchor.row + h > rows || anchor.col + w > cols) return false
 
-  const neighbors: Block[] = []
-  for (let rr = anchor.row; rr < anchor.row + h; rr++) {
-    for (let cc = anchor.col; cc < anchor.col + w; cc++) {
-      if (rr === anchor.row && cc === anchor.col) continue
-      const id = occupancy[rr]![cc]
-      const nb = blocks.value.find(b => b.id === id)
-      if (!nb || nb.shape !== 'sm' || nb.row !== rr || nb.col !== cc) return false
-      neighbors.push(nb)
+  for (const origin of mergeOriginsFor(block, w, h)) {
+    const affectedById = new Map<number, Block>()
+
+    for (let rr = origin.row; rr < origin.row + h; rr++) {
+      for (let cc = origin.col; cc < origin.col + w; cc++) {
+        const id = occupancy[rr]![cc]
+        const nb = blocks.value.find(b => b.id === id)
+        if (!nb) continue
+        affectedById.set(nb.id, nb)
+      }
     }
-  }
+    affectedById.set(block.id, block)
 
-  const absorbed = [anchor, ...neighbors]
-  for (const b of absorbed) {
-    const shownSrc = b.layers[b.activeLayer]
-    if (shownSrc) {
-      shown.delete(shownSrc)
-      queue.value.unshift(shownSrc)
+    const affected = [...affectedById.values()]
+    const freedCells = new Map<string, { row: number, col: number }>()
+    const targetCells = new Set<string>()
+
+    for (let rr = origin.row; rr < origin.row + h; rr++) {
+      for (let cc = origin.col; cc < origin.col + w; cc++) {
+        targetCells.add(cellKey(rr, cc))
+      }
     }
-  }
 
-  const absorbedIds = new Set(absorbed.map(b => b.id))
-  blocks.value = blocks.value.filter(b => !absorbedIds.has(b.id))
+    const retired: string[] = []
+    for (const b of affected) {
+      const shownSrc = b.layers[b.activeLayer]
+      if (shownSrc) {
+        shown.delete(shownSrc)
+        retired.push(shownSrc)
+      }
+      for (const cell of blockCells(b)) freedCells.set(cellKey(cell.row, cell.col), cell)
+    }
 
-  const merged: Block = {
-    id: nextBlockId++,
-    row: anchor.row,
-    col: anchor.col,
-    shape: targetShape,
-    layers: [src, ''],
-    activeLayer: 0
+    const affectedIds = new Set(affected.map(b => b.id))
+    blocks.value = blocks.value.filter(b => !affectedIds.has(b.id))
+    for (const b of affected) {
+      const { w: bw, h: bh } = DIMS[b.shape]
+      markOccupancy(b.row, b.col, bw, bh, -1)
+    }
+
+    const merged: Block = {
+      id: nextBlockId++,
+      row: origin.row,
+      col: origin.col,
+      shape: targetShape,
+      layers: [src, ''],
+      activeLayer: 0
+    }
+    blocks.value.push(merged)
+    markOccupancy(origin.row, origin.col, w, h, merged.id)
+
+    const leftovers = [...freedCells.values()]
+      .filter(cell => !targetCells.has(cellKey(cell.row, cell.col)))
+      .sort((a, b) => a.row - b.row || a.col - b.col)
+
+    for (const cell of leftovers) {
+      const id = nextBlockId++
+      blocks.value.push({
+        id,
+        row: cell.row,
+        col: cell.col,
+        shape: 'sm',
+        layers: [nextImage() ?? '', ''],
+        activeLayer: 0
+      })
+      markOccupancy(cell.row, cell.col, 1, 1, id)
+    }
+
+    queue.value.push(...retired)
+    return true
   }
-  blocks.value.push(merged)
-  markOccupancy(anchor.row, anchor.col, w, h, merged.id)
-  return true
+  return false
 }
 
 // Breaks `block` down into 1x1 'sm' blocks, giving the triggering photo to
@@ -276,11 +342,11 @@ function applySwap(reservedId: number, src: string, targetShape: SizeClass) {
   const targetArea = DIMS[targetShape].w * DIMS[targetShape].h
   const blockArea = DIMS[block.shape].w * DIMS[block.shape].h
 
-  if (targetArea > blockArea && tryMerge(block, targetShape, src)) return
+  if (targetShape !== 'sm' && tryReshape(block, targetShape, src)) return
   if (targetArea < blockArea && trySplit(block, src)) return
 
-  // Same area but different shape (wide <-> tall), or no compatible
-  // neighbors to merge with — just crossfade in the existing slot.
+  // No compatible footprint to reshape into — just crossfade in the existing
+  // slot rather than leaving the cell blank.
   crossfadeInPlace(block, src)
 }
 

@@ -14,6 +14,7 @@ defineProps<{
   items: FeedItem[]
 }>()
 const { t } = useI18n()
+const localePath = useLocalePath()
 </script>
 
 <template>
@@ -44,6 +45,10 @@ const { t } = useI18n()
           <p class="scard__date">{{ item.date }}</p>
         </NuxtLink>
       </div>
+      <div class="stories__footer">
+        <NuxtLink :to="localePath('/albums')" class="stories__view-all">{{ t('home.viewAllAlbums') }}</NuxtLink>
+        <NuxtLink :to="localePath('/blog')" class="stories__view-all">{{ t('home.viewAllPosts') }}</NuxtLink>
+      </div>
     </div>
   </section>
 </template>
@@ -54,6 +59,28 @@ const { t } = useI18n()
   border-top: 1px solid var(--subtle);
   border-bottom: 1px solid var(--subtle);
   padding: 6rem 3rem;
+}
+.stories__footer {
+  margin-top: 2.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.stories__view-all {
+  display: inline-block;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--accent);
+  padding: 0.72rem 1.6rem;
+  transition: background 0.2s, color 0.2s;
+}
+.stories__view-all:hover {
+  background: var(--accent);
+  color: #fff;
 }
 .stories__layout {
   display: grid;

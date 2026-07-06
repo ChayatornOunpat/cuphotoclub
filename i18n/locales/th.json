@@ -26,6 +26,8 @@
   "home": {
     "featuredWork": "ผลงานประจำวัน",
     "latest": "ล่าสุด",
+    "viewAllAlbums": "ดูอัลบั้มทั้งหมด →",
+    "viewAllPosts": "ดูโพสต์ทั้งหมด →",
     "ourHistory": "ประวัติของเรา",
     "aboutUs": "เกี่ยวกับเรา",
     "missionBanner": "ชมรมถ่ายภาพจุฬาฯ เปิดรับนิสิตทุกคน ไม่ว่าจะมีประสบการณ์ถ่ายภาพมาก่อนหรือไม่",
@@ -348,15 +350,22 @@
   "adminPhotoManager": {
     "title": "รูปภาพ",
     "uploaded": "อัปโหลดแล้ว ({count})",
+    "manageR2": "จัดการรูปภาพ R2",
     "done": "เสร็จสิ้น"
   },
   "uploader": {
     "dragHere": "ลากรูปภาพมาวาง หรือ",
     "browse": "เลือกไฟล์",
-    "hintR2": "JPG · PNG · WebP · HEIC — สูงสุด 50 MB ต่อไฟล์",
+    "hintR2": "JPG · PNG · WebP · HEIC — อัปโหลดหลังบีบอัดได้สูงสุด 15 MB ต่อไฟล์",
     "hint15": "รองรับ JPG, PNG, WebP — สูงสุด 15MB ต่อไฟล์",
     "uploading": "กำลังอัปโหลด {done}/{total}…",
+    "uploadingKicker": "กำลังอัปโหลด",
+    "stayOnPage": "กรุณาอยู่ในหน้านี้จนกว่าจะอัปโหลดเสร็จ",
     "failed": "อัปโหลดไม่สำเร็จ {n} ไฟล์",
+    "failedListTitle": "ไฟล์ที่อัปโหลดไม่สำเร็จ {n} ไฟล์",
+    "retryFailed": "ลองใหม่เฉพาะไฟล์ที่ล้มเหลว",
+    "moreFailed": "มีไฟล์ที่ล้มเหลวอีก {n} ไฟล์",
+    "duplicatesSkipped": "ข้ามไฟล์ที่อัปโหลดแล้ว {n} ไฟล์",
     "skipped": "ข้าม {n} ไฟล์ — เกินจำนวนที่อัปโหลดได้",
     "limitReached": "อัปโหลดครบจำนวนแล้ว",
     "autoCompress": "บีบอัดอัตโนมัติ",

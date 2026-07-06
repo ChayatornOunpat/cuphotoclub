@@ -26,6 +26,8 @@
   "home": {
     "featuredWork": "Featured Work",
     "latest": "Latest",
+    "viewAllAlbums": "View All Albums →",
+    "viewAllPosts": "View All Posts →",
     "ourHistory": "Our History",
     "aboutUs": "About Us",
     "missionBanner": "CU Photo Club is Chulalongkorn University's photography society — open to every student, camera or no experience required.",
@@ -348,15 +350,22 @@
   "adminPhotoManager": {
     "title": "Photos",
     "uploaded": "Uploaded ({count})",
+    "manageR2": "Manage R2 images",
     "done": "Done"
   },
   "uploader": {
     "dragHere": "Drag photos here or",
     "browse": "browse",
-    "hintR2": "JPG · PNG · WebP · HEIC — up to 50 MB per file",
+    "hintR2": "JPG · PNG · WebP · HEIC — compressed upload up to 15 MB per file",
     "hint15": "JPG, PNG, WebP — up to 15 MB per file",
     "uploading": "Uploading {done}/{total}…",
+    "uploadingKicker": "Uploading",
+    "stayOnPage": "Stay on this page until the upload finishes",
     "failed": "{n} file failed to upload | {n} files failed to upload",
+    "failedListTitle": "{n} failed file | {n} failed files",
+    "retryFailed": "Retry failed",
+    "moreFailed": "+ {n} more failed file | + {n} more failed files",
+    "duplicatesSkipped": "{n} already uploaded file skipped | {n} already uploaded files skipped",
     "skipped": "{n} file skipped — upload limit reached | {n} files skipped — upload limit reached",
     "limitReached": "Upload limit reached",
     "autoCompress": "Auto-compress",

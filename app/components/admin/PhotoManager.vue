@@ -64,6 +64,9 @@ function onUploaded(keys: string[]) {
       </template>
 
       <div class="pm__footer">
+        <NuxtLink class="pm__manage-link" to="/admin/r2-images">
+          {{ t('adminPhotoManager.manageR2') }}
+        </NuxtLink>
         <UiButton variant="secondary" @click="open = false">{{ t('adminPhotoManager.done') }}</UiButton>
       </div>
     </div>
@@ -112,9 +115,22 @@ function onUploaded(keys: string[]) {
 
 .pm__footer {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 1rem;
   padding: 0.75rem 0.9rem;
   border-top: 1px solid var(--subtle);
   flex-shrink: 0;
 }
+
+.pm__manage-link {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.pm__manage-link:hover { color: var(--accent); }
 </style>
