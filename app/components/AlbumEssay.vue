@@ -22,6 +22,16 @@ interface Album {
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number, draggableCells?: boolean }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
+const coverAspect = ref<number | null>(null)
+let coverMeasureId = 0
+
+const coverOrientation = computed(() => {
+  const aspect = coverAspect.value
+  if (!aspect) return 'landscape'
+  if (aspect < 0.82) return 'portrait'
+  if (aspect < 1.18) return 'square'
+  return 'landscape'
+})
 
 // Sequential image number keyed by "ri-ci"
 const imageNumbers = computed(() => {
@@ -55,14 +65,43 @@ function textCellStyle(cell: AlbumCell) {
   const font = cell.font ?? props.album.textDefaults?.font ?? 'serif'
   return { textAlign: align, fontFamily: font === 'sans' ? 'var(--font-sans)' : 'var(--font-serif)' }
 }
+
+const excerptStyle = computed(() => {
+  const align = props.album.textDefaults?.align ?? 'left'
+  const font = props.album.textDefaults?.font ?? 'serif'
+  return { textAlign: align, fontFamily: font === 'sans' ? 'var(--font-sans)' : 'var(--font-serif)' }
+})
+
+function measureCover(src: string) {
+  const id = ++coverMeasureId
+  coverAspect.value = null
+  if (!import.meta.client || !src) return
+
+  const img = new Image()
+  img.onload = () => {
+    if (id !== coverMeasureId) return
+    const width = img.naturalWidth || img.width
+    const height = img.naturalHeight || img.height
+    coverAspect.value = width > 0 && height > 0 ? width / height : null
+  }
+  img.onerror = () => {
+    if (id === coverMeasureId) coverAspect.value = null
+  }
+  img.src = src
+}
+
+watch(() => props.album.coverSrc, measureCover, { immediate: true })
 </script>
 
 <template>
   <article>
     <!-- COVER -->
-    <header class="cover" data-chrome-header>
+    <header class="cover" :class="`cover--${coverOrientation}`" data-chrome-header>
       <div class="cover__bg" data-parallax>
         <AppImg :src="album.coverSrc" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="cover__img" eager />
+      </div>
+      <div v-if="coverOrientation !== 'landscape'" class="cover__subject" aria-hidden="true">
+        <AppImg :src="album.coverSrc" alt="" sizes="xs:100vw sm:70vw md:45vw lg:520px" class="cover__subject-img" eager />
       </div>
       <span v-if="disableNavigation" class="cover__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="cover__back">{{ t('albums.coverBack') }}</NuxtLink>
@@ -80,7 +119,7 @@ function textCellStyle(cell: AlbumCell) {
 
     <!-- INTRO -->
     <section class="intro">
-      <p class="intro__lead" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
+      <p class="intro__lead" :style="excerptStyle" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
     </section>
 
     <!-- ESSAY FLOW — Lego grid -->
@@ -168,6 +207,43 @@ function textCellStyle(cell: AlbumCell) {
   background: linear-gradient(to bottom, rgba(12, 12, 10, 0.4) 0%, transparent 35%, rgba(12, 12, 10, 0.85) 100%);
 }
 :deep(.cover__img) { width: 100%; height: 100%; object-fit: cover; opacity: 0.55; display: block; }
+.cover__subject {
+  position: absolute;
+  z-index: 1;
+  top: 7rem;
+  right: 3rem;
+  bottom: 5rem;
+  width: min(38vw, 520px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.cover__subject :deep(img) {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.28);
+}
+.cover--portrait :deep(.cover__img),
+.cover--square :deep(.cover__img) {
+  opacity: 0.28;
+  filter: blur(22px);
+  transform: scale(1.08);
+}
+.cover--portrait .cover__bg::after,
+.cover--square .cover__bg::after {
+  background:
+    linear-gradient(to right, rgba(12, 12, 10, 0.88) 0%, rgba(12, 12, 10, 0.72) 46%, rgba(12, 12, 10, 0.42) 100%),
+    linear-gradient(to bottom, rgba(12, 12, 10, 0.52) 0%, transparent 34%, rgba(12, 12, 10, 0.88) 100%);
+}
+.cover--portrait .cover__body,
+.cover--square .cover__body {
+  padding-right: min(46vw, 620px);
+}
 .cover__back {
   position: absolute; top: 6rem; left: 3rem; z-index: 3;
   font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase;
@@ -215,6 +291,22 @@ figcaption .n { color: var(--accent); font-weight: 500; flex-shrink: 0; }
 @media (max-width: 720px) {
   .cover__back { left: 1.5rem; }
   .cover__body { padding: 0 1.5rem 2.5rem; }
+  .cover__subject {
+    top: 5.5rem;
+    left: 1.5rem;
+    right: 1.5rem;
+    bottom: auto;
+    width: auto;
+    height: 42svh;
+  }
+  .cover--portrait .cover__body,
+  .cover--square .cover__body {
+    padding-right: 1.5rem;
+  }
+  .cover--portrait .cover__title,
+  .cover--square .cover__title {
+    font-size: clamp(2.8rem, 17vw, 5rem);
+  }
   .intro, .essay, .albnav { padding-left: 1.5rem; padding-right: 1.5rem; }
   .lego-row { grid-template-columns: 1fr; gap: 1rem; }
   .cell--image, .cell--text { grid-column: 1 / -1; }

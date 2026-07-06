@@ -13,6 +13,16 @@ const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedR
 const { t } = useI18n()
 const localePath = useLocalePath()
 const cover = computed(() => props.album.coverSrc)
+const coverAspect = ref<number | null>(null)
+let coverMeasureId = 0
+
+const coverOrientation = computed(() => {
+  const aspect = coverAspect.value
+  if (!aspect) return 'landscape'
+  if (aspect < 0.82) return 'portrait'
+  if (aspect < 1.18) return 'square'
+  return 'landscape'
+})
 
 // Flat list of image cells with their row/cell coordinates for admin selection
 const imageCells = computed(() => {
@@ -42,6 +52,24 @@ function close() { open.value = false }
 function prev() { show(idx.value - 1) }
 function next() { show(idx.value + 1) }
 
+function measureCover(src: string) {
+  const id = ++coverMeasureId
+  coverAspect.value = null
+  if (!import.meta.client || !src) return
+
+  const img = new Image()
+  img.onload = () => {
+    if (id !== coverMeasureId) return
+    const width = img.naturalWidth || img.width
+    const height = img.naturalHeight || img.height
+    coverAspect.value = width > 0 && height > 0 ? width / height : null
+  }
+  img.onerror = () => {
+    if (id === coverMeasureId) coverAspect.value = null
+  }
+  img.src = src
+}
+
 function onKey(e: KeyboardEvent) {
   if (!open.value) return
   if (e.key === 'Escape') close()
@@ -57,14 +85,18 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
   if (import.meta.client) document.body.style.overflow = ''
 })
+watch(cover, measureCover, { immediate: true })
 </script>
 
 <template>
   <article>
     <!-- COMPACT HEADER -->
-    <header class="head" data-chrome-header>
+    <header class="head" :class="`head--${coverOrientation}`" data-chrome-header>
       <div class="head__bg" data-parallax>
         <AppImg :src="cover" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="head__img" eager />
+      </div>
+      <div v-if="coverOrientation !== 'landscape'" class="head__subject" aria-hidden="true">
+        <AppImg :src="cover" alt="" sizes="xs:100vw sm:70vw md:38vw lg:420px" class="head__subject-img" eager />
       </div>
       <span v-if="disableNavigation" class="head__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="head__back">{{ t('albums.coverBack') }}</NuxtLink>
@@ -147,11 +179,48 @@ onUnmounted(() => {
 .head__bg { position: absolute; inset: 0; will-change: transform; }
 .head__bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(12, 12, 10, 0.5), rgba(12, 12, 10, 0.9)); }
 :deep(.head__img) { width: 100%; height: 100%; object-fit: cover; opacity: 0.4; display: block; }
+.head__subject {
+  position: absolute;
+  z-index: 1;
+  top: 5rem;
+  right: 3rem;
+  bottom: 3rem;
+  width: min(34vw, 420px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.head__subject :deep(img) {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.3);
+}
+.head--portrait :deep(.head__img),
+.head--square :deep(.head__img) {
+  opacity: 0.24;
+  filter: blur(20px);
+  transform: scale(1.08);
+}
+.head--portrait .head__bg::after,
+.head--square .head__bg::after {
+  background:
+    linear-gradient(to right, rgba(12, 12, 10, 0.88) 0%, rgba(12, 12, 10, 0.7) 48%, rgba(12, 12, 10, 0.42) 100%),
+    linear-gradient(to bottom, rgba(12, 12, 10, 0.5), rgba(12, 12, 10, 0.9));
+}
 .head__back { position: absolute; top: 6rem; left: 3rem; z-index: 3; font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(245, 244, 240, 0.7); text-decoration: none; }
 .head__back:hover { color: var(--accent); }
 .head__back.is-disabled { cursor: default; pointer-events: none; }
 .head__back.is-disabled:hover { color: rgba(245, 244, 240, 0.7); }
 .head__body { position: relative; z-index: 2; padding: 0 3rem 3rem; max-width: 1380px; margin: 0 auto; width: 100%; }
+.head--portrait .head__body,
+.head--square .head__body {
+  padding-right: min(42vw, 520px);
+}
 .head__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.25rem; }
 .head__kicker-category, .head__kicker-date { display: inline; }
 .head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; }
@@ -335,6 +404,24 @@ onUnmounted(() => {
 @media (max-width: 720px) {
   .head__back { left: 1.5rem; }
   .head__body, .sheet { padding-left: 1.5rem; padding-right: 1.5rem; }
+  .head--portrait,
+  .head--square {
+    height: auto;
+    min-height: 76svh;
+  }
+  .head__subject {
+    top: 5rem;
+    left: 1.5rem;
+    right: 1.5rem;
+    bottom: auto;
+    width: auto;
+    height: 32svh;
+  }
+  .head--portrait .head__body,
+  .head--square .head__body {
+    padding-right: 1.5rem;
+    padding-top: 38svh;
+  }
   .grid { gap: 0.5rem; }
   .cell { height: 130px; }
   .cell :deep(img) { max-width: 85vw; }
