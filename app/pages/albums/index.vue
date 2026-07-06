@@ -26,6 +26,21 @@ const categories = computed(() => {
 })
 
 const activeCat = ref('all')
+const categoryMenuOpen = ref(false)
+const inlineCategoryLimit = 4
+const sortedCategories = computed(() =>
+  [...categories.value].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+)
+const primaryCategories = computed(() => sortedCategories.value.slice(0, inlineCategoryLimit))
+const secondaryCategories = computed(() => sortedCategories.value.slice(inlineCategoryLimit))
+const activeSecondaryCategory = computed(() =>
+  secondaryCategories.value.find(cat => cat.name === activeCat.value) ?? null
+)
+const inlineCategories = computed(() => {
+  const cats = [...primaryCategories.value]
+  if (activeSecondaryCategory.value) cats.push(activeSecondaryCategory.value)
+  return cats
+})
 const filtered = computed(() =>
   activeCat.value === 'all'
     ? galleryAlbums.value
@@ -35,7 +50,10 @@ const filtered = computed(() =>
 const pageSize = 30
 const page = ref(1)
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
-watch(activeCat, () => { page.value = 1 })
+watch(activeCat, () => {
+  page.value = 1
+  categoryMenuOpen.value = false
+})
 watch(totalPages, () => {
   if (page.value > totalPages.value) page.value = totalPages.value
 })
@@ -100,13 +118,41 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
               {{ t('common.all') }} <sup>{{ galleryAlbums.length }}</sup>
             </button>
             <button
-              v-for="cat in categories"
+              v-for="cat in inlineCategories"
               :key="cat.name"
               :class="{ active: activeCat === cat.name }"
+              :lang="textLang(cat.name)"
               @click="activeCat = cat.name"
             >
               {{ cat.name }} <sup>{{ cat.count }}</sup>
             </button>
+            <div v-if="secondaryCategories.length" class="filter__menu">
+              <button
+                type="button"
+                class="filter__more"
+                :class="{ active: activeSecondaryCategory }"
+                :aria-expanded="categoryMenuOpen"
+                aria-haspopup="menu"
+                @click="categoryMenuOpen = !categoryMenuOpen"
+              >
+                {{ t('albums.categoryMenu') }} <sup>{{ secondaryCategories.length }}</sup>
+              </button>
+              <div v-if="categoryMenuOpen" class="filter__panel" role="menu">
+                <button
+                  v-for="cat in secondaryCategories"
+                  :key="`menu-${cat.name}`"
+                  type="button"
+                  role="menuitemradio"
+                  :aria-checked="activeCat === cat.name"
+                  :class="{ active: activeCat === cat.name }"
+                  :lang="textLang(cat.name)"
+                  @click="activeCat = cat.name"
+                >
+                  <span>{{ cat.name }}</span>
+                  <sup>{{ cat.count }}</sup>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -199,7 +245,7 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
 .index-bar__title { font-family: var(--font-serif); font-size: clamp(1.6rem, 2.4vw, 2.3rem); font-weight: 300; letter-spacing: -0.02em; line-height: 1.1; }
 .index-bar__title em { font-style: italic; color: var(--accent); }
 
-.filter { display: flex; flex-wrap: wrap; gap: 0.4rem 1.6rem; max-width: 680px; justify-content: flex-end; }
+.filter { display: flex; flex-wrap: wrap; gap: 0.4rem 1.6rem; max-width: 760px; justify-content: flex-end; align-items: flex-start; }
 .filter button { background: none; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 0.6rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); padding: 0.35rem 0; position: relative; transition: color 0.2s; }
 .filter button:hover { color: var(--dark); }
 .filter button sup { font-size: 0.78em; color: var(--subtle); margin-left: 0.2em; transition: color 0.2s; }
@@ -207,6 +253,50 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
 .filter button.active { color: var(--accent); }
 .filter button.active sup { color: var(--accent); }
 .filter button.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); }
+.filter__menu { position: relative; }
+.filter .filter__more {
+  padding-right: 1.2rem;
+}
+.filter .filter__more::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: translateY(-68%) rotate(45deg);
+}
+.filter__panel {
+  position: absolute;
+  top: calc(100% + 0.85rem);
+  right: 0;
+  z-index: 10;
+  width: min(18rem, 72vw);
+  border-top: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--body-bg) 96%, white);
+  box-shadow: 0 1.4rem 3.5rem rgba(26, 25, 24, 0.12);
+}
+.filter__panel button {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.25rem;
+  border-bottom: 1px solid var(--subtle);
+  padding: 0.9rem 1rem;
+  text-align: left;
+}
+.filter__panel button.active {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.filter__panel button.active::after {
+  display: none;
+}
+.filter__panel button sup {
+  flex-shrink: 0;
+}
 
 .feature { display: grid; grid-template-columns: 1.45fr 1fr; gap: 0; margin-bottom: 4.5rem; background: var(--hero-bg); cursor: pointer; overflow: hidden; text-decoration: none; }
 .feature__img { position: relative; overflow: hidden; min-height: 460px; }
