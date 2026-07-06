@@ -26,7 +26,7 @@ export default defineContentConfig({
         excerpt: z.string(),
         location: z.string().optional(),
         // Display style chosen by the admin (set-and-forget). See album style components.
-        style: z.enum(['essay', 'sticky', 'contact']).default('essay'),
+        style: z.enum(['essay', 'sticky', 'contact', 'darkroom']).default('essay'),
         // Which index section(s) list this album. Default Gallery; admin-editable.
         placement: z.enum(['blog', 'gallery', 'both']).default('gallery'),
         coverIndex: z.number().default(0), // which image in `images` is the cover
