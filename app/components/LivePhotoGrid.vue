@@ -56,9 +56,12 @@ function currentGridConfig(): GridConfig {
 }
 
 // Picks a target shape from a photo's real aspect ratio (width / height).
+// Thresholds are set so common camera ratios actually land as wide/tall —
+// e.g. 4:3 (1.333) and its portrait counterpart 3:4 (0.75) — rather than
+// falling into the sm/big middle bucket reserved for near-square crops.
 function shapeForRatio(ratio: number): SizeClass {
-  if (ratio >= 1.35) return 'wide'
-  if (ratio <= 0.74) return 'tall'
+  if (ratio >= 1.2) return 'wide'
+  if (ratio <= 0.83) return 'tall'
   return Math.random() < 0.25 ? 'big' : 'sm'
 }
 
@@ -258,9 +261,12 @@ function trySplit(block: Block, src: string): boolean {
   return true
 }
 
-function applySwap(src: string, targetShape: SizeClass) {
-  if (!blocks.value.length) return
-  const block = blocks.value[Math.floor(Math.random() * blocks.value.length)]!
+function applySwap(reservedId: number, src: string, targetShape: SizeClass) {
+  // The block may have been absorbed as a merge neighbor by a *different*
+  // concurrent swap since it was reserved — bail out gracefully rather than
+  // operating on cells that now belong to another block.
+  const block = blocks.value.find(b => b.id === reservedId)
+  if (!block) return
 
   if (block.shape === targetShape) {
     crossfadeInPlace(block, src)
@@ -278,20 +284,29 @@ function applySwap(src: string, targetShape: SizeClass) {
   crossfadeInPlace(block, src)
 }
 
-function performSwap() {
+// `reserved` holds block ids already claimed by other swaps still in flight
+// this tick, so two simultaneous swaps can never target the same tile —
+// that would otherwise snap an in-progress flip backward mid-rotation.
+function performSwap(reserved: Set<number>) {
+  const candidates = blocks.value.filter(b => !reserved.has(b.id))
+  if (!candidates.length) return
+  const block = candidates[Math.floor(Math.random() * candidates.length)]!
+  reserved.add(block.id)
+
   const src = nextImage()
   if (!src) return
   const preload = new Image()
   preload.onload = () => {
     const ratio = preload.naturalWidth / preload.naturalHeight || 1
-    applySwap(src, shapeForRatio(ratio))
+    applySwap(block.id, src, shapeForRatio(ratio))
   }
   preload.src = src
 }
 
 function tick() {
   if (!visible) return
-  for (let i = 0; i < SWAPS_PER_TICK; i++) performSwap()
+  const reserved = new Set<number>()
+  for (let i = 0; i < SWAPS_PER_TICK; i++) performSwap(reserved)
   void refillIfLow()
 }
 

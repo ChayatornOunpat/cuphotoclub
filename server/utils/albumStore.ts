@@ -25,7 +25,8 @@ function rowToAlbum(row: AlbumRow): Album {
     style: row.style,
     placement: row.placement,
     coverSrc: row.coverSrc,
-    rows: row.rows ?? []
+    rows: row.rows ?? [],
+    updatedAt: row.updatedAt?.toISOString()
   }
 }
 

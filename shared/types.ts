@@ -46,10 +46,11 @@ export interface Album {
   coverSrc: string       // URL of the cover/hero image
   rows: AlbumRow[]       // ordered content rows
   textDefaults?: { align?: TextAlign, font?: TextFont }
+  updatedAt?: string
 }
 
 /** Fields the admin supplies when creating/updating (no id). */
-export type AlbumInput = Omit<Album, 'id'>
+export type AlbumInput = Omit<Album, 'id' | 'updatedAt'>
 
 // ─── Post block types ──────────────────────────────────────────────────────
 
@@ -108,10 +109,11 @@ export interface Post {
   createdBy?: AdminAttribution | null
   updatedBy?: AdminAttribution | null
   blocks: PostBlock[]
+  updatedAt?: string
 }
 
 /** Fields the admin supplies when creating/updating (no id). */
-export type PostInput = Omit<Post, 'id'>
+export type PostInput = Omit<Post, 'id' | 'updatedAt'>
 
 // Shape of the authenticated user stored in the session by nuxt-auth-utils.
 declare module '#auth-utils' {

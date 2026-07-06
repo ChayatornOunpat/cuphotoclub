@@ -245,6 +245,7 @@
     "searchPosts": "Search posts by title, tag, body...",
     "sortBy": "Sort by",
     "sortNewest": "Newest",
+    "sortModified": "Last modified",
     "sortOldest": "Oldest",
     "sortTitle": "Title A-Z",
     "sortCategory": "Category",

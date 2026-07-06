@@ -75,7 +75,8 @@ function rowToPost(row: PostRow, users = new Map<number, AdminAttribution>()): P
     updatedById: row.updatedBy ?? null,
     createdBy: row.createdBy ? users.get(row.createdBy) ?? null : null,
     updatedBy: row.updatedBy ? users.get(row.updatedBy) ?? null : null,
-    blocks: (row.blocks ?? []) as PostBlock[]
+    blocks: (row.blocks ?? []) as PostBlock[],
+    updatedAt: row.updatedAt?.toISOString()
   }
 }
 

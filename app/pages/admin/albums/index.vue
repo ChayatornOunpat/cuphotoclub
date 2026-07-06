@@ -27,6 +27,10 @@ function previewPath(album: NonNullable<typeof albums.value>[number]) {
   return `/admin/albums/${album.id}/preview`
 }
 
+function modifiedValue(album: NonNullable<typeof albums.value>[number]) {
+  return album.updatedAt || album.published
+}
+
 const visibleAlbums = computed(() => {
   const q = query.value.trim().toLowerCase()
   const rows = [...(albums.value ?? [])]
@@ -37,6 +41,7 @@ const visibleAlbums = computed(() => {
     })
 
   return rows.sort((a, b) => {
+    if (sortBy.value === 'modified') return modifiedValue(b).localeCompare(modifiedValue(a))
     if (sortBy.value === 'oldest') return a.published.localeCompare(b.published)
     if (sortBy.value === 'title') return a.title.localeCompare(b.title)
     if (sortBy.value === 'category') return a.category.localeCompare(b.category)
@@ -89,6 +94,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
         <span>{{ t('admin.sortBy') }}</span>
         <select v-model="sortBy">
           <option value="newest">{{ t('admin.sortNewest') }}</option>
+          <option value="modified">{{ t('admin.sortModified') }}</option>
           <option value="oldest">{{ t('admin.sortOldest') }}</option>
           <option value="title">{{ t('admin.sortTitle') }}</option>
           <option value="category">{{ t('admin.sortCategory') }}</option>
@@ -110,7 +116,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
         <tr v-for="a in visibleAlbums" :key="a.id">
           <td class="t-title">{{ a.title }}</td>
           <td>{{ a.category }}</td>
-          <td><span class="pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span></td>
+          <td><span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span></td>
           <td><span class="pill">{{ a.style }}</span></td>
           <td>{{ imageCount(a) }}</td>
           <td class="t-muted">{{ a.date }}</td>
@@ -133,7 +139,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           <h2>{{ a.title }}</h2>
           <p>{{ a.excerpt }}</p>
           <div class="card__facts">
-            <span :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span>
+            <span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span>
             <span>{{ imageCount(a) }} {{ t('common.frames') }}</span>
             <span>{{ a.style }}</span>
           </div>
@@ -178,11 +184,39 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 .tbl td { padding: 0.9rem 0.75rem; border-bottom: 1px solid var(--subtle); vertical-align: middle; }
 .t-title { font-weight: 500; }
 .t-muted { color: var(--muted); }
-.pill { font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--subtle); padding: 0.2rem 0.5rem; }
+.pill { font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--subtle); padding: 0.2rem 0.5rem; }
+.visibility-pill {
+  display: inline-flex;
+  align-items: center;
+  min-width: 5.8rem;
+  border: 1px solid currentColor;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  padding: 0.42rem 0.62rem;
+  text-transform: uppercase;
+}
+.visibility-pill::before {
+  content: '';
+  width: 0.42rem;
+  height: 0.42rem;
+  margin-right: 0.5rem;
+  background: currentColor;
+}
 .pill--muted { color: var(--muted); }
-.pill--draft { color: #b0243c; }
-.pill--link { color: #6b7fd4; }
-.pill--public { color: var(--accent); }
+.pill--draft {
+  background: color-mix(in srgb, #b0243c 12%, var(--body-bg));
+  color: #b0243c;
+}
+.pill--link {
+  background: color-mix(in srgb, #4d5fb8 12%, var(--body-bg));
+  color: #4d5fb8;
+}
+.pill--public {
+  background: color-mix(in srgb, var(--accent) 8%, var(--body-bg));
+  color: var(--accent);
+}
 .t-actions { text-align: right; white-space: nowrap; }
 .link { font-family: var(--font-sans); font-size: 0.7rem; letter-spacing: 0.05em; background: none; border: none; cursor: pointer; color: var(--dark); text-decoration: none; margin-left: 1rem; transition: color 0.2s; }
 .link:hover { color: var(--accent); }
@@ -198,9 +232,17 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 .card__body > p:not(.card__meta) { color: var(--muted); font-size: 0.82rem; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .card__facts { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.8rem 0 0.9rem; }
 .card__facts span { border: 1px solid var(--subtle); color: var(--muted); font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.2rem 0.45rem; }
-.card__facts .pill--draft { color: #b0243c; }
-.card__facts .pill--link { color: #6b7fd4; }
-.card__facts .pill--public { color: var(--accent); }
+.card__facts .visibility-pill {
+  min-width: 0;
+  border-color: currentColor;
+  font-size: 0.56rem;
+  padding: 0.38rem 0.52rem;
+}
+.card__facts .visibility-pill::before {
+  width: 0.38rem;
+  height: 0.38rem;
+  margin-right: 0.42rem;
+}
 .card__actions { display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.8rem; }
 .card__actions .link { margin-left: 0; }
 @media (max-width: 760px) {

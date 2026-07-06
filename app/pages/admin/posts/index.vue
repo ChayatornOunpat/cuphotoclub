@@ -31,6 +31,10 @@ function actorName(actor?: { name?: string | null, email?: string } | null) {
   return actor?.name || actor?.email || 'Unknown'
 }
 
+function modifiedValue(post: NonNullable<typeof posts.value>[number]) {
+  return post.updatedAt || post.published
+}
+
 const visiblePosts = computed(() => {
   const q = query.value.trim().toLowerCase()
   const rows = [...(posts.value ?? [])]
@@ -44,6 +48,7 @@ const visiblePosts = computed(() => {
     })
 
   return rows.sort((a, b) => {
+    if (sortBy.value === 'modified') return modifiedValue(b).localeCompare(modifiedValue(a))
     if (sortBy.value === 'oldest') return a.published.localeCompare(b.published)
     if (sortBy.value === 'title') return a.title.localeCompare(b.title)
     if (sortBy.value === 'tag') return a.tag.localeCompare(b.tag)
@@ -87,6 +92,7 @@ useHead({ title: () => `${t('admin.posts')} - Admin` })
         <span>{{ t('admin.sortBy') }}</span>
         <select v-model="sortBy">
           <option value="newest">{{ t('admin.sortNewest') }}</option>
+          <option value="modified">{{ t('admin.sortModified') }}</option>
           <option value="oldest">{{ t('admin.sortOldest') }}</option>
           <option value="title">{{ t('admin.sortTitle') }}</option>
           <option value="tag">{{ t('admin.sortTag') }}</option>
