@@ -117,4 +117,18 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   color: rgba(245, 244, 240, 0.35);
   line-height: 1.8;
 }
+
+@media (max-width: 720px) {
+  .hero { height: 80svh; }
+  .hero__body { padding-left: 1.5rem; padding-right: 1.5rem; }
+  .hero__cut {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    margin-top: 2.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    padding-bottom: 2.25rem;
+  }
+  .hero__meta { text-align: left; }
+}
 </style>
