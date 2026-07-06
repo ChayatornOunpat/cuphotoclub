@@ -168,6 +168,8 @@ function formatRange(ev: EventRow) {
       <div class="eyebrow"><span class="num">01</span> {{ t('activities.calendarLabel') }}</div>
 
       <section class="cal-section" :aria-label="t('activities.calendarLabel')">
+        <div class="cal-section__grid">
+        <div class="cal-section__cal">
         <div class="cal-toolbar">
           <h2 class="cal-toolbar__month">{{ monthTitle }}</h2>
           <div class="cal-toolbar__controls">
@@ -218,8 +220,10 @@ function formatRange(ev: EventRow) {
             </div>
           </div>
         </div>
+        </div>
 
         <!-- Card for the event clicked on the calendar -->
+        <aside class="cal-section__side" :aria-label="t('activities.selectedEvent')">
         <article v-if="selectedEvent" ref="selectedCardEl" class="selected-card">
           <button type="button" class="selected-card__close" :aria-label="t('activities.close')" @click="selectedEvent = null">
             ×
@@ -240,6 +244,12 @@ function formatRange(ev: EventRow) {
             </NuxtLink>
           </div>
         </article>
+        <div v-else class="side-placeholder">
+          <Icon name="heroicons:cursor-arrow-rays" />
+          <p>{{ t('activities.selectHint') }}</p>
+        </div>
+        </aside>
+        </div>
       </section>
 
       <!-- All event cards this year -->
@@ -349,6 +359,19 @@ function formatRange(ev: EventRow) {
   margin-bottom: 5rem;
 }
 
+/* Desktop: compact calendar on the left, selected event on the right */
+.cal-section__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 2.5rem;
+  align-items: start;
+}
+
+.cal-section__side {
+  position: sticky;
+  top: 5.5rem;
+}
+
 .cal-toolbar {
   display: flex;
   align-items: flex-end;
@@ -359,7 +382,7 @@ function formatRange(ev: EventRow) {
 
 .cal-toolbar__month {
   font-family: var(--font-serif);
-  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-size: clamp(1.4rem, 2.2vw, 1.9rem);
   font-weight: 200;
   color: var(--dark);
   text-transform: capitalize;
@@ -410,9 +433,9 @@ function formatRange(ev: EventRow) {
   background: color-mix(in srgb, var(--paper) 45%, transparent);
 }
 .cal__weekdays span {
-  padding: 0.6rem;
+  padding: 0.45rem;
   color: var(--muted);
-  font-size: 0.5rem;
+  font-size: 0.46rem;
   font-weight: 500;
   letter-spacing: 0.22em;
   text-align: center;
@@ -425,8 +448,8 @@ function formatRange(ev: EventRow) {
 }
 
 .cal__day {
-  min-height: 7rem;
-  padding: 0.45rem;
+  min-height: 4.6rem;
+  padding: 0.3rem;
   border-right: 1px solid var(--subtle);
   border-bottom: 1px solid var(--subtle);
 }
@@ -440,10 +463,10 @@ function formatRange(ev: EventRow) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 1.35rem;
+  height: 1.35rem;
   color: var(--dark);
-  font-size: 0.7rem;
+  font-size: 0.62rem;
 }
 .cal__day--today .cal__num {
   background: var(--accent);
@@ -459,14 +482,14 @@ function formatRange(ev: EventRow) {
 .cal__chip {
   display: block;
   width: 100%;
-  margin-top: 0.24rem;
+  margin-top: 0.18rem;
   border: 0;
   border-left: 2px solid var(--accent);
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   color: var(--dark);
-  padding: 0.26rem 0.45rem;
+  padding: 0.18rem 0.32rem;
   font-family: var(--font-sans);
-  font-size: 0.64rem;
+  font-size: 0.55rem;
   line-height: 1.3;
   text-align: left;
   overflow: hidden;
@@ -483,9 +506,9 @@ function formatRange(ev: EventRow) {
 
 .cal__more {
   margin-top: 0.2rem;
-  padding: 0 0.45rem;
+  padding: 0 0.32rem;
   color: var(--muted);
-  font-size: 0.58rem;
+  font-size: 0.52rem;
 }
 
 .cal__dots {
@@ -496,10 +519,9 @@ function formatRange(ev: EventRow) {
 .selected-card {
   position: relative;
   display: flex;
-  gap: 0;
-  margin-top: 1.5rem;
+  flex-direction: column;
   border: 1px solid var(--subtle);
-  border-left: 2px solid var(--accent);
+  border-top: 2px solid var(--accent);
   background: color-mix(in srgb, var(--paper) 30%, transparent);
 }
 
@@ -518,7 +540,8 @@ function formatRange(ev: EventRow) {
 .selected-card__close:hover { color: var(--dark); }
 
 .selected-card__media {
-  width: 16rem;
+  width: 100%;
+  aspect-ratio: 3 / 2;
   flex-shrink: 0;
   overflow: hidden;
   background: var(--paper);
@@ -533,7 +556,32 @@ function formatRange(ev: EventRow) {
 .selected-card__body {
   flex: 1;
   min-width: 0;
-  padding: 1.5rem 2.4rem 1.5rem 1.6rem;
+  padding: 1.3rem 2.2rem 1.5rem 1.4rem;
+}
+
+/* Placeholder shown until an event is picked */
+.side-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  min-height: 14rem;
+  padding: 2.5rem 1.5rem;
+  border: 1px dashed var(--subtle);
+  text-align: center;
+  color: var(--muted);
+}
+.side-placeholder svg,
+.side-placeholder :deep(svg) {
+  width: 1.8rem;
+  height: 1.8rem;
+  opacity: 0.45;
+}
+.side-placeholder p {
+  max-width: 16rem;
+  font-size: 0.72rem;
+  line-height: 1.7;
 }
 
 .selected-card__meta {
@@ -705,12 +753,15 @@ function formatRange(ev: EventRow) {
     background: var(--accent);
   }
 
-  .selected-card {
-    flex-direction: column;
+  .cal-section__grid {
+    display: block;
   }
-  .selected-card__media {
-    width: 100%;
-    aspect-ratio: 3 / 2;
+  .cal-section__side {
+    position: static;
+    margin-top: 1.5rem;
+  }
+  .side-placeholder {
+    display: none;
   }
   .selected-card__body {
     padding: 1.1rem 2.2rem 1.3rem 1.1rem;

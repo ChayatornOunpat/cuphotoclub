@@ -195,7 +195,9 @@
     "emptyYear": "ไม่มีกิจกรรมในปี {year}",
     "dateTba": "ยังไม่กำหนดวัน",
     "viewEvent": "ดูรายละเอียด →",
-    "close": "ปิด"
+    "close": "ปิด",
+    "selectedEvent": "กิจกรรมที่เลือก",
+    "selectHint": "เลือกกิจกรรมบนปฏิทินเพื่อดูรายละเอียดที่นี่"
   },
   "adminActivities": {
     "title": "กิจกรรม",

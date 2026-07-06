@@ -38,6 +38,16 @@ const UPLOAD_CONCURRENCY = 4
 
 const autoCompress = ref(true)
 
+// Queue-order stamp sent with each upload. R2's uploadedAt records *completion*
+// time, which scrambles under parallel uploads — this seq is taken when a worker
+// pulls the file off the queue, so it preserves the order files were queued in.
+// Epoch-ms based so it sorts on the same axis as uploadedAt for legacy images.
+let lastSeq = 0
+function nextSeq() {
+  lastSeq = Math.max(Date.now(), lastSeq + 1)
+  return lastSeq
+}
+
 function fileSignature(file: File) {
   return `${file.name}:${file.size}:${file.lastModified}`
 }
@@ -122,6 +132,7 @@ function chooseFiles() {
 
 async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set<string>) {
   const signature = fileSignature(file)
+  const seq = nextSeq()
   try {
     const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
     const hash = await contentHash(toUpload)
@@ -129,6 +140,7 @@ async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set
     fd.append('file', toUpload)
     fd.append('prefix', props.prefix)
     fd.append('hash', hash)
+    fd.append('seq', String(seq))
 
     const { key } = await $fetch<{ key: string }>('/api/admin/upload', {
       method: 'POST',

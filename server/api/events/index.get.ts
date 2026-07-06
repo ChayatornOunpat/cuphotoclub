@@ -2,7 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 
 // Public: published events (most recent / upcoming first).
 export default defineEventHandler(async () => {
-  return db
+  const rows = await db
     .select({
       id: schema.events.id,
       slug: schema.events.slug,
@@ -17,4 +17,10 @@ export default defineEventHandler(async () => {
     .from(schema.events)
     .where(eq(schema.events.status, 'published'))
     .orderBy(desc(schema.events.eventDate), desc(schema.events.createdAt))
+
+  // Empty dev DB: serve mock activities so the calendar has something to show.
+  if (import.meta.dev && !rows.length) {
+    return devMockEvents().map(({ body, publishedAt, ...row }) => row)
+  }
+  return rows
 })

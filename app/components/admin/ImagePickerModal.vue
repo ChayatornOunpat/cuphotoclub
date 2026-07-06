@@ -17,6 +17,7 @@ const modalTitle = computed(() => props.title || t('adminPicker.title'))
 interface LibraryImage {
   key: string
   uploadedAt?: string
+  orderAt?: number
   size?: number
 }
 
@@ -29,15 +30,18 @@ const managerOpen = ref(false)
 const sortMode = ref<SortMode>('newest')
 const lastSelectedKey = ref<string | null>(null)
 
+// orderAt is the upload queue-order stamp; uploadedAt (completion time) covers
+// images uploaded before the stamp existed.
+function imageTime(image: LibraryImage) {
+  return image.orderAt ?? (image.uploadedAt ? new Date(image.uploadedAt).getTime() : 0)
+}
+
 const sortedImages = computed(() => {
   return [...libraryImages.value].sort((a, b) => {
-    const aTime = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0
-    const bTime = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0
-
-    if (sortMode.value === 'oldest') return aTime - bTime || a.key.localeCompare(b.key)
+    if (sortMode.value === 'oldest') return imageTime(a) - imageTime(b) || a.key.localeCompare(b.key)
     if (sortMode.value === 'name-asc') return a.key.localeCompare(b.key)
     if (sortMode.value === 'name-desc') return b.key.localeCompare(a.key)
-    return bTime - aTime || a.key.localeCompare(b.key)
+    return imageTime(b) - imageTime(a) || a.key.localeCompare(b.key)
   })
 })
 

@@ -86,6 +86,14 @@ function usageLabel(item: ImageUsage) {
 }
 
 const deletingKey = ref<string | null>(null)
+const deleteConfirm = reactive({
+  active: false,
+  title: '',
+  message: '',
+  detail: '',
+  confirmLabel: 'Delete',
+  resolve: null as null | ((confirmed: boolean) => void)
+})
 const deleteProgress = reactive({
   active: false,
   title: '',
@@ -100,6 +108,28 @@ const deleteProgressPercent = computed(() =>
     ? Math.min(100, Math.round((deleteProgress.done / deleteProgress.total) * 100))
     : 0
 )
+
+function askDeleteConfirmation(options: {
+  title: string
+  message: string
+  detail?: string
+  confirmLabel?: string
+}) {
+  deleteConfirm.active = true
+  deleteConfirm.title = options.title
+  deleteConfirm.message = options.message
+  deleteConfirm.detail = options.detail || ''
+  deleteConfirm.confirmLabel = options.confirmLabel || 'Delete'
+  return new Promise<boolean>((resolve) => {
+    deleteConfirm.resolve = resolve
+  })
+}
+
+function resolveDeleteConfirmation(confirmed: boolean) {
+  deleteConfirm.active = false
+  deleteConfirm.resolve?.(confirmed)
+  deleteConfirm.resolve = null
+}
 
 function beginDeleteProgress(title: string, total: number) {
   deleteProgress.active = true
@@ -138,6 +168,7 @@ async function requestDelete(key: string, force = false) {
 async function deleteImage(image: R2Image) {
   deletingKey.value = image.key
   beginDeleteProgress('Deleting image', 1)
+  await nextTick()
   try {
     await requestDelete(image.key)
     stepDeleteProgress(image.key)
@@ -145,7 +176,12 @@ async function deleteImage(image: R2Image) {
   } catch (err: any) {
     if (err?.statusCode === 409) {
       stepDeleteProgress(image.key, 'blocked')
-      if (confirm(`${err.data?.message || 'This image is still referenced elsewhere.'}\n\nDelete it anyway?`)) {
+      if (await askDeleteConfirmation({
+        title: 'Delete referenced image?',
+        message: err.data?.message || 'This image is still referenced elsewhere.',
+        detail: image.key,
+        confirmLabel: 'Delete anyway'
+      })) {
         extendDeleteProgress(1)
         try {
           await requestDelete(image.key, true)
@@ -166,9 +202,13 @@ async function deleteImage(image: R2Image) {
   }
 }
 
-function confirmDelete(image: R2Image) {
-  if (!confirm(`Delete "${image.key}" from R2? This cannot be undone.`)) return
-  deleteImage(image)
+async function confirmDelete(image: R2Image) {
+  const confirmed = await askDeleteConfirmation({
+    title: 'Delete image?',
+    message: 'This removes the object from R2. This cannot be undone.',
+    detail: image.key
+  })
+  if (confirmed) deleteImage(image)
 }
 
 // ── Bulk selection ───────────────────────────────────────────────────────
@@ -257,10 +297,16 @@ async function runDeletePool(keys: string[], worker: (key: string) => Promise<vo
 async function bulkDelete() {
   const keys = [...selected.value]
   if (!keys.length) return
-  if (!confirm(`Delete ${keys.length} image${keys.length === 1 ? '' : 's'} from R2? This cannot be undone.`)) return
+  const confirmed = await askDeleteConfirmation({
+    title: `Delete ${keys.length} image${keys.length === 1 ? '' : 's'}?`,
+    message: 'This removes the selected objects from R2. This cannot be undone.',
+    detail: `${keys.length} selected`
+  })
+  if (!confirmed) return
 
   bulkDeleting.value = true
   beginDeleteProgress(`Deleting ${keys.length} image${keys.length === 1 ? '' : 's'}`, keys.length)
+  await nextTick()
   const blocked: string[] = []
   const failed: string[] = []
   try {
@@ -279,9 +325,12 @@ async function bulkDelete() {
       }
     })
 
-    if (blocked.length && confirm(
-      `${blocked.length} of the selected images are still referenced elsewhere. Delete them anyway?`
-    )) {
+    if (blocked.length && await askDeleteConfirmation({
+      title: `Delete ${blocked.length} referenced image${blocked.length === 1 ? '' : 's'}?`,
+      message: `${blocked.length} of the selected images are still referenced elsewhere.`,
+      detail: 'Delete them anyway?',
+      confirmLabel: 'Delete anyway'
+    })) {
       extendDeleteProgress(blocked.length)
       await runDeletePool(blocked, async (key) => {
         try {
@@ -311,9 +360,27 @@ async function bulkDelete() {
   <div class="r2">
     <Teleport to="body">
       <Transition name="delete-modal">
-        <div v-if="deleteProgress.active" class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-progress-title">
+        <div
+          v-if="deleteConfirm.active || deleteProgress.active"
+          class="delete-modal"
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="deleteConfirm.active ? 'delete-confirm-title' : 'delete-progress-title'"
+        >
           <div class="delete-modal__backdrop" />
-          <div class="delete-modal__panel">
+          <div v-if="deleteConfirm.active" class="delete-modal__panel">
+            <p class="delete-modal__kicker">R2 operation</p>
+            <h2 id="delete-confirm-title">{{ deleteConfirm.title }}</h2>
+            <p class="delete-modal__copy">{{ deleteConfirm.message }}</p>
+            <p v-if="deleteConfirm.detail" class="delete-modal__current">{{ deleteConfirm.detail }}</p>
+            <div class="delete-modal__actions">
+              <button type="button" class="delete-modal__cancel" @click="resolveDeleteConfirmation(false)">Cancel</button>
+              <button type="button" class="delete-modal__danger" @click="resolveDeleteConfirmation(true)">
+                {{ deleteConfirm.confirmLabel }}
+              </button>
+            </div>
+          </div>
+          <div v-else class="delete-modal__panel">
             <div class="delete-modal__mark" aria-hidden="true">
               <span />
               <span />
@@ -650,6 +717,46 @@ async function bulkDelete() {
   font-size: 0.5rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.delete-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--subtle);
+  padding-top: 0.85rem;
+}
+
+.delete-modal__actions button {
+  border: 1px solid var(--subtle);
+  padding: 0.55rem 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.delete-modal__cancel {
+  background: transparent;
+  color: var(--dark);
+}
+
+.delete-modal__cancel:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.delete-modal__danger {
+  border-color: #b0243c !important;
+  background: #b0243c;
+  color: #F5F4F0;
+}
+
+.delete-modal__danger:hover {
+  border-color: #8f1c30 !important;
+  background: #8f1c30;
 }
 
 .delete-modal-enter-active,

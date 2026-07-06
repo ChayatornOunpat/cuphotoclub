@@ -195,7 +195,9 @@
     "emptyYear": "No activities in {year}",
     "dateTba": "Date to be announced",
     "viewEvent": "View event →",
-    "close": "Close"
+    "close": "Close",
+    "selectedEvent": "Selected event",
+    "selectHint": "Select an event on the calendar to preview it here"
   },
   "adminActivities": {
     "title": "Activities",
