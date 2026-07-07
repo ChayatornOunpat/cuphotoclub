@@ -396,7 +396,7 @@ function goToPage(n: number) {
 }
 
 const DELETE_CONCURRENCY = 2
-const DELETE_BATCH_DELAY_MS = 1_000
+const DELETE_BATCH_DELAY_MS = 500
 
 function wait(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
