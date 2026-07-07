@@ -8,7 +8,7 @@
           "https://cuphotoclub.pages.dev",
           "http://localhost:3000"
         ],
-        "methods": ["PUT"],
+        "methods": ["PUT", "DELETE"],
         "headers": [
           "content-type",
           "x-amz-meta-hash",

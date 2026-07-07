@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   if (!result.success) throw createError({ statusCode: 400, message: 'Invalid upload session payload.' })
 
   const prefix = sanitizeUploadPrefix(result.data.prefix || 'covers')
-  const items = await mapUploadSessionItems(result.data.files, 12, async (file) => {
+  const items = result.data.files.map((file) => {
     const ext = sanitizeUploadExt(file.ext || file.name.split('.').pop() || 'jpg')
     const hash = sanitizeUploadHash(file.hash)
     const key = hashedUploadKey(prefix, hash, ext)
@@ -26,9 +26,6 @@ export default defineEventHandler(async (event) => {
     if (file.type && !file.type.startsWith('image/')) {
       throw createError({ statusCode: 400, message: 'รองรับเฉพาะไฟล์รูปภาพ' })
     }
-
-    const { blobs } = await blob.list({ prefix: key, limit: 1 })
-    const exists = blobs.some(item => item.pathname === key)
     return {
       id: file.id,
       name: file.name,
@@ -37,7 +34,7 @@ export default defineEventHandler(async (event) => {
       key,
       size: file.size ?? 0,
       type: file.type || 'image/jpeg',
-      status: exists ? 'exists' as const : 'pending' as const
+      status: 'pending' as const
     }
   })
 
@@ -50,7 +47,14 @@ export default defineEventHandler(async (event) => {
     updatedAt: now,
     items
   }
-  await saveUploadSession(session)
+  try {
+    await saveUploadSession(session)
+  } catch {
+    throw createError({
+      statusCode: 503,
+      message: 'Could not create upload session. KV storage is unavailable or misconfigured.'
+    })
+  }
 
   return uploadSessionSummary(session)
 })

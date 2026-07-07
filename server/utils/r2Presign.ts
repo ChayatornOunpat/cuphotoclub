@@ -115,6 +115,59 @@ export async function createR2PresignedPutUrl(options: R2PresignOptions) {
   }
 }
 
+export async function createR2PresignedDeleteUrl(options: Omit<R2PresignOptions, 'contentType' | 'metadata'>) {
+  const expiresSeconds = Math.min(Math.max(options.expiresSeconds ?? 900, 60), 3600)
+  const { amzDate, dateStamp } = amzDates()
+  const region = 'auto'
+  const service = 's3'
+  const host = `${options.accountId}.r2.cloudflarestorage.com`
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`
+  const canonicalUri = `/${encodePath(options.bucketName)}/${encodePath(options.key)}`
+  const signedHeaders = 'host'
+
+  const query: Record<string, string> = {
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Content-Sha256': 'UNSIGNED-PAYLOAD',
+    'X-Amz-Credential': `${options.accessKeyId}/${credentialScope}`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(expiresSeconds),
+    'X-Amz-SignedHeaders': signedHeaders
+  }
+  const canonicalQuery = Object.entries(query)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${encodeRfc3986(key)}=${encodeRfc3986(value)}`)
+    .join('&')
+
+  const canonicalHeaders = `host:${host}\n`
+  const canonicalRequest = [
+    'DELETE',
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    signedHeaders,
+    'UNSIGNED-PAYLOAD'
+  ].join('\n')
+
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    credentialScope,
+    await sha256(canonicalRequest)
+  ].join('\n')
+
+  const kDate = await hmac(encoder.encode(`AWS4${options.secretAccessKey}`), dateStamp)
+  const kRegion = await hmac(kDate, region)
+  const kService = await hmac(kRegion, service)
+  const kSigning = await hmac(kService, 'aws4_request')
+  const signature = hex(await hmac(kSigning, stringToSign))
+
+  return {
+    url: `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`,
+    headers: {},
+    expiresAt: new Date(Date.now() + expiresSeconds * 1000).toISOString()
+  }
+}
+
 export function r2DirectUploadConfig() {
   const config = useRuntimeConfig()
   const direct = config.r2DirectUpload as {

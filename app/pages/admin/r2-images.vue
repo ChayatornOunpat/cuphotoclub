@@ -26,6 +26,26 @@ interface R2Inventory {
   images: R2Image[]
 }
 
+interface DirectDeletePayload {
+  url: string
+  headers?: Record<string, string>
+  expiresAt?: string
+}
+
+interface DeleteSessionItem {
+  key: string
+  status: 'ready' | 'blocked' | 'deleted' | 'failed'
+  referenced: boolean
+  error?: string
+  delete?: DirectDeletePayload
+}
+
+interface DeleteSessionResponse {
+  id: string
+  force: boolean
+  items: DeleteSessionItem[]
+}
+
 const prefixInput = ref('')
 const activePrefix = ref('')
 const statusFilter = ref<'all' | 'album' | 'referenced' | 'unlinked'>('all')
@@ -395,19 +415,89 @@ function goToPage(n: number) {
   if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-const DELETE_CONCURRENCY = 2
-const DELETE_BATCH_DELAY_MS = 500
+const DELETE_DIRECT_CONCURRENCY = 8
+const DELETE_SESSION_SIZE = 250
 
 function wait(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function runDeletePool(keys: string[], worker: (key: string) => Promise<void>) {
-  for (let index = 0; index < keys.length; index += DELETE_CONCURRENCY) {
+async function runDeletePool<T>(items: T[], worker: (item: T) => Promise<void>) {
+  for (let index = 0; index < items.length; index += DELETE_DIRECT_CONCURRENCY) {
     await waitForDeleteResourceLimitPause()
-    const batch = keys.slice(index, index + DELETE_CONCURRENCY)
-    await Promise.all(batch.map(key => worker(key)))
-    if (index + DELETE_CONCURRENCY < keys.length) await wait(DELETE_BATCH_DELAY_MS)
+    const batch = items.slice(index, index + DELETE_DIRECT_CONCURRENCY)
+    await Promise.all(batch.map(item => worker(item)))
+  }
+}
+
+function chunkKeys(keys: string[]) {
+  const chunks: string[][] = []
+  for (let index = 0; index < keys.length; index += DELETE_SESSION_SIZE) {
+    chunks.push(keys.slice(index, index + DELETE_SESSION_SIZE))
+  }
+  return chunks
+}
+
+async function createDeleteSession(keys: string[], force = false) {
+  return await $fetch<DeleteSessionResponse>('/api/admin/r2-images/delete-session', {
+    method: 'POST',
+    body: { keys, force }
+  })
+}
+
+async function completeDeleteSession(id: string, results: { key: string; status: 'deleted' | 'failed'; error?: string }[]) {
+  if (!results.length) return
+  await $fetch(`/api/admin/r2-images/delete-session/${encodeURIComponent(id)}/complete`, {
+    method: 'POST',
+    body: { results }
+  })
+}
+
+async function requestDirectDelete(item: DeleteSessionItem) {
+  if (!item.delete?.url) throw new Error(item.error || 'Direct R2 delete URL was not issued.')
+  const response = await fetch(item.delete.url, {
+    method: 'DELETE',
+    headers: item.delete.headers || {}
+  })
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(`Direct R2 delete failed (${response.status}). ${body}`.trim())
+  }
+}
+
+async function runDeleteSessions(keys: string[], force: boolean, blocked: string[], failed: string[]) {
+  for (const chunk of chunkKeys(keys)) {
+    const session = await createDeleteSession(chunk, force)
+    const ready = session.items.filter(item => item.status === 'ready')
+    const results: { key: string; status: 'deleted' | 'failed'; error?: string }[] = []
+
+    for (const item of session.items) {
+      if (item.status !== 'blocked') continue
+      blocked.push(item.key)
+      stepDeleteProgress(item.key, 'blocked')
+    }
+
+    await runDeletePool(ready, async (item) => {
+      try {
+        await requestDirectDelete(item)
+        results.push({ key: item.key, status: 'deleted' })
+        stepDeleteProgress(item.key)
+      } catch (err: any) {
+        failed.push(item.key)
+        results.push({ key: item.key, status: 'failed', error: err?.message || 'Direct R2 delete failed.' })
+        stepDeleteProgress(item.key, 'failed')
+      }
+    })
+
+    try {
+      await completeDeleteSession(session.id, results)
+    } catch (err: any) {
+      const message = err?.data?.message || err?.message || 'Could not complete delete session.'
+      for (const result of results) {
+        if (result.status === 'deleted') failed.push(result.key)
+      }
+      alert(message)
+    }
   }
 }
 
@@ -462,21 +552,7 @@ async function bulkDelete() {
   const blocked: string[] = []
   const failed: string[] = []
   try {
-    await runDeletePool(keys, async (key) => {
-      try {
-        await requestDelete(key)
-        stepDeleteProgress(key)
-      } catch (err: any) {
-        if (err?.statusCode === 409) {
-          blocked.push(key)
-          stepDeleteProgress(key, 'blocked')
-        } else {
-          if (isDeleteResourceLimitError(err)) await beginDeleteResourceLimitPause()
-          failed.push(key)
-          stepDeleteProgress(key, 'failed')
-        }
-      }
-    })
+    await runDeleteSessions(keys, false, blocked, failed)
 
     if (blocked.length && await askDeleteConfirmation({
       title: `Delete ${blocked.length} referenced image${blocked.length === 1 ? '' : 's'}?`,
@@ -485,16 +561,8 @@ async function bulkDelete() {
       confirmLabel: 'Delete anyway'
     })) {
       extendDeleteProgress(blocked.length)
-      await runDeletePool(blocked, async (key) => {
-        try {
-          await requestDelete(key, true)
-          stepDeleteProgress(key)
-        } catch (err: any) {
-          if (isDeleteResourceLimitError(err)) await beginDeleteResourceLimitPause()
-          failed.push(key)
-          stepDeleteProgress(key, 'failed')
-        }
-      })
+      const forceBlocked: string[] = []
+      await runDeleteSessions(blocked, true, forceBlocked, failed)
     }
 
     clearSelection()
