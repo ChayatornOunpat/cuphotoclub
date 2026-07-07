@@ -22,6 +22,12 @@ export default defineEventHandler(async (event) => {
   if (item.status === 'exists' || item.status === 'uploaded') {
     return { key: item.key, status: item.status, duplicate: item.status === 'exists' }
   }
+  if (item.size > MAX_UPLOAD_BYTES) {
+    item.status = 'failed'
+    item.error = 'File too large.'
+    await saveUploadSession(session)
+    throw createError({ statusCode: 413, message: 'ไฟล์ใหญ่เกิน 15MB' })
+  }
 
   const type = item.type || 'image/jpeg'
   if (!type.startsWith('image/')) throw createError({ statusCode: 400, message: 'รองรับเฉพาะไฟล์รูปภาพ' })
@@ -39,6 +45,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const directConfig = assertR2DirectUploadConfig()
+  if (item.status === 'failed') {
+    item.status = 'pending'
+    item.error = undefined
+    await saveUploadSession(session)
+  }
   const signed = await createR2PresignedPutUrl({
     ...directConfig,
     key: item.key,

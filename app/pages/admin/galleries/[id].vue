@@ -25,7 +25,7 @@ interface Album {
 const route = useRoute()
 const id = Number(route.params.id)
 
-const { data, refresh, error } = await useFetch<{ album: Album, photos: Photo[] }>(`/api/admin/albums/${id}`)
+const { data, refresh, error } = await useFetch<{ album: Album, photos: Photo[] }>(`/api/admin/galleries/${id}`)
 if (error.value) throw createError({ statusCode: 404, statusMessage: 'ไม่พบอัลบั้ม', fatal: true })
 
 const album = computed(() => data.value?.album)
@@ -56,7 +56,7 @@ async function saveDetails() {
   savingDetails.value = true
   detailsMsg.value = ''
   try {
-    await $fetch(`/api/admin/albums/${id}`, {
+    await $fetch(`/api/admin/galleries/${id}`, {
       method: 'PATCH',
       body: {
         title: form.title,
@@ -117,7 +117,7 @@ const deletingAlbum = ref(false)
 async function deleteAlbum() {
   deletingAlbum.value = true
   try {
-    await $fetch(`/api/admin/albums/${id}`, { method: 'DELETE' })
+    await $fetch(`/api/admin/galleries/${id}`, { method: 'DELETE' })
     await navigateTo('/admin/galleries')
   } catch (e) {
     alert(errMsg(e, 'ลบไม่สำเร็จ'))

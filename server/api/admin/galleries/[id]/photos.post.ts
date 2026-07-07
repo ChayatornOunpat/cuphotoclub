@@ -1,8 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
 
-const MAX_BYTES = 15 * 1024 * 1024 // 15MB
-
-// Single-file upload (the uploader posts one file at a time, with client-measured dimensions).
+// Single-file upload for legacy gallery photos. R2 manager uploads use the direct
+// presigned flow; this route is only for adding photos directly inside a gallery.
 export default defineEventHandler(async (event) => {
   const actor = await requireAdmin(event)
   const albumId = Number(getRouterParam(event, 'id'))
@@ -17,12 +16,12 @@ export default defineEventHandler(async (event) => {
 
   const type = file.type || ''
   if (!type.startsWith('image/')) throw createError({ statusCode: 400, message: 'รองรับเฉพาะไฟล์รูปภาพ' })
-  if (file.data.length > MAX_BYTES) throw createError({ statusCode: 413, message: 'ไฟล์ใหญ่เกิน 15MB' })
+  if (file.data.length > MAX_UPLOAD_BYTES) throw createError({ statusCode: 413, message: 'ไฟล์ใหญ่เกิน 15MB' })
 
   const width = Number(form?.find(p => p.name === 'width')?.data?.toString()) || null
   const height = Number(form?.find(p => p.name === 'height')?.data?.toString()) || null
 
-  const ext = (file.filename?.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+  const ext = sanitizeUploadExt(file.filename?.split('.').pop() || 'jpg')
   const key = `photos/${album.slug}/originals/${crypto.randomUUID()}.${ext}`
   await blob.put(key, file.data, { contentType: type })
 

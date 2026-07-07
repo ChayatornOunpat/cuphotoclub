@@ -5,7 +5,14 @@ export default defineEventHandler(async (event) => {
   const prefix = String(query.prefix || '').replace(/[^a-z0-9/_-]/gi, '')
   if (!prefix) throw createError({ statusCode: 400, statusMessage: 'Missing media prefix' })
 
-  const { blobs } = await blob.list({ prefix, limit: 1000 })
+  const blobs = []
+  let cursor: string | undefined
+  do {
+    const result = await blob.list({ prefix, limit: 1000, cursor })
+    blobs.push(...result.blobs)
+    cursor = result.hasMore ? result.cursor : undefined
+  } while (cursor)
+
   const images = blobs
     .filter(item => item.contentType?.startsWith('image/'))
     .map((item) => {

@@ -35,6 +35,16 @@ const { data, pending, error, refresh } = await useFetch<R2Inventory>('/api/admi
   query: computed(() => ({ prefix: activePrefix.value || undefined }))
 })
 
+const AUTO_REFRESH_MS = 45_000
+let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+async function autoRefreshInventory() {
+  if (pending.value) return
+  if (deleteConfirm.active || passwordGate.active || deleteProgress.active || bulkDeleting.value) return
+  if (import.meta.client && document.visibilityState !== 'visible') return
+  await refresh()
+}
+
 const images = computed(() => data.value?.images ?? [])
 const filteredImages = computed(() => {
   const term = search.value.trim().toLowerCase()
@@ -499,7 +509,14 @@ async function bulkDelete() {
   }
 }
 
+onMounted(() => {
+  autoRefreshTimer = setInterval(() => {
+    autoRefreshInventory().catch(() => {})
+  }, AUTO_REFRESH_MS)
+})
+
 onBeforeUnmount(() => {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer)
   if (deleteResourcePauseTimer) clearInterval(deleteResourcePauseTimer)
 })
 </script>

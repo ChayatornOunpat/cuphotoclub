@@ -7,7 +7,7 @@ const bodySchema = z.object({
     name: z.string().min(1),
     hash: z.string().min(16),
     ext: z.string().optional(),
-    size: z.number().nonnegative().optional(),
+    size: z.number().nonnegative().max(MAX_UPLOAD_BYTES).optional(),
     type: z.string().optional()
   })).min(1).max(250)
 })
@@ -18,11 +18,14 @@ export default defineEventHandler(async (event) => {
   if (!result.success) throw createError({ statusCode: 400, message: 'Invalid upload session payload.' })
 
   const prefix = sanitizeUploadPrefix(result.data.prefix || 'covers')
-  const items = await Promise.all(result.data.files.map(async (file) => {
+  const items = await mapUploadSessionItems(result.data.files, 12, async (file) => {
     const ext = sanitizeUploadExt(file.ext || file.name.split('.').pop() || 'jpg')
     const hash = sanitizeUploadHash(file.hash)
     const key = hashedUploadKey(prefix, hash, ext)
     if (!key) throw createError({ statusCode: 400, message: 'Invalid upload hash.' })
+    if (file.type && !file.type.startsWith('image/')) {
+      throw createError({ statusCode: 400, message: 'รองรับเฉพาะไฟล์รูปภาพ' })
+    }
 
     const { blobs } = await blob.list({ prefix: key, limit: 1 })
     const exists = blobs.some(item => item.pathname === key)
@@ -36,7 +39,7 @@ export default defineEventHandler(async (event) => {
       type: file.type || 'image/jpeg',
       status: exists ? 'exists' as const : 'pending' as const
     }
-  }))
+  })
 
   const now = new Date().toISOString()
   const session: UploadSession = {

@@ -1,3 +1,5 @@
+export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+
 export function sanitizeUploadPrefix(value: string) {
   return value.replace(/[^a-z0-9/_-]/gi, '').replace(/^\/+|\/+$/g, '') || 'covers'
 }

@@ -13,7 +13,7 @@ interface AlbumRow {
   coverKey: string | null
 }
 
-const { data: albums, pending } = await useFetch<AlbumRow[]>('/api/admin/albums')
+const { data: albums, pending } = await useFetch<AlbumRow[]>('/api/admin/galleries')
 
 const showCreate = ref(false)
 const saving = ref(false)
@@ -30,7 +30,7 @@ async function create() {
   saving.value = true
   createErr.value = ''
   try {
-    const album = await $fetch('/api/admin/albums', {
+    const album = await $fetch('/api/admin/galleries', {
       method: 'POST',
       body: {
         title: form.title,

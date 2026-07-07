@@ -35,6 +35,24 @@ export function decodeUploadItemId(value: string) {
   }
 }
 
+export async function mapUploadSessionItems<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>
+) {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const workers = Array.from({ length: Math.min(Math.max(concurrency, 1), items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++
+      results[index] = await worker(items[index], index)
+    }
+  })
+
+  await Promise.all(workers)
+  return results
+}
+
 export async function getUploadSession(id: string) {
   return await kv.get<UploadSession>(uploadSessionKey(id))
 }
