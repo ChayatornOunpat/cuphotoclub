@@ -28,6 +28,7 @@ const errorCount = ref(0)
 const skippedCount = ref(0)
 const duplicateCount = ref(0)
 const resourcePauseSeconds = ref(0)
+const resourceLimitStopped = ref(false)
 const pendingQueue = ref<File[]>([])
 const failedUploads = ref<Array<{ file: File, name: string, reason: string }>>([])
 const completedSignatures = new Set<string>()
@@ -42,6 +43,7 @@ const RESOURCE_LIMIT_PAUSE_MS = 30_000
 const autoCompress = ref(true)
 let resourcePausePromise: Promise<void> | null = null
 let resourcePauseTimer: ReturnType<typeof setInterval> | null = null
+let shouldStopCurrentUpload = false
 
 // Queue-order stamp sent with each upload. R2's uploadedAt records *completion*
 // time, which scrambles under parallel uploads — this seq is taken when a worker
@@ -64,21 +66,23 @@ async function contentHash(file: File) {
 }
 
 function rawUploadError(err: any) {
-  const data = err?.data
+  const data = err?.data ?? err?.response?._data
   return typeof data === 'string'
     ? data
-    : data?.message || data?.statusMessage || err?.message || ''
+    : data?.message || data?.statusMessage || err?.message || err?.statusMessage || ''
 }
 
 function isWorkerResourceLimitError(err: any) {
-  return /Worker exceeded resource limits|Error 1102/i.test(rawUploadError(err))
+  const raw = rawUploadError(err)
+  return /Worker exceeded resource limits|Error 1102|exceeded resource limits/i.test(raw)
+    || (err?.statusCode >= 500 && /cloudflare|worker|fetch|network|response/i.test(raw || err?.name || ''))
 }
 
 function uploadErrorMessage(err: any) {
   const raw = rawUploadError(err)
 
   if (isWorkerResourceLimitError(err)) {
-    return 'Cloudflare Worker exceeded resource limits. Upload paused before continuing.'
+    return 'Cloudflare Worker exceeded resource limits. Upload stopped; retry failed files after the cooldown.'
   }
   if (/Failed to fetch|fetch failed|NetworkError/i.test(raw)) {
     return 'Network request failed. Retry this file.'
@@ -179,7 +183,7 @@ function chooseFiles() {
 async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set<string>) {
   const signature = fileSignature(file)
   const seq = nextSeq()
-  let pauseAfterError: Promise<void> | null = null
+  let stoppedByResourceLimit = false
   try {
     const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
     const hash = await contentHash(toUpload)
@@ -200,7 +204,12 @@ async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set
     completedSignatures.add(signature)
   } catch (err) {
     errorCount.value++
-    if (isWorkerResourceLimitError(err)) pauseAfterError = beginResourceLimitPause()
+    if (isWorkerResourceLimitError(err)) {
+      shouldStopCurrentUpload = true
+      resourceLimitStopped.value = true
+      stoppedByResourceLimit = true
+      beginResourceLimitPause()
+    }
     failedUploads.value.push({
       file,
       name: file.name,
@@ -209,14 +218,36 @@ async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set
   } finally {
     done.value++
   }
-  if (pauseAfterError) await pauseAfterError
+  return stoppedByResourceLimit
+}
+
+function markUploadStopped(files: File[]) {
+  if (!files.length) return
+  const reason = 'Not attempted because Cloudflare Worker limits were hit. Retry failed files after the cooldown.'
+  for (const file of files) {
+    errorCount.value++
+    done.value++
+    failedUploads.value.push({ file, name: file.name, reason })
+  }
 }
 
 async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet: Set<string>) {
   for (let index = 0; index < files.length; index += UPLOAD_CONCURRENCY) {
+    if (shouldStopCurrentUpload) {
+      markUploadStopped(files.slice(index))
+      break
+    }
     await waitForResourceLimitPause()
+    if (shouldStopCurrentUpload) {
+      markUploadStopped(files.slice(index))
+      break
+    }
     const batch = files.slice(index, index + UPLOAD_CONCURRENCY)
-    await Promise.all(batch.map(file => uploadOne(file, uploadedKeys, uploadedKeySet)))
+    const stopped = await Promise.all(batch.map(file => uploadOne(file, uploadedKeys, uploadedKeySet)))
+    if (shouldStopCurrentUpload || stopped.some(Boolean)) {
+      markUploadStopped(files.slice(index + UPLOAD_CONCURRENCY))
+      break
+    }
     if (index + UPLOAD_CONCURRENCY < files.length) await wait(UPLOAD_BATCH_DELAY_MS)
   }
 }
@@ -239,6 +270,8 @@ async function upload(files: File[], retry = false) {
   }
 
   uploading.value = true
+  shouldStopCurrentUpload = false
+  resourceLimitStopped.value = false
   errorCount.value = 0
   skippedCount.value = 0
   if (!retry) failedUploads.value = []
@@ -260,6 +293,7 @@ async function upload(files: File[], retry = false) {
 
     await uploadMany(toProcess, allUploadedKeys, uploadedKeySet)
 
+    if (shouldStopCurrentUpload) break
     if (!props.multiple) break
 
     // Drain anything queued while this batch was running
@@ -370,6 +404,9 @@ function onDrop(e: DragEvent) {
     </div>
 
     <!-- Status -->
+      <p v-if="!uploading && resourceLimitStopped" class="r2up__error">
+        Upload stopped after Cloudflare Worker limits were hit. Retry failed files after the cooldown.
+      </p>
       <p v-if="!uploading && errorCount" class="r2up__error">{{ t('uploader.failed', errorCount, { n: errorCount }) }}</p>
       <p v-if="!uploading && skippedCount" class="r2up__error">{{ t('uploader.skipped', skippedCount, { n: skippedCount }) }}</p>
       <p v-if="!uploading && duplicateCount" class="r2up__note">{{ t('uploader.duplicatesSkipped', duplicateCount, { n: duplicateCount }) }}</p>
