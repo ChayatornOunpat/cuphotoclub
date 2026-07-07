@@ -134,8 +134,11 @@ export async function saveUploadSession(session: UploadSession) {
     error: item.error ?? null
   }))
 
-  for (let i = 0; i < rows.length; i += 40) {
-    await db.insert(schema.uploadSessionItems).values(rows.slice(i, i + 40))
+  // D1 caps a query at 100 bound parameters. This table has 11 columns, so we
+  // can insert at most floor(100 / 11) = 9 rows per statement.
+  const UPLOAD_ITEM_BATCH = 9
+  for (let i = 0; i < rows.length; i += UPLOAD_ITEM_BATCH) {
+    await db.insert(schema.uploadSessionItems).values(rows.slice(i, i + UPLOAD_ITEM_BATCH))
   }
 }
 

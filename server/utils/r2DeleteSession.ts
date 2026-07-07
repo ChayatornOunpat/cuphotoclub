@@ -93,8 +93,11 @@ export async function saveR2DeleteSession(session: R2DeleteSession) {
     error: item.error ?? null
   }))
 
-  for (let i = 0; i < rows.length; i += 50) {
-    await db.insert(schema.r2DeleteSessionItems).values(rows.slice(i, i + 50))
+  // D1 caps a query at 100 bound parameters. This table has 6 columns, so we
+  // can insert at most floor(100 / 6) = 16 rows per statement.
+  const DELETE_ITEM_BATCH = 16
+  for (let i = 0; i < rows.length; i += DELETE_ITEM_BATCH) {
+    await db.insert(schema.r2DeleteSessionItems).values(rows.slice(i, i + DELETE_ITEM_BATCH))
   }
 }
 

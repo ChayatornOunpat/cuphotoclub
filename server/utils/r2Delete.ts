@@ -1,5 +1,22 @@
 import { eq, inArray } from 'drizzle-orm'
 
+// D1 allows at most 100 bound parameters per query. Every inArray() below binds
+// one parameter per value, and callers may pass up to 250 keys, so we chunk any
+// caller-supplied list into groups small enough to stay under the cap (with
+// headroom for the set/where extras on update statements).
+const D1_INARRAY_CHUNK = 90
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
+}
+
+async function selectChunked<R>(keys: string[], run: (chunk: string[]) => Promise<R[]>): Promise<R[]> {
+  const results = await Promise.all(chunk(keys, D1_INARRAY_CHUNK).map(run))
+  return results.flat()
+}
+
 export interface R2DeleteReferenceInfo {
   galleryPhoto: boolean
   post: boolean
@@ -46,10 +63,10 @@ export async function getR2DeleteReferences(keys: string[]) {
     heroRows,
     editorialAlbums
   ] = await Promise.all([
-    db.select({ r2Key: schema.photos.r2Key }).from(schema.photos).where(inArray(schema.photos.r2Key, normalizedKeys)),
-    db.select({ coverR2Key: schema.posts.coverR2Key }).from(schema.posts).where(inArray(schema.posts.coverR2Key, normalizedKeys)),
-    db.select({ coverR2Key: schema.events.coverR2Key }).from(schema.events).where(inArray(schema.events.coverR2Key, normalizedKeys)),
-    db.select({ photoR2Key: schema.members.photoR2Key }).from(schema.members).where(inArray(schema.members.photoR2Key, normalizedKeys)),
+    selectChunked(normalizedKeys, c => db.select({ r2Key: schema.photos.r2Key }).from(schema.photos).where(inArray(schema.photos.r2Key, c))),
+    selectChunked(normalizedKeys, c => db.select({ coverR2Key: schema.posts.coverR2Key }).from(schema.posts).where(inArray(schema.posts.coverR2Key, c))),
+    selectChunked(normalizedKeys, c => db.select({ coverR2Key: schema.events.coverR2Key }).from(schema.events).where(inArray(schema.events.coverR2Key, c))),
+    selectChunked(normalizedKeys, c => db.select({ photoR2Key: schema.members.photoR2Key }).from(schema.members).where(inArray(schema.members.photoR2Key, c))),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'heroImages')),
     albumStore.list()
   ])
@@ -95,23 +112,27 @@ export async function scrubR2DeleteReferences(keys: string[]) {
   if (!normalizedKeys.length) return
 
   const [galleryPhotos, heroRows, editorialAlbums] = await Promise.all([
-    db.select({ id: schema.photos.id }).from(schema.photos).where(inArray(schema.photos.r2Key, normalizedKeys)),
+    selectChunked(normalizedKeys, c => db.select({ id: schema.photos.id }).from(schema.photos).where(inArray(schema.photos.r2Key, c))),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'heroImages')),
     albumStore.list()
   ])
 
   const doomedIds = galleryPhotos.map(photo => photo.id)
   if (doomedIds.length) {
-    await db.update(schema.albums)
-      .set({ coverPhotoId: null })
-      .where(inArray(schema.albums.coverPhotoId, doomedIds))
-    await db.delete(schema.photos).where(inArray(schema.photos.id, doomedIds))
+    for (const c of chunk(doomedIds, D1_INARRAY_CHUNK)) {
+      await db.update(schema.albums)
+        .set({ coverPhotoId: null })
+        .where(inArray(schema.albums.coverPhotoId, c))
+    }
+    for (const c of chunk(doomedIds, D1_INARRAY_CHUNK)) {
+      await db.delete(schema.photos).where(inArray(schema.photos.id, c))
+    }
   }
 
   await Promise.all([
-    db.update(schema.posts).set({ coverR2Key: null }).where(inArray(schema.posts.coverR2Key, normalizedKeys)),
-    db.update(schema.events).set({ coverR2Key: null }).where(inArray(schema.events.coverR2Key, normalizedKeys)),
-    db.update(schema.members).set({ photoR2Key: null }).where(inArray(schema.members.photoR2Key, normalizedKeys))
+    ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.posts).set({ coverR2Key: null }).where(inArray(schema.posts.coverR2Key, c))),
+    ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.events).set({ coverR2Key: null }).where(inArray(schema.events.coverR2Key, c))),
+    ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.members).set({ photoR2Key: null }).where(inArray(schema.members.photoR2Key, c)))
   ])
 
   const heroImages = decodeHeroImages(heroRows[0]?.value)
