@@ -1395,6 +1395,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       v-model="bulkPickerOpen"
       :prefix="mediaPrefix"
       multiple
+      initial-sort="oldest"
       :title="t('adminForm.autofillModalTitle')"
       @select="onBulkPick"
     />

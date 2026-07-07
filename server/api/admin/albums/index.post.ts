@@ -60,16 +60,37 @@ async function migrateDraftMediaToAlbum(fromPrefix: string, albumId: string, alb
   const images = blobs.filter(item => item.contentType?.startsWith('image/'))
   let changed = false
 
+  // Workers allow ~6 simultaneous connections and 128 MB memory; cap batches
+  // by bytes too so uncompressed uploads (up to 15 MB each) can't pile up.
+  const BATCH_MAX_COUNT = 6
+  const BATCH_MAX_BYTES = 48 * 1024 * 1024
+  const batches: typeof images[] = []
+  let current: typeof images = []
+  let currentBytes = 0
   for (const item of images) {
-    const file = await blob.get(item.pathname)
-    if (!file) continue
+    if (current.length && (current.length >= BATCH_MAX_COUNT || currentBytes + item.size > BATCH_MAX_BYTES)) {
+      batches.push(current)
+      current = []
+      currentBytes = 0
+    }
+    current.push(item)
+    currentBytes += item.size
+  }
+  if (current.length) batches.push(current)
 
-    const suffix = item.pathname.slice(fromPrefix.length).replace(/^\/+/, '')
-    if (!suffix) continue
+  for (const batch of batches) {
+    const moved = await Promise.all(batch.map(async (item) => {
+      const file = await blob.get(item.pathname)
+      if (!file) return false
 
-    await blob.put(`${toPrefix}/${suffix}`, file, { contentType: item.contentType })
-    await blob.delete(item.pathname).catch(() => {})
-    changed = true
+      const suffix = item.pathname.slice(fromPrefix.length).replace(/^\/+/, '')
+      if (!suffix) return false
+
+      await blob.put(`${toPrefix}/${suffix}`, file, { contentType: item.contentType })
+      await blob.delete(item.pathname).catch(() => {})
+      return true
+    }))
+    if (moved.includes(true)) changed = true
   }
 
   if (!changed) return { changed: false, album }

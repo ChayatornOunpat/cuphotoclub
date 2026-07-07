@@ -27,7 +27,8 @@ export default defineEventHandler(async (event) => {
       }
     })
 
-  images.sort((a, b) => b.orderAt - a.orderAt || a.key.localeCompare(b.key))
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+  images.sort((a, b) => a.orderAt - b.orderAt || collator.compare(a.key, b.key))
 
   return {
     keys: images.map(item => item.key),

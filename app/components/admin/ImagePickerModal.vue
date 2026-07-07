@@ -3,9 +3,11 @@ const props = withDefaults(defineProps<{
   prefix?: string
   multiple?: boolean
   title?: string
+  initialSort?: SortMode
 }>(), {
   prefix: 'uploads',
-  multiple: false
+  multiple: false,
+  initialSort: 'newest'
 })
 
 const open = defineModel<boolean>({ required: true })
@@ -61,6 +63,7 @@ watch(open, val => {
   if (!val) return
   selected.value = new Set()
   lastSelectedKey.value = null
+  sortMode.value = props.initialSort
   loadLibrary()
 })
 
