@@ -59,7 +59,21 @@ export default defineEventHandler(async (event) => {
       error: 'error' in item ? item.error : undefined
     }))
   }
-  await saveR2DeleteSession(session)
+  try {
+    await saveR2DeleteSession(session)
+  } catch (error) {
+    const cause = error instanceof Error ? error.message : String(error)
+    console.error('r2 delete session save failed', {
+      sessionId: session.id,
+      itemCount: session.items.length,
+      force: session.force,
+      cause
+    })
+    throw createError({
+      statusCode: 503,
+      message: `Could not create R2 delete session: ${cause || 'unknown storage error'}`
+    })
+  }
 
   return {
     ...r2DeleteSessionSummary(session),

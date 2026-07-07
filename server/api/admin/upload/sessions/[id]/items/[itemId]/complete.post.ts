@@ -20,34 +20,34 @@ export default defineEventHandler(async (event) => {
   if (!uploaded) {
     item.status = 'failed'
     item.error = 'Direct upload did not create the expected R2 object.'
-    await saveUploadSession(session)
+    await saveUploadSessionItem(session, item)
     throw createError({ statusCode: 409, message: item.error })
   }
   if (!uploaded.contentType?.startsWith('image/')) {
     await blob.delete(item.key).catch(() => {})
     item.status = 'failed'
     item.error = 'Uploaded object is not an image.'
-    await saveUploadSession(session)
+    await saveUploadSessionItem(session, item)
     throw createError({ statusCode: 400, message: item.error })
   }
   if ((uploaded.size || 0) > MAX_UPLOAD_BYTES) {
     await blob.delete(item.key).catch(() => {})
     item.status = 'failed'
     item.error = 'Uploaded object is too large.'
-    await saveUploadSession(session)
+    await saveUploadSessionItem(session, item)
     throw createError({ statusCode: 413, message: item.error })
   }
   if (uploaded.customMetadata?.hash !== item.hash) {
     await blob.delete(item.key).catch(() => {})
     item.status = 'failed'
     item.error = 'Uploaded object hash metadata did not match the manifest.'
-    await saveUploadSession(session)
+    await saveUploadSessionItem(session, item)
     throw createError({ statusCode: 400, message: item.error })
   }
 
   item.status = 'uploaded'
   item.error = undefined
-  await saveUploadSession(session)
+  await saveUploadSessionItem(session, item)
 
   await recordAdminAudit(actor, {
     action: 'create',

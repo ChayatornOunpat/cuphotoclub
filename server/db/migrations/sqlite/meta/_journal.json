@@ -50,6 +50,13 @@
       "when": 1783343462017,
       "tag": "0006_adorable_magma",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1783459080506,
+      "tag": "0007_amazing_freak",
+      "breakpoints": true
     }
   ]
 }

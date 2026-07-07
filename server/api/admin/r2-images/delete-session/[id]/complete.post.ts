@@ -25,14 +25,16 @@ export default defineEventHandler(async (event) => {
     .map(item => ({ ...item, key: normalizeR2Key(item.key) }))
     .filter((item): item is { key: string; status: 'deleted' | 'failed'; error?: string } => !!item.key && itemsByKey.has(item.key))
 
+  const updatedItems = [] as typeof session.items
   for (const resultItem of accepted) {
     const item = itemsByKey.get(resultItem.key)
     if (!item || item.status === 'blocked') continue
     item.status = resultItem.status
     item.error = resultItem.status === 'failed' ? resultItem.error || 'Direct R2 delete failed.' : undefined
+    updatedItems.push(item)
   }
 
-  await saveR2DeleteSession(session)
+  if (updatedItems.length) await saveR2DeleteSessionItems(session, updatedItems)
 
   const deleted = session.items.filter(item => item.status === 'deleted')
   const failed = session.items.filter(item => item.status === 'failed')

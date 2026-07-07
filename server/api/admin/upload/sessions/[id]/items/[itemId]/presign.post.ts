@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
   if (item.size > MAX_UPLOAD_BYTES) {
     item.status = 'failed'
     item.error = 'File too large.'
-    await saveUploadSession(session)
+    await saveUploadSessionItem(session, item)
     throw createError({ statusCode: 413, message: 'ไฟล์ใหญ่เกิน 15MB' })
   }
 
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
   if (blobs.some(entry => entry.pathname === item.key)) {
     item.status = 'exists'
     item.error = undefined
-    await saveUploadSession(session)
+    await saveUploadSessionItem(session, item)
     return { key: item.key, status: item.status, duplicate: true }
   }
 
@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
   if (item.status === 'failed') {
     item.status = 'pending'
     item.error = undefined
-    await saveUploadSession(session)
+    await saveUploadSessionItem(session, item)
   }
   const signed = await createR2PresignedPutUrl({
     ...directConfig,
