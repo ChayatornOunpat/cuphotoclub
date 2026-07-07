@@ -49,10 +49,17 @@ export default defineEventHandler(async (event) => {
   }
   try {
     await saveUploadSession(session)
-  } catch {
+  } catch (error) {
+    const cause = error instanceof Error ? error.message : String(error)
+    console.error('upload session save failed', {
+      sessionId: session.id,
+      prefix: session.prefix,
+      itemCount: session.items.length,
+      cause
+    })
     throw createError({
       statusCode: 503,
-      message: 'Could not create upload session. KV storage is unavailable or misconfigured.'
+      message: `Could not create upload session: ${cause || 'unknown storage error'}`
     })
   }
 
