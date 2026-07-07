@@ -27,6 +27,14 @@ export function uploadSessionKey(id: string) {
   return `admin-upload-session:${id}`
 }
 
+export function decodeUploadItemId(value: string) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
 export async function getUploadSession(id: string) {
   return await kv.get<UploadSession>(uploadSessionKey(id))
 }

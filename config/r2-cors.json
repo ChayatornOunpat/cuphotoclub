@@ -1,0 +1,18 @@
+[
+  {
+    "AllowedOrigins": [
+      "https://cuphotoclub.com",
+      "https://www.cuphotoclub.com",
+      "https://cuphotoclub.pages.dev",
+      "http://localhost:3000"
+    ],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": [
+      "content-type",
+      "x-amz-meta-hash",
+      "x-amz-meta-seq"
+    ],
+    "ExposeHeaders": ["etag"],
+    "MaxAgeSeconds": 3600
+  }
+]

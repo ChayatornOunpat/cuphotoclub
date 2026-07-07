@@ -3,14 +3,7 @@ const MAX_BYTES = 15 * 1024 * 1024
 export default defineEventHandler(async (event) => {
   const actor = await requireAdmin(event)
   const id = getRouterParam(event, 'id') || ''
-  const rawItemId = getRouterParam(event, 'itemId') || ''
-  const itemId = (() => {
-    try {
-      return decodeURIComponent(rawItemId)
-    } catch {
-      return rawItemId
-    }
-  })()
+  const itemId = decodeUploadItemId(getRouterParam(event, 'itemId') || '')
   const session = await getUploadSession(id)
 
   if (!session) {

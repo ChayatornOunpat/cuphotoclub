@@ -134,7 +134,7 @@ function uploadErrorMessage(err: any) {
     return 'Cloudflare Worker exceeded resource limits. Upload stopped; retry failed files after the cooldown.'
   }
   if (/Failed to fetch|fetch failed|NetworkError/i.test(raw)) {
-    return 'Network request failed. Retry this file.'
+    return 'Network request failed. If this was a direct R2 upload, check the bucket CORS settings and retry this file.'
   }
   if (err?.statusCode === 413 || /too large|ใหญ่เกิน/i.test(raw)) {
     return 'File is too large after compression.'
@@ -322,24 +322,26 @@ async function uploadPreparedFile(
       return false
     }
 
+    if (item.sessionId && item.itemId) {
+      const { key } = await uploadPreparedFileDirect(item, seq)
+      if (!model.value.includes(key) && !uploadedKeySet.has(key)) {
+        uploadedKeySet.add(key)
+        uploadedKeys.push(key)
+      }
+      rememberCompletedSignature(signature)
+      return false
+    }
+
     const fd = new FormData()
     fd.append('file', item.toUpload)
     fd.append('prefix', props.prefix)
     fd.append('hash', item.hash)
     fd.append('seq', String(seq))
 
-    const { key } = item.sessionId && item.itemId
-      ? await $fetch<{ key: string }>(
-          `/api/admin/upload/sessions/${encodeURIComponent(item.sessionId)}/items/${encodeURIComponent(item.itemId)}`,
-          {
-            method: 'POST',
-            body: fd
-          }
-        )
-      : await $fetch<{ key: string }>('/api/admin/upload', {
-          method: 'POST',
-          body: fd
-        })
+    const { key } = await $fetch<{ key: string }>('/api/admin/upload', {
+      method: 'POST',
+      body: fd
+    })
     if (!model.value.includes(key) && !uploadedKeySet.has(key)) {
       uploadedKeySet.add(key)
       uploadedKeys.push(key)
@@ -362,6 +364,42 @@ async function uploadPreparedFile(
     done.value++
   }
   return stoppedByResourceLimit
+}
+
+async function uploadPreparedFileDirect(item: UploadManifestItem, seq: number) {
+  if (!item.sessionId || !item.itemId) throw new Error('Upload manifest item is missing session identity.')
+
+  const base = `/api/admin/upload/sessions/${encodeURIComponent(item.sessionId)}/items/${encodeURIComponent(item.itemId)}`
+  const presigned = await $fetch<{
+    key: string
+    status: string
+    duplicate?: boolean
+    upload?: { url: string, headers: Record<string, string>, expiresAt: string }
+  }>(`${base}/presign`, {
+    method: 'POST',
+    body: { seq }
+  })
+
+  if (presigned.duplicate || presigned.status === 'exists' || presigned.status === 'uploaded') {
+    duplicateCount.value++
+    return { key: presigned.key }
+  }
+  if (!presigned.upload) {
+    throw new Error('Direct R2 upload did not return an upload URL.')
+  }
+
+  const response = await fetch(presigned.upload.url, {
+    method: 'PUT',
+    headers: presigned.upload.headers,
+    body: item.toUpload
+  })
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(`Direct R2 upload failed (${response.status}). ${body}`.trim())
+  }
+
+  return await $fetch<{ key: string }>(`${base}/complete`, { method: 'POST' })
 }
 
 function markUploadStopped(files: File[]) {

@@ -62,6 +62,12 @@ export default defineNuxtConfig({
     oauth: {
       google: { clientId: '', clientSecret: '' }
     },
+    r2DirectUpload: {
+      accountId: process.env.NUXT_R2_ACCOUNT_ID || '',
+      bucketName: process.env.NUXT_R2_BUCKET_NAME || 'cuphotoclub-blob',
+      accessKeyId: process.env.NUXT_R2_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.NUXT_R2_SECRET_ACCESS_KEY || ''
+    },
     session: {
       cookie: {
         secure: process.env.NODE_ENV === 'production'
