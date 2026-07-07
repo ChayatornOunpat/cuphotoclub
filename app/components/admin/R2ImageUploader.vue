@@ -27,6 +27,7 @@ const done = ref(0)
 const errorCount = ref(0)
 const skippedCount = ref(0)
 const duplicateCount = ref(0)
+const resourcePauseSeconds = ref(0)
 const pendingQueue = ref<File[]>([])
 const failedUploads = ref<Array<{ file: File, name: string, reason: string }>>([])
 const completedSignatures = new Set<string>()
@@ -34,9 +35,12 @@ const completedSignatures = new Set<string>()
 const COMPRESS_MAX_DIM = 3040
 const COMPRESS_QUALITY = 0.90
 const COMPRESS_MIN_BYTES = 200_000
-const UPLOAD_CONCURRENCY = 4
+const UPLOAD_CONCURRENCY = 2
+const RESOURCE_LIMIT_PAUSE_MS = 30_000
 
 const autoCompress = ref(true)
+let resourcePausePromise: Promise<void> | null = null
+let resourcePauseTimer: ReturnType<typeof setInterval> | null = null
 
 // Queue-order stamp sent with each upload. R2's uploadedAt records *completion*
 // time, which scrambles under parallel uploads — this seq is taken when a worker
@@ -58,14 +62,22 @@ async function contentHash(file: File) {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-function uploadErrorMessage(err: any) {
+function rawUploadError(err: any) {
   const data = err?.data
-  const raw = typeof data === 'string'
+  return typeof data === 'string'
     ? data
     : data?.message || data?.statusMessage || err?.message || ''
+}
 
-  if (/Worker exceeded resource limits|Error 1102/i.test(raw)) {
-    return 'Cloudflare Worker exceeded resource limits. Retry the failed files in a smaller batch.'
+function isWorkerResourceLimitError(err: any) {
+  return /Worker exceeded resource limits|Error 1102/i.test(rawUploadError(err))
+}
+
+function uploadErrorMessage(err: any) {
+  const raw = rawUploadError(err)
+
+  if (isWorkerResourceLimitError(err)) {
+    return 'Cloudflare Worker exceeded resource limits. Upload paused before continuing.'
   }
   if (/Failed to fetch|fetch failed|NetworkError/i.test(raw)) {
     return 'Network request failed. Retry this file.'
@@ -74,6 +86,32 @@ function uploadErrorMessage(err: any) {
     return 'File is too large after compression.'
   }
   return raw ? String(raw).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220) : 'Upload failed without a server message.'
+}
+
+function beginResourceLimitPause() {
+  if (resourcePausePromise) return resourcePausePromise
+
+  const pauseUntil = Date.now() + RESOURCE_LIMIT_PAUSE_MS
+  resourcePauseSeconds.value = Math.ceil(RESOURCE_LIMIT_PAUSE_MS / 1000)
+  resourcePauseTimer = setInterval(() => {
+    resourcePauseSeconds.value = Math.max(0, Math.ceil((pauseUntil - Date.now()) / 1000))
+  }, 250)
+
+  resourcePausePromise = new Promise((resolve) => {
+    setTimeout(() => {
+      if (resourcePauseTimer) clearInterval(resourcePauseTimer)
+      resourcePauseTimer = null
+      resourcePauseSeconds.value = 0
+      resourcePausePromise = null
+      resolve()
+    }, RESOURCE_LIMIT_PAUSE_MS)
+  })
+
+  return resourcePausePromise
+}
+
+async function waitForResourceLimitPause() {
+  if (resourcePausePromise) await resourcePausePromise
 }
 
 function uniqueUncompleted(files: File[]) {
@@ -124,7 +162,10 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   e.returnValue = ''
 }
 onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
-onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload))
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
+  if (resourcePauseTimer) clearInterval(resourcePauseTimer)
+})
 
 function chooseFiles() {
   if (!uploading.value && canAddMore.value) fileInput.value?.click()
@@ -133,6 +174,7 @@ function chooseFiles() {
 async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set<string>) {
   const signature = fileSignature(file)
   const seq = nextSeq()
+  let pauseAfterError: Promise<void> | null = null
   try {
     const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
     const hash = await contentHash(toUpload)
@@ -153,6 +195,7 @@ async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set
     completedSignatures.add(signature)
   } catch (err) {
     errorCount.value++
+    if (isWorkerResourceLimitError(err)) pauseAfterError = beginResourceLimitPause()
     failedUploads.value.push({
       file,
       name: file.name,
@@ -161,12 +204,14 @@ async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set
   } finally {
     done.value++
   }
+  if (pauseAfterError) await pauseAfterError
 }
 
 async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet: Set<string>) {
   const queue = [...files]
   const workers = Array.from({ length: Math.min(UPLOAD_CONCURRENCY, queue.length) }, async () => {
     while (queue.length) {
+      await waitForResourceLimitPause()
       const file = queue.shift()
       if (file) await uploadOne(file, uploadedKeys, uploadedKeySet)
     }
@@ -288,6 +333,9 @@ function onDrop(e: DragEvent) {
         <div class="r2up__uploading-meter" role="progressbar" :aria-valuenow="progressPercent" aria-valuemin="0" aria-valuemax="100">
           <span :style="{ transform: `scaleX(${progressPercent / 100})` }" />
         </div>
+        <p v-if="resourcePauseSeconds" class="r2up__uploading-pause">
+          {{ t('uploader.resourcePause', { seconds: resourcePauseSeconds }) }}
+        </p>
         <p class="r2up__uploading-stay">{{ t('uploader.stayOnPage') }}</p>
       </div>
       <template v-else-if="canAddMore">
@@ -489,6 +537,19 @@ function onDrop(e: DragEvent) {
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.2s ease-out;
+}
+
+.r2up__uploading-pause {
+  margin-top: 0.7rem;
+  border: 1px solid color-mix(in srgb, #b0243c 28%, var(--subtle));
+  padding: 0.38rem 0.52rem;
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  color: #8f1c30;
+  background: color-mix(in srgb, #b0243c 5%, var(--body-bg));
 }
 
 .r2up__uploading-stay {

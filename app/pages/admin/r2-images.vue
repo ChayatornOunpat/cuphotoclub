@@ -280,7 +280,7 @@ function goToPage(n: number) {
   if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-const DELETE_CONCURRENCY = 5
+const DELETE_CONCURRENCY = 2
 
 async function runDeletePool(keys: string[], worker: (key: string) => Promise<void>) {
   let next = 0

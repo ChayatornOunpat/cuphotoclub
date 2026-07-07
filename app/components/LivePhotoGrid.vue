@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { PhotoGridImage } from '~~/server/api/photogrid.get'
+
 // Museum-wall photogrid: a dense wall of small thumbnails randomly sourced
 // from published albums, that keep crossfading to new photos over time.
 //
@@ -71,6 +73,9 @@ const blocks = ref<Block[]>([])
 const queue = ref<string[]>([])
 const shown = new Set<string>()
 
+// ── Album mapping: track which album each image belongs to ──
+const albumMap = new Map<string, Omit<PhotoGridImage, 'src'>>()
+
 let rows = 0
 let cols = 0
 let occupancy: number[][] = []
@@ -79,6 +84,40 @@ let intervalId: ReturnType<typeof setInterval> | null = null
 let observer: IntersectionObserver | null = null
 let visible = false
 let refilling = false
+
+// ── Modal state ──
+const modalOpen = ref(false)
+const modalData = ref({
+  albumId: '',
+  albumTitle: '',
+  albumCover: '',
+  albumDate: '',
+  photoCount: 0,
+  clickedSrc: ''
+})
+
+function openModal(src: string) {
+  const meta = albumMap.get(src)
+  if (!meta) return
+  modalData.value = {
+    albumId: meta.albumId,
+    albumTitle: meta.albumTitle,
+    albumCover: meta.albumCover,
+    albumDate: meta.albumDate,
+    photoCount: meta.photoCount,
+    clickedSrc: src
+  }
+  modalOpen.value = true
+}
+
+function closeModal() {
+  modalOpen.value = false
+}
+
+function handleCellClick(block: Block) {
+  const src = block.layers[block.activeLayer]
+  if (src) openModal(src)
+}
 
 const gridHeight = computed(() => {
   const { rows: r, rowHeight } = gridConfig.value
@@ -179,8 +218,21 @@ function fillEmptyBlocks() {
 
 async function fetchBatch(): Promise<string[]> {
   try {
-    const res = await $fetch<{ images: string[] }>('/api/photogrid', { query: { count: BATCH_COUNT } })
-    return res.images ?? []
+    const res = await $fetch<{ images: PhotoGridImage[] }>('/api/photogrid', { query: { count: BATCH_COUNT } })
+    const images = res.images ?? []
+    // Populate the album lookup map
+    for (const img of images) {
+      if (!albumMap.has(img.src)) {
+        albumMap.set(img.src, {
+          albumId: img.albumId,
+          albumTitle: img.albumTitle,
+          albumCover: img.albumCover,
+          albumDate: img.albumDate,
+          photoCount: img.photoCount
+        })
+      }
+    }
+    return images.map(img => img.src)
   } catch {
     return []
   }
@@ -439,6 +491,11 @@ onBeforeUnmount(() => {
           gridColumn: `${block.col + 1} / span ${DIMS[block.shape].w}`,
           gridRow: `${block.row + 1} / span ${DIMS[block.shape].h}`
         }"
+        role="button"
+        tabindex="0"
+        :aria-label="albumMap.get(block.layers[block.activeLayer])?.albumTitle || ''"
+        @click="handleCellClick(block)"
+        @keydown.enter="handleCellClick(block)"
       >
         <div class="cube" :class="{ 'is-flipped': block.activeLayer === 1 }">
           <img
@@ -458,6 +515,17 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </TransitionGroup>
+
+    <AlbumPreviewModal
+      :open="modalOpen"
+      :album-id="modalData.albumId"
+      :album-title="modalData.albumTitle"
+      :album-cover="modalData.albumCover"
+      :album-date="modalData.albumDate"
+      :photo-count="modalData.photoCount"
+      :clicked-src="modalData.clickedSrc"
+      @close="closeModal"
+    />
   </div>
 </template>
 
@@ -479,6 +547,12 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: hidden;
   perspective: 800px;
+  cursor: pointer;
+}
+.photogrid__cell:focus-visible {
+  outline: 2px solid var(--accent, #e63946);
+  outline-offset: -2px;
+  z-index: 1;
 }
 
 .cube {
