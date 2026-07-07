@@ -11,7 +11,7 @@ NUXT_R2_ACCESS_KEY_ID=
 NUXT_R2_SECRET_ACCESS_KEY=
 ```
 
-The R2 bucket also needs CORS for browser `PUT` requests:
+The R2 bucket also needs CORS for browser `PUT` requests. The config uses Wrangler 4's R2 API shape with a top-level `rules` array:
 
 ```powershell
 npx wrangler r2 bucket cors set cuphotoclub-blob --file config/r2-cors.json
