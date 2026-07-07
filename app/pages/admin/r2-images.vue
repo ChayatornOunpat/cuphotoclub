@@ -96,6 +96,15 @@ const deleteConfirm = reactive({
   warningItems: [] as string[],
   resolve: null as null | ((confirmed: boolean) => void)
 })
+const passwordGate = reactive({
+  active: false,
+  title: '',
+  message: '',
+  password: '',
+  error: '',
+  loading: false,
+  resolve: null as null | ((confirmed: boolean) => void)
+})
 const deleteProgress = reactive({
   active: false,
   title: '',
@@ -136,6 +145,41 @@ function resolveDeleteConfirmation(confirmed: boolean) {
   deleteConfirm.active = false
   deleteConfirm.resolve?.(confirmed)
   deleteConfirm.resolve = null
+}
+
+function askPasswordGate(options: { title: string; message: string }) {
+  passwordGate.active = true
+  passwordGate.title = options.title
+  passwordGate.message = options.message
+  passwordGate.password = ''
+  passwordGate.error = ''
+  passwordGate.loading = false
+  return new Promise<boolean>((resolve) => {
+    passwordGate.resolve = resolve
+  })
+}
+
+function resolvePasswordGate(confirmed: boolean) {
+  passwordGate.active = false
+  passwordGate.resolve?.(confirmed)
+  passwordGate.resolve = null
+}
+
+async function submitPasswordGate() {
+  if (passwordGate.loading || !passwordGate.password) return
+  passwordGate.loading = true
+  passwordGate.error = ''
+  try {
+    await $fetch('/api/admin/verify-password', {
+      method: 'POST',
+      body: { password: passwordGate.password }
+    })
+    resolvePasswordGate(true)
+  } catch (err: any) {
+    passwordGate.error = err?.data?.message || 'Password check failed.'
+  } finally {
+    passwordGate.loading = false
+  }
 }
 
 const DELETE_RESOURCE_LIMIT_PAUSE_MS = 30_000
@@ -363,15 +407,12 @@ async function bulkDelete() {
   const selectedImages = images.value.filter(image => selected.value.has(image.key))
   const referencedCount = selectedImages.filter(image => image.albums.length || image.usages.length).length
   const deletingAllLoaded = images.value.length > 0 && keys.length === images.value.length
-  const deletingAllShown = filteredImages.value.length > 0 && keys.length === filteredImages.value.length && allFilteredSelected.value
   const warningItems: string[] = []
 
   if (deletingAllLoaded) {
     warningItems.push(activePrefix.value
       ? `This selects every image under prefix "${activePrefix.value}".`
       : 'This selects every R2 image currently loaded in this inventory.')
-  } else if (deletingAllShown) {
-    warningItems.push('This selects every image in the current filtered view.')
   }
   if (referencedCount) {
     warningItems.push(`${referencedCount} selected image${referencedCount === 1 ? ' is' : 's are'} referenced by albums, heroes, posts, events, members, or layouts.`)
@@ -391,11 +432,19 @@ async function bulkDelete() {
         ? 'DANGER: MASS R2 DELETE'
         : referencedCount
           ? 'DANGER: REFERENCED IMAGES'
-          : 'DANGER: FULL VIEW DELETE'
+          : ''
       : '',
     warningItems
   })
   if (!confirmed) return
+
+  if (referencedCount > 50) {
+    const verified = await askPasswordGate({
+      title: 'Admin password required',
+      message: `You are deleting ${referencedCount} referenced images. Enter your admin password to continue.`
+    })
+    if (!verified) return
+  }
 
   bulkDeleting.value = true
   beginDeleteProgress(`Deleting ${keys.length} image${keys.length === 1 ? '' : 's'}`, keys.length)
@@ -460,14 +509,30 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <Transition name="delete-modal">
         <div
-          v-if="deleteConfirm.active || deleteProgress.active"
+          v-if="deleteConfirm.active || passwordGate.active || deleteProgress.active"
           class="delete-modal"
           role="dialog"
           aria-modal="true"
-          :aria-labelledby="deleteConfirm.active ? 'delete-confirm-title' : 'delete-progress-title'"
+          :aria-labelledby="passwordGate.active ? 'password-gate-title' : deleteConfirm.active ? 'delete-confirm-title' : 'delete-progress-title'"
         >
           <div class="delete-modal__backdrop" />
-          <div v-if="deleteConfirm.active" class="delete-modal__panel">
+          <form v-if="passwordGate.active" class="delete-modal__panel" @submit.prevent="submitPasswordGate">
+            <p class="delete-modal__kicker">Admin password gate</p>
+            <h2 id="password-gate-title">{{ passwordGate.title }}</h2>
+            <p class="delete-modal__copy">{{ passwordGate.message }}</p>
+            <label class="delete-modal__field">
+              <span>Password</span>
+              <input v-model="passwordGate.password" type="password" autocomplete="current-password" autofocus>
+            </label>
+            <p v-if="passwordGate.error" class="delete-modal__field-error">{{ passwordGate.error }}</p>
+            <div class="delete-modal__actions">
+              <button type="button" class="delete-modal__cancel" :disabled="passwordGate.loading" @click="resolvePasswordGate(false)">Cancel</button>
+              <button type="submit" class="delete-modal__danger" :disabled="passwordGate.loading || !passwordGate.password">
+                {{ passwordGate.loading ? 'Checking...' : 'Confirm password' }}
+              </button>
+            </div>
+          </form>
+          <div v-else-if="deleteConfirm.active" class="delete-modal__panel">
             <p class="delete-modal__kicker">R2 operation</p>
             <h2 id="delete-confirm-title">{{ deleteConfirm.title }}</h2>
             <p class="delete-modal__copy">{{ deleteConfirm.message }}</p>
@@ -813,6 +878,42 @@ onBeforeUnmount(() => {
   width: 0.42rem;
   height: 2px;
   background: #b0243c;
+}
+
+.delete-modal__field {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.delete-modal__field span {
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.delete-modal__field input {
+  width: 100%;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  padding: 0.7rem 0.8rem;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.delete-modal__field input:focus {
+  border-color: var(--accent);
+}
+
+.delete-modal__field-error {
+  margin-top: 0.6rem;
+  color: #b0243c;
+  font-size: 0.68rem;
+  line-height: 1.45;
 }
 
 .delete-modal__meter {

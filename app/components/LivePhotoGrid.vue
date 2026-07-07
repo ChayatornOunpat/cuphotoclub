@@ -67,11 +67,24 @@ function shapeForRatio(ratio: number): SizeClass {
   return Math.random() < 0.25 ? 'big' : 'sm'
 }
 
+const { t } = useI18n()
+
 const root = ref<HTMLElement | null>(null)
 const gridConfig = ref<GridConfig>(currentGridConfig())
 const blocks = ref<Block[]>([])
 const queue = ref<string[]>([])
 const shown = new Set<string>()
+
+// Id of the block currently under pointer/keyboard focus. We skip it in
+// performSwap so the tile a user is inspecting doesn't flip away mid-hover.
+const hoveredId = ref<number | null>(null)
+
+// The album title backing a block's currently-shown photo, for the hover
+// overlay affordance. albumMap is a plain (non-reactive) Map, but block
+// reactivity already re-renders the cell when its shown layer changes.
+function titleFor(block: Block): string {
+  return albumMap.get(block.layers[block.activeLayer])?.albumTitle || ''
+}
 
 // ── Album mapping: track which album each image belongs to ──
 const albumMap = new Map<string, Omit<PhotoGridImage, 'src'>>()
@@ -406,7 +419,7 @@ function applySwap(reservedId: number, src: string, targetShape: SizeClass) {
 // this tick, so two simultaneous swaps can never target the same tile —
 // that would otherwise snap an in-progress flip backward mid-rotation.
 function performSwap(reserved: Set<number>) {
-  const candidates = blocks.value.filter(b => !reserved.has(b.id))
+  const candidates = blocks.value.filter(b => !reserved.has(b.id) && b.id !== hoveredId.value)
   if (!candidates.length) return
   const block = candidates[Math.floor(Math.random() * candidates.length)]!
   reserved.add(block.id)
@@ -493,9 +506,13 @@ onBeforeUnmount(() => {
         }"
         role="button"
         tabindex="0"
-        :aria-label="albumMap.get(block.layers[block.activeLayer])?.albumTitle || ''"
+        :aria-label="titleFor(block)"
         @click="handleCellClick(block)"
         @keydown.enter="handleCellClick(block)"
+        @mouseenter="hoveredId = block.id"
+        @mouseleave="hoveredId = null"
+        @focus="hoveredId = block.id"
+        @blur="hoveredId = null"
       >
         <div class="cube" :class="{ 'is-flipped': block.activeLayer === 1 }">
           <img
@@ -512,6 +529,10 @@ onBeforeUnmount(() => {
             loading="lazy"
             class="cube__face cube__face--back"
           >
+        </div>
+        <div class="photogrid__overlay" aria-hidden="true">
+          <span class="photogrid__kicker">{{ t('common.album') }}</span>
+          <span v-if="titleFor(block)" class="photogrid__title">{{ titleFor(block) }}</span>
         </div>
       </div>
     </TransitionGroup>
@@ -549,10 +570,61 @@ onBeforeUnmount(() => {
   perspective: 800px;
   cursor: pointer;
 }
+.photogrid__cell:hover,
+.photogrid__cell:focus-visible {
+  z-index: 2;
+}
 .photogrid__cell:focus-visible {
   outline: 2px solid var(--accent, #e63946);
   outline-offset: -2px;
+}
+
+/* Editorial hover affordance: a soft bottom gradient that surfaces the album
+   name so the wall reads as a set of clickable album links. Lives as a sibling
+   of .cube (not inside it) so it never touches the cube's preserve-3d flip.
+   pointer-events:none keeps the click landing on the cell. */
+.photogrid__overlay {
+  position: absolute;
+  inset: 0;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.15em;
+  padding: 0.4rem 0.45rem;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    to top,
+    rgba(12, 12, 10, 0.9) 0%,
+    rgba(12, 12, 10, 0.55) 38%,
+    rgba(12, 12, 10, 0) 72%
+  );
+  transition: opacity 0.4s ease;
+}
+.photogrid__cell:hover .photogrid__overlay,
+.photogrid__cell:focus-visible .photogrid__overlay {
+  opacity: 1;
+}
+
+.photogrid__kicker {
+  font-family: var(--font-latin-sans, sans-serif);
+  font-size: 0.44rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent, #e63946);
+}
+.photogrid__title {
+  font-family: var(--font-serif, serif);
+  font-size: 0.68rem;
+  line-height: 1.15;
+  font-weight: 400;
+  color: #f5f4f0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .cube {
@@ -573,12 +645,24 @@ onBeforeUnmount(() => {
   object-fit: cover;
   display: block;
   backface-visibility: hidden;
+  /* Only the hover zoom animates here — the flip lives on the parent .cube, so
+     this transition never competes with rotateY. Composing scale after the
+     face's own rotateY keeps backface-visibility working. */
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .cube__face--front {
   transform: rotateY(0deg);
 }
 .cube__face--back {
   transform: rotateY(180deg);
+}
+.photogrid__cell:hover .cube__face--front,
+.photogrid__cell:focus-visible .cube__face--front {
+  transform: rotateY(0deg) scale(1.08);
+}
+.photogrid__cell:hover .cube__face--back,
+.photogrid__cell:focus-visible .cube__face--back {
+  transform: rotateY(180deg) scale(1.08);
 }
 
 /* Tiles created/destroyed by a reshape (merge/split) don't have a "before"
@@ -601,6 +685,22 @@ onBeforeUnmount(() => {
   /* Grid items are explicitly placed (grid-column/row), so a leaving tile
      can safely stay in flow while it fades — no reflow risk of siblings. */
   z-index: 0;
+}
+
+/* Under reduced-motion, keep the overlay reveal (opacity only) but drop the
+   image zoom so nothing scales. */
+@media (prefers-reduced-motion: reduce) {
+  .cube__face {
+    transition: none;
+  }
+  .photogrid__cell:hover .cube__face--front,
+  .photogrid__cell:focus-visible .cube__face--front {
+    transform: rotateY(0deg);
+  }
+  .photogrid__cell:hover .cube__face--back,
+  .photogrid__cell:focus-visible .cube__face--back {
+    transform: rotateY(180deg);
+  }
 }
 
 @media (max-width: 1100px) {

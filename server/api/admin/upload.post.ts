@@ -1,18 +1,5 @@
 const MAX_BYTES = 15 * 1024 * 1024
 
-function sanitizePrefix(value: string) {
-  return value.replace(/[^a-z0-9/_-]/gi, '').replace(/^\/+|\/+$/g, '') || 'covers'
-}
-
-function sanitizeExt(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
-}
-
-function sanitizeHash(value: string) {
-  const hash = value.toLowerCase().replace(/[^a-f0-9]/g, '')
-  return hash.length >= 16 ? hash : ''
-}
-
 // Generic single-image upload → returns { key }. Used for post/event cover images.
 export default defineEventHandler(async (event) => {
   const actor = await requireAdmin(event)
@@ -25,9 +12,9 @@ export default defineEventHandler(async (event) => {
   if (!type.startsWith('image/')) throw createError({ statusCode: 400, message: 'รองรับเฉพาะไฟล์รูปภาพ' })
   if (file.data.length > MAX_BYTES) throw createError({ statusCode: 413, message: 'ไฟล์ใหญ่เกิน 15MB' })
 
-  const prefix = sanitizePrefix(form?.find(p => p.name === 'prefix')?.data?.toString() || 'covers')
-  const ext = sanitizeExt(file.filename?.split('.').pop() || 'jpg')
-  const contentHash = sanitizeHash(form?.find(p => p.name === 'hash')?.data?.toString() || '')
+  const prefix = sanitizeUploadPrefix(form?.find(p => p.name === 'prefix')?.data?.toString() || 'covers')
+  const ext = sanitizeUploadExt(file.filename?.split('.').pop() || 'jpg')
+  const contentHash = sanitizeUploadHash(form?.find(p => p.name === 'hash')?.data?.toString() || '')
   const key = `${prefix}/${contentHash || crypto.randomUUID()}.${ext}`
 
   // Client queue-order stamp (epoch ms) used to sort listings in the order the

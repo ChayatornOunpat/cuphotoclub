@@ -38,12 +38,24 @@ const COMPRESS_QUALITY = 0.90
 const COMPRESS_MIN_BYTES = 200_000
 const UPLOAD_CONCURRENCY = 2
 const UPLOAD_BATCH_DELAY_MS = 1_000
+const UPLOAD_SESSION_SIZE = 250
 const RESOURCE_LIMIT_PAUSE_MS = 30_000
 
 const autoCompress = ref(true)
 let resourcePausePromise: Promise<void> | null = null
 let resourcePauseTimer: ReturnType<typeof setInterval> | null = null
 let shouldStopCurrentUpload = false
+
+interface UploadManifestItem {
+  file: File
+  toUpload: File
+  hash: string
+  key: string
+  exists: boolean
+  sessionId?: string
+  itemId?: string
+  status?: string
+}
 
 // Queue-order stamp sent with each upload. R2's uploadedAt records *completion*
 // time, which scrambles under parallel uploads — this seq is taken when a worker
@@ -59,10 +71,47 @@ function fileSignature(file: File) {
   return `${file.name}:${file.size}:${file.lastModified}`
 }
 
+function prepareId(file: File) {
+  return fileSignature(file)
+}
+
+function signatureStorageKey() {
+  return `cu-r2-uploaded-signatures:${props.prefix}`
+}
+
+function loadCompletedSignatures() {
+  if (!import.meta.client) return
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(signatureStorageKey()) || '[]')
+    if (Array.isArray(saved)) {
+      for (const signature of saved) {
+        if (typeof signature === 'string') completedSignatures.add(signature)
+      }
+    }
+  } catch {
+    sessionStorage.removeItem(signatureStorageKey())
+  }
+}
+
+function rememberCompletedSignature(signature: string) {
+  completedSignatures.add(signature)
+  if (!import.meta.client) return
+  try {
+    const saved = [...completedSignatures].slice(-2_000)
+    sessionStorage.setItem(signatureStorageKey(), JSON.stringify(saved))
+  } catch {
+    // Ignore storage quota/private-mode failures; server-side hash checks still apply.
+  }
+}
+
 async function contentHash(file: File) {
   const buffer = await file.arrayBuffer()
   const digest = await crypto.subtle.digest('SHA-256', buffer)
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function fileExt(file: File) {
+  return file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
 }
 
 function rawUploadError(err: any) {
@@ -170,7 +219,10 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   e.preventDefault()
   e.returnValue = ''
 }
-onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
+onMounted(() => {
+  loadCompletedSignatures()
+  window.addEventListener('beforeunload', onBeforeUnload)
+})
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   if (resourcePauseTimer) clearInterval(resourcePauseTimer)
@@ -187,21 +239,8 @@ async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set
   try {
     const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
     const hash = await contentHash(toUpload)
-    const fd = new FormData()
-    fd.append('file', toUpload)
-    fd.append('prefix', props.prefix)
-    fd.append('hash', hash)
-    fd.append('seq', String(seq))
-
-    const { key } = await $fetch<{ key: string }>('/api/admin/upload', {
-      method: 'POST',
-      body: fd
-    })
-    if (!model.value.includes(key) && !uploadedKeySet.has(key)) {
-      uploadedKeySet.add(key)
-      uploadedKeys.push(key)
-    }
-    completedSignatures.add(signature)
+    const stopped = await uploadPreparedFile({ file, toUpload, hash, key: '', exists: false }, uploadedKeys, uploadedKeySet, seq)
+    stoppedByResourceLimit = stopped
   } catch (err) {
     errorCount.value++
     if (isWorkerResourceLimitError(err)) {
@@ -213,6 +252,110 @@ async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set
     failedUploads.value.push({
       file,
       name: file.name,
+      reason: uploadErrorMessage(err)
+    })
+    done.value++
+  }
+  return stoppedByResourceLimit
+}
+
+async function createUploadSessionBatch(files: File[]) {
+  const prepared = await Promise.all(files.map(async (file) => {
+    const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
+    return {
+      file,
+      toUpload,
+      hash: await contentHash(toUpload),
+      key: '',
+      exists: false
+    }
+  }))
+
+  const session = await $fetch<{
+    id: string
+    items: Array<{ id: string, key: string, status: string }>
+  }>('/api/admin/upload/sessions', {
+    method: 'POST',
+    body: {
+      prefix: props.prefix,
+      files: prepared.map(item => ({
+        id: prepareId(item.file),
+        name: item.file.name,
+        hash: item.hash,
+        ext: fileExt(item.toUpload),
+        size: item.toUpload.size,
+        type: item.toUpload.type || 'image/jpeg'
+      }))
+    }
+  })
+
+  const manifest = new Map(session.items.map(item => [item.id, item]))
+  return prepared.map((item) => {
+    const match = manifest.get(prepareId(item.file))
+    return {
+      ...item,
+      key: match?.key || '',
+      exists: match?.status === 'exists' || match?.status === 'uploaded',
+      sessionId: session.id,
+      itemId: prepareId(item.file),
+      status: match?.status
+    }
+  })
+}
+
+async function uploadPreparedFile(
+  item: UploadManifestItem,
+  uploadedKeys: string[],
+  uploadedKeySet: Set<string>,
+  seq = nextSeq()
+) {
+  const signature = fileSignature(item.file)
+  let stoppedByResourceLimit = false
+  try {
+    if (item.exists && item.key) {
+      duplicateCount.value++
+      if (!model.value.includes(item.key) && !uploadedKeySet.has(item.key)) {
+        uploadedKeySet.add(item.key)
+        uploadedKeys.push(item.key)
+      }
+      rememberCompletedSignature(signature)
+      return false
+    }
+
+    const fd = new FormData()
+    fd.append('file', item.toUpload)
+    fd.append('prefix', props.prefix)
+    fd.append('hash', item.hash)
+    fd.append('seq', String(seq))
+
+    const { key } = item.sessionId && item.itemId
+      ? await $fetch<{ key: string }>(
+          `/api/admin/upload/sessions/${encodeURIComponent(item.sessionId)}/items/${encodeURIComponent(item.itemId)}`,
+          {
+            method: 'POST',
+            body: fd
+          }
+        )
+      : await $fetch<{ key: string }>('/api/admin/upload', {
+          method: 'POST',
+          body: fd
+        })
+    if (!model.value.includes(key) && !uploadedKeySet.has(key)) {
+      uploadedKeySet.add(key)
+      uploadedKeys.push(key)
+    }
+    rememberCompletedSignature(signature)
+  } catch (err) {
+    errorCount.value++
+    if (isWorkerResourceLimitError(err)) {
+      shouldStopCurrentUpload = true
+      resourceLimitStopped.value = true
+      stoppedByResourceLimit = true
+      beginResourceLimitPause()
+    }
+    failedUploads.value.push({
+      file: item.file,
+      name: item.file.name,
       reason: uploadErrorMessage(err)
     })
   } finally {
@@ -232,23 +375,58 @@ function markUploadStopped(files: File[]) {
 }
 
 async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet: Set<string>) {
-  for (let index = 0; index < files.length; index += UPLOAD_CONCURRENCY) {
+  for (let sessionStart = 0; sessionStart < files.length; sessionStart += UPLOAD_SESSION_SIZE) {
     if (shouldStopCurrentUpload) {
-      markUploadStopped(files.slice(index))
+      markUploadStopped(files.slice(sessionStart))
       break
     }
+
     await waitForResourceLimitPause()
     if (shouldStopCurrentUpload) {
-      markUploadStopped(files.slice(index))
+      markUploadStopped(files.slice(sessionStart))
       break
     }
-    const batch = files.slice(index, index + UPLOAD_CONCURRENCY)
-    const stopped = await Promise.all(batch.map(file => uploadOne(file, uploadedKeys, uploadedKeySet)))
-    if (shouldStopCurrentUpload || stopped.some(Boolean)) {
-      markUploadStopped(files.slice(index + UPLOAD_CONCURRENCY))
-      break
+
+    const sessionFiles = files.slice(sessionStart, sessionStart + UPLOAD_SESSION_SIZE)
+    let preparedSession: Awaited<ReturnType<typeof createUploadSessionBatch>>
+    try {
+      preparedSession = await createUploadSessionBatch(sessionFiles)
+    } catch (err) {
+      for (let index = 0; index < sessionFiles.length; index += UPLOAD_CONCURRENCY) {
+        const batch = sessionFiles.slice(index, index + UPLOAD_CONCURRENCY)
+        const stopped = await Promise.all(batch.map(file => uploadOne(file, uploadedKeys, uploadedKeySet)))
+        if (shouldStopCurrentUpload || stopped.some(Boolean)) {
+          markUploadStopped([...sessionFiles.slice(index + UPLOAD_CONCURRENCY), ...files.slice(sessionStart + UPLOAD_SESSION_SIZE)])
+          return
+        }
+        if (index + UPLOAD_CONCURRENCY < sessionFiles.length || sessionStart + UPLOAD_SESSION_SIZE < files.length) {
+          await wait(UPLOAD_BATCH_DELAY_MS)
+        }
+      }
+      continue
     }
-    if (index + UPLOAD_CONCURRENCY < files.length) await wait(UPLOAD_BATCH_DELAY_MS)
+
+    for (let index = 0; index < preparedSession.length; index += UPLOAD_CONCURRENCY) {
+      if (shouldStopCurrentUpload) {
+        markUploadStopped([...preparedSession.slice(index).map(item => item.file), ...files.slice(sessionStart + UPLOAD_SESSION_SIZE)])
+        return
+      }
+      await waitForResourceLimitPause()
+      if (shouldStopCurrentUpload) {
+        markUploadStopped([...preparedSession.slice(index).map(item => item.file), ...files.slice(sessionStart + UPLOAD_SESSION_SIZE)])
+        return
+      }
+
+      const batch = preparedSession.slice(index, index + UPLOAD_CONCURRENCY)
+      const stopped = await Promise.all(batch.map(item => uploadPreparedFile(item, uploadedKeys, uploadedKeySet)))
+      if (shouldStopCurrentUpload || stopped.some(Boolean)) {
+        markUploadStopped([...preparedSession.slice(index + UPLOAD_CONCURRENCY).map(item => item.file), ...files.slice(sessionStart + UPLOAD_SESSION_SIZE)])
+        return
+      }
+      if (index + UPLOAD_CONCURRENCY < preparedSession.length || sessionStart + UPLOAD_SESSION_SIZE < files.length) {
+        await wait(UPLOAD_BATCH_DELAY_MS)
+      }
+    }
   }
 }
 

@@ -35,19 +35,70 @@ const formattedDate = computed(() => {
   }
 })
 
+const dialogRef = ref<HTMLElement | null>(null)
+let lastFocused: HTMLElement | null = null
+
 function handleBackdropClick() {
   emit('close')
 }
 
-function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') emit('close')
+function focusableEls(): HTMLElement[] {
+  if (!dialogRef.value) return []
+  return Array.from(
+    dialogRef.value.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter(el => el.offsetParent !== null || el === dialogRef.value)
 }
+
+function trapTab(e: KeyboardEvent) {
+  const els = focusableEls()
+  if (!els.length) {
+    e.preventDefault()
+    dialogRef.value?.focus()
+    return
+  }
+  const first = els[0]!
+  const last = els[els.length - 1]!
+  const active = document.activeElement as HTMLElement | null
+  if (e.shiftKey && (active === first || active === dialogRef.value)) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && active === last) {
+    e.preventDefault()
+    first.focus()
+  }
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  if (!props.open) return
+  if (e.key === 'Escape') {
+    emit('close')
+    return
+  }
+  if (e.key === 'Tab') trapTab(e)
+}
+
+// Focus the dialog on open, lock body scroll, and restore focus on close.
+watch(() => props.open, (open) => {
+  if (import.meta.server) return
+  if (open) {
+    lastFocused = document.activeElement as HTMLElement | null
+    document.body.style.overflow = 'hidden'
+    nextTick(() => dialogRef.value?.focus())
+  } else {
+    document.body.style.overflow = ''
+    lastFocused?.focus?.()
+    lastFocused = null
+  }
+})
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeydown)
 })
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeydown)
+  document.body.style.overflow = ''
 })
 </script>
 
@@ -62,7 +113,11 @@ onBeforeUnmount(() => {
         :aria-label="albumTitle"
       >
         <div class="album-modal__backdrop" @click="handleBackdropClick" />
-        <div class="album-modal__content">
+        <div
+          ref="dialogRef"
+          class="album-modal__content"
+          tabindex="-1"
+        >
           <button
             type="button"
             class="album-modal__close"
@@ -82,14 +137,16 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="album-modal__body">
-            <p v-if="formattedDate" class="album-modal__date">{{ formattedDate }}</p>
+            <p class="album-modal__kicker">{{ t('common.album') }}</p>
             <h2 class="album-modal__title">{{ albumTitle }}</h2>
-            <p class="album-modal__count">
-              {{ t('albums.metaFrames', { count: photoCount }) }}
+            <p class="album-modal__meta">
+              <span v-if="formattedDate" class="album-modal__meta-item">{{ formattedDate }}</span>
+              <span v-if="formattedDate" class="album-modal__dot" aria-hidden="true">·</span>
+              <span class="album-modal__meta-item">{{ t('albums.metaFrames', { count: photoCount }) }}</span>
             </p>
 
             <NuxtLink :to="albumPath" class="album-modal__cta">
-              {{ t('albums.viewFull') || 'ดูอัลบั้มเต็ม' }}
+              {{ t('albums.viewFull') }}
             </NuxtLink>
           </div>
         </div>
@@ -112,7 +169,8 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   background: rgba(12, 12, 10, 0.82);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .album-modal__content {
@@ -150,10 +208,26 @@ onBeforeUnmount(() => {
 }
 
 .album-modal__hero {
+  position: relative;
   width: 100%;
   aspect-ratio: 3 / 2;
   overflow: hidden;
   background: #1a1a18;
+}
+/* Soft top-and-bottom scrim: keeps the close button legible over bright
+   frames and lets the featured photo blend into the body below. */
+.album-modal__hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(12, 12, 10, 0.35) 0%,
+    rgba(12, 12, 10, 0) 24%,
+    rgba(12, 12, 10, 0) 72%,
+    rgba(12, 12, 10, 0.55) 100%
+  );
 }
 .album-modal__image {
   width: 100%;
@@ -166,28 +240,37 @@ onBeforeUnmount(() => {
   padding: 1.5rem 1.75rem 2rem;
 }
 
-.album-modal__date {
+.album-modal__kicker {
   font-family: var(--font-latin-sans, sans-serif);
   font-size: 0.6rem;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--accent, #e63946);
-  margin-bottom: 0.5rem;
+  margin: 0 0 0.55rem;
 }
 
 .album-modal__title {
   font-family: var(--font-serif, serif);
-  font-size: clamp(1.4rem, 4vw, 1.8rem);
+  font-size: clamp(1.5rem, 4.5vw, 1.95rem);
   font-weight: 300;
-  line-height: 1.2;
+  line-height: 1.15;
   color: var(--dark, #F5F4F0);
   margin: 0;
 }
 
-.album-modal__count {
-  font-size: 0.78rem;
+.album-modal__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--font-latin-sans, sans-serif);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
   color: var(--muted, #8a8a84);
-  margin-top: 0.5rem;
+  margin: 0.7rem 0 0;
+}
+.album-modal__dot {
+  color: var(--subtle, #55554f);
 }
 
 .album-modal__cta {
@@ -252,6 +335,18 @@ onBeforeUnmount(() => {
   .modal-leave-to .album-modal__content {
     transform: translateY(100%);
     opacity: 1;
+  }
+}
+
+/* Reduced motion: fade only, no rise/scale. */
+@media (prefers-reduced-motion: reduce) {
+  .modal-enter-active .album-modal__content,
+  .modal-leave-active .album-modal__content {
+    transition: opacity 0.2s ease;
+  }
+  .modal-enter-from .album-modal__content,
+  .modal-leave-to .album-modal__content {
+    transform: none;
   }
 }
 </style>
