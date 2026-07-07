@@ -36,6 +36,7 @@ const COMPRESS_MAX_DIM = 3040
 const COMPRESS_QUALITY = 0.90
 const COMPRESS_MIN_BYTES = 200_000
 const UPLOAD_CONCURRENCY = 2
+const UPLOAD_BATCH_DELAY_MS = 1_000
 const RESOURCE_LIMIT_PAUSE_MS = 30_000
 
 const autoCompress = ref(true)
@@ -112,6 +113,10 @@ function beginResourceLimitPause() {
 
 async function waitForResourceLimitPause() {
   if (resourcePausePromise) await resourcePausePromise
+}
+
+function wait(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 function uniqueUncompleted(files: File[]) {
@@ -208,15 +213,12 @@ async function uploadOne(file: File, uploadedKeys: string[], uploadedKeySet: Set
 }
 
 async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet: Set<string>) {
-  const queue = [...files]
-  const workers = Array.from({ length: Math.min(UPLOAD_CONCURRENCY, queue.length) }, async () => {
-    while (queue.length) {
-      await waitForResourceLimitPause()
-      const file = queue.shift()
-      if (file) await uploadOne(file, uploadedKeys, uploadedKeySet)
-    }
-  })
-  await Promise.all(workers)
+  for (let index = 0; index < files.length; index += UPLOAD_CONCURRENCY) {
+    await waitForResourceLimitPause()
+    const batch = files.slice(index, index + UPLOAD_CONCURRENCY)
+    await Promise.all(batch.map(file => uploadOne(file, uploadedKeys, uploadedKeySet)))
+    if (index + UPLOAD_CONCURRENCY < files.length) await wait(UPLOAD_BATCH_DELAY_MS)
+  }
 }
 
 async function upload(files: File[], retry = false) {

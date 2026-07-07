@@ -92,6 +92,8 @@ const deleteConfirm = reactive({
   message: '',
   detail: '',
   confirmLabel: 'Delete',
+  warningTitle: '',
+  warningItems: [] as string[],
   resolve: null as null | ((confirmed: boolean) => void)
 })
 const deleteProgress = reactive({
@@ -101,7 +103,8 @@ const deleteProgress = reactive({
   done: 0,
   total: 0,
   failed: 0,
-  blocked: 0
+  blocked: 0,
+  pauseSeconds: 0
 })
 const deleteProgressPercent = computed(() =>
   deleteProgress.total
@@ -114,12 +117,16 @@ function askDeleteConfirmation(options: {
   message: string
   detail?: string
   confirmLabel?: string
+  warningTitle?: string
+  warningItems?: string[]
 }) {
   deleteConfirm.active = true
   deleteConfirm.title = options.title
   deleteConfirm.message = options.message
   deleteConfirm.detail = options.detail || ''
   deleteConfirm.confirmLabel = options.confirmLabel || 'Delete'
+  deleteConfirm.warningTitle = options.warningTitle || ''
+  deleteConfirm.warningItems = options.warningItems || []
   return new Promise<boolean>((resolve) => {
     deleteConfirm.resolve = resolve
   })
@@ -131,6 +138,47 @@ function resolveDeleteConfirmation(confirmed: boolean) {
   deleteConfirm.resolve = null
 }
 
+const DELETE_RESOURCE_LIMIT_PAUSE_MS = 30_000
+let deleteResourcePausePromise: Promise<void> | null = null
+let deleteResourcePauseTimer: ReturnType<typeof setInterval> | null = null
+
+function rawDeleteError(err: any) {
+  const data = err?.data
+  return typeof data === 'string'
+    ? data
+    : data?.message || data?.statusMessage || err?.message || ''
+}
+
+function isDeleteResourceLimitError(err: any) {
+  return /Worker exceeded resource limits|Error 1102/i.test(rawDeleteError(err))
+}
+
+function beginDeleteResourceLimitPause() {
+  if (deleteResourcePausePromise) return deleteResourcePausePromise
+
+  const pauseUntil = Date.now() + DELETE_RESOURCE_LIMIT_PAUSE_MS
+  deleteProgress.pauseSeconds = Math.ceil(DELETE_RESOURCE_LIMIT_PAUSE_MS / 1000)
+  deleteResourcePauseTimer = setInterval(() => {
+    deleteProgress.pauseSeconds = Math.max(0, Math.ceil((pauseUntil - Date.now()) / 1000))
+  }, 250)
+
+  deleteResourcePausePromise = new Promise((resolve) => {
+    setTimeout(() => {
+      if (deleteResourcePauseTimer) clearInterval(deleteResourcePauseTimer)
+      deleteResourcePauseTimer = null
+      deleteProgress.pauseSeconds = 0
+      deleteResourcePausePromise = null
+      resolve()
+    }, DELETE_RESOURCE_LIMIT_PAUSE_MS)
+  })
+
+  return deleteResourcePausePromise
+}
+
+async function waitForDeleteResourceLimitPause() {
+  if (deleteResourcePausePromise) await deleteResourcePausePromise
+}
+
 function beginDeleteProgress(title: string, total: number) {
   deleteProgress.active = true
   deleteProgress.title = title
@@ -139,6 +187,7 @@ function beginDeleteProgress(title: string, total: number) {
   deleteProgress.total = Math.max(1, total)
   deleteProgress.failed = 0
   deleteProgress.blocked = 0
+  deleteProgress.pauseSeconds = 0
 }
 
 function extendDeleteProgress(count: number) {
@@ -188,11 +237,13 @@ async function deleteImage(image: R2Image) {
           stepDeleteProgress(image.key)
           await refresh()
         } catch (forceErr: any) {
+          if (isDeleteResourceLimitError(forceErr)) await beginDeleteResourceLimitPause()
           stepDeleteProgress(image.key, 'failed')
           alert(forceErr?.data?.message || 'Could not delete image.')
         }
       }
     } else {
+      if (isDeleteResourceLimitError(err)) await beginDeleteResourceLimitPause()
       stepDeleteProgress(image.key, 'failed')
       alert(err?.data?.message || 'Could not delete image.')
     }
@@ -203,10 +254,20 @@ async function deleteImage(image: R2Image) {
 }
 
 async function confirmDelete(image: R2Image) {
+  const hasReferences = image.albums.length > 0 || image.usages.length > 0
   const confirmed = await askDeleteConfirmation({
-    title: 'Delete image?',
-    message: 'This removes the object from R2. This cannot be undone.',
-    detail: image.key
+    title: hasReferences ? 'Delete referenced image?' : 'Delete image?',
+    message: hasReferences
+      ? 'This image is currently used by the site. The server will block deletion unless you force it in the next step.'
+      : 'This removes the object from R2. This cannot be undone.',
+    detail: image.key,
+    warningTitle: hasReferences ? 'REFERENCED IMAGE' : '',
+    warningItems: hasReferences
+      ? [
+          `${image.albums.length + image.usages.length} known reference${image.albums.length + image.usages.length === 1 ? '' : 's'}`,
+          'Deleting it can break covers, hero images, gallery tiles, or album layouts.'
+        ]
+      : []
   })
   if (confirmed) deleteImage(image)
 }
@@ -281,26 +342,58 @@ function goToPage(n: number) {
 }
 
 const DELETE_CONCURRENCY = 2
+const DELETE_BATCH_DELAY_MS = 1_000
+
+function wait(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
 async function runDeletePool(keys: string[], worker: (key: string) => Promise<void>) {
-  let next = 0
-  await Promise.all(
-    Array.from({ length: Math.min(DELETE_CONCURRENCY, keys.length) }, async () => {
-      while (next < keys.length) {
-        const key = keys[next++]!
-        await worker(key)
-      }
-    })
-  )
+  for (let index = 0; index < keys.length; index += DELETE_CONCURRENCY) {
+    await waitForDeleteResourceLimitPause()
+    const batch = keys.slice(index, index + DELETE_CONCURRENCY)
+    await Promise.all(batch.map(key => worker(key)))
+    if (index + DELETE_CONCURRENCY < keys.length) await wait(DELETE_BATCH_DELAY_MS)
+  }
 }
 
 async function bulkDelete() {
   const keys = [...selected.value]
   if (!keys.length) return
+  const selectedImages = images.value.filter(image => selected.value.has(image.key))
+  const referencedCount = selectedImages.filter(image => image.albums.length || image.usages.length).length
+  const deletingAllLoaded = images.value.length > 0 && keys.length === images.value.length
+  const deletingAllShown = filteredImages.value.length > 0 && keys.length === filteredImages.value.length && allFilteredSelected.value
+  const warningItems: string[] = []
+
+  if (deletingAllLoaded) {
+    warningItems.push(activePrefix.value
+      ? `This selects every image under prefix "${activePrefix.value}".`
+      : 'This selects every R2 image currently loaded in this inventory.')
+  } else if (deletingAllShown) {
+    warningItems.push('This selects every image in the current filtered view.')
+  }
+  if (referencedCount) {
+    warningItems.push(`${referencedCount} selected image${referencedCount === 1 ? ' is' : 's are'} referenced by albums, heroes, posts, events, members, or layouts.`)
+    warningItems.push('Referenced deletions can break visible public pages unless their references are removed or force-cleared.')
+  }
+
   const confirmed = await askDeleteConfirmation({
-    title: `Delete ${keys.length} image${keys.length === 1 ? '' : 's'}?`,
+    title: deletingAllLoaded
+      ? 'Delete every selected R2 image?'
+      : referencedCount
+        ? 'Delete referenced R2 images?'
+        : `Delete ${keys.length} image${keys.length === 1 ? '' : 's'}?`,
     message: 'This removes the selected objects from R2. This cannot be undone.',
-    detail: `${keys.length} selected`
+    detail: `${keys.length} selected`,
+    warningTitle: warningItems.length
+      ? deletingAllLoaded
+        ? 'DANGER: MASS R2 DELETE'
+        : referencedCount
+          ? 'DANGER: REFERENCED IMAGES'
+          : 'DANGER: FULL VIEW DELETE'
+      : '',
+    warningItems
   })
   if (!confirmed) return
 
@@ -319,6 +412,7 @@ async function bulkDelete() {
           blocked.push(key)
           stepDeleteProgress(key, 'blocked')
         } else {
+          if (isDeleteResourceLimitError(err)) await beginDeleteResourceLimitPause()
           failed.push(key)
           stepDeleteProgress(key, 'failed')
         }
@@ -336,7 +430,8 @@ async function bulkDelete() {
         try {
           await requestDelete(key, true)
           stepDeleteProgress(key)
-        } catch {
+        } catch (err: any) {
+          if (isDeleteResourceLimitError(err)) await beginDeleteResourceLimitPause()
           failed.push(key)
           stepDeleteProgress(key, 'failed')
         }
@@ -354,6 +449,10 @@ async function bulkDelete() {
     await finishDeleteProgress()
   }
 }
+
+onBeforeUnmount(() => {
+  if (deleteResourcePauseTimer) clearInterval(deleteResourcePauseTimer)
+})
 </script>
 
 <template>
@@ -372,6 +471,12 @@ async function bulkDelete() {
             <p class="delete-modal__kicker">R2 operation</p>
             <h2 id="delete-confirm-title">{{ deleteConfirm.title }}</h2>
             <p class="delete-modal__copy">{{ deleteConfirm.message }}</p>
+            <div v-if="deleteConfirm.warningTitle" class="delete-modal__warning">
+              <p>{{ deleteConfirm.warningTitle }}</p>
+              <ul>
+                <li v-for="item in deleteConfirm.warningItems" :key="item">{{ item }}</li>
+              </ul>
+            </div>
             <p v-if="deleteConfirm.detail" class="delete-modal__current">{{ deleteConfirm.detail }}</p>
             <div class="delete-modal__actions">
               <button type="button" class="delete-modal__cancel" @click="resolveDeleteConfirmation(false)">Cancel</button>
@@ -400,6 +505,9 @@ async function bulkDelete() {
             </div>
             <p class="delete-modal__current">
               {{ deleteProgress.current || 'Preparing delete queue' }}
+            </p>
+            <p v-if="deleteProgress.pauseSeconds" class="delete-modal__pause">
+              Worker limit hit · waiting {{ deleteProgress.pauseSeconds }}s before continuing
             </p>
             <div v-if="deleteProgress.failed || deleteProgress.blocked" class="delete-modal__notes">
               <span v-if="deleteProgress.blocked">{{ deleteProgress.blocked }} referenced</span>
@@ -660,6 +768,53 @@ async function bulkDelete() {
   line-height: 1.65;
 }
 
+.delete-modal__warning {
+  margin-top: 1.05rem;
+  border: 2px solid #b0243c;
+  border-top-width: 0.45rem;
+  background:
+    linear-gradient(90deg, rgba(176, 36, 60, 0.1), rgba(176, 36, 60, 0.02)),
+    var(--body-bg);
+  padding: 0.9rem;
+  color: #8f1c30;
+}
+
+.delete-modal__warning p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(1.15rem, 5vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.delete-modal__warning ul {
+  display: grid;
+  gap: 0.42rem;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.delete-modal__warning li {
+  position: relative;
+  padding-left: 1rem;
+  color: var(--dark);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.delete-modal__warning li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.58em;
+  width: 0.42rem;
+  height: 2px;
+  background: #b0243c;
+}
+
 .delete-modal__meter {
   height: 0.42rem;
   margin-top: 1.35rem;
@@ -717,6 +872,19 @@ async function bulkDelete() {
   font-size: 0.5rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.delete-modal__pause {
+  margin-top: 0.7rem;
+  border: 1px solid color-mix(in srgb, #b0243c 28%, var(--subtle));
+  padding: 0.38rem 0.52rem;
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  color: #8f1c30;
+  background: color-mix(in srgb, #b0243c 5%, var(--body-bg));
 }
 
 .delete-modal__actions {
