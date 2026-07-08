@@ -10,7 +10,8 @@ const { data: albums } = await useAsyncData('albums-archive', async () => {
 })
 
 function coverOf(a: NonNullable<typeof albums.value>[number]) {
-  return a.coverSrc || a.rows?.flatMap((r: any) => r.cells).find((c: any) => c.type === 'image' && c.src)?.src || ''
+  // /api/albums resolves the cover server-side and no longer ships full `rows`.
+  return a.coverSrc || ''
 }
 
 // Gallery section lists albums whose placement includes the gallery.
@@ -68,7 +69,8 @@ function goToPage(n: number) {
 }
 
 function imageCount(a: NonNullable<typeof albums.value>[number]): number {
-  return (a.rows ?? []).reduce((n: number, r: any) => n + r.cells.filter((c: any) => c.type === 'image').length, 0)
+  // Photo count is precomputed server-side (full `rows` no longer sent).
+  return a.photoCount ?? 0
 }
 const totalFrames = computed(() => galleryAlbums.value.reduce((n, a) => n + imageCount(a), 0))
 const headerBg = computed(() => (galleryAlbums.value[0] ? coverOf(galleryAlbums.value[0]) : ''))
