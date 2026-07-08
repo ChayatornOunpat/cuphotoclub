@@ -2,25 +2,12 @@ import { desc, eq, sql } from 'drizzle-orm'
 import type { Album, AlbumInput } from '~~/shared/types'
 import { readContentAlbums } from './contentAlbumFiles'
 
+// Unicode-aware: keep letters (incl. Thai), digits, and combining marks (Thai
+// vowel/tone signs), replacing runs of anything else with a hyphen. A Thai title
+// like "รับน้องก้าวใหม่ 2012" becomes the slug "รับน้องก้าวใหม่-2012" (browsers show
+// the Thai in the address bar) instead of collapsing to a bare "2012".
 function slugify(s: string): string {
-  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-}
-
-function randomSlug(): string {
-  return crypto.randomUUID().replace(/-/g, '').slice(0, 8)
-}
-
-// slugify() strips non-ASCII, so a Thai title like "รับน้องก้าวใหม่ 2012" collapses
-// to just "2012" and every Thai album collides into "2012-2", "2012-3", … A title
-// only yields a readable slug if it has real Latin words (≥2 Latin letters, e.g.
-// "Basic Control"); Thai-only or digits-only titles get a short random slug minted
-// once at creation and preserved thereafter (see update()).
-function hasMeaningfulLatin(title: string): boolean {
-  return slugify(title).replace(/[^a-z]/g, '').length >= 2
-}
-
-function slugRoot(title: string): string {
-  return hasMeaningfulLatin(title) ? slugify(title) : randomSlug()
+  return s.toLowerCase().trim().replace(/[^\p{L}\p{N}\p{M}]+/gu, '-').replace(/^-|-$/g, '')
 }
 
 function withoutOrderPrefix(s: string): string {
@@ -30,7 +17,7 @@ function withoutOrderPrefix(s: string): string {
 // Find a slug not already taken by a *different* album. `exceptId` lets an album
 // keep its own slug on update without colliding with itself.
 async function uniqueSlug(base: string, exceptId?: string): Promise<string> {
-  const root = slugRoot(base) || randomSlug()
+  const root = slugify(base) || 'album'
   let candidate = root
   for (let n = 2; ; n++) {
     const [row] = await db
@@ -206,9 +193,9 @@ export const albumStore = {
   async createDraft(): Promise<Album> {
     await seedFromContentOnce()
     const id = crypto.randomUUID()
-    // Mint a clean random slug now; it stays the permanent slug for Thai-titled
-    // albums (update() only replaces it when the title has real Latin words).
-    const slug = await uniqueSlug(randomSlug())
+    // Placeholder slug while the draft is untitled; update() sets the real one
+    // from the title on first save.
+    const slug = await uniqueSlug(`draft-${id.slice(0, 8)}`)
     const today = new Date().toISOString().slice(0, 10)
     const album: Album = {
       id,
@@ -233,11 +220,10 @@ export const albumStore = {
     const existing = await this.get(id)
     if (!existing) return null
 
-    // A Latin title keeps the URL in sync with the title; a Thai/number-only
-    // title has no readable slug, so preserve the stable (random) one already
-    // minted at creation instead of re-randomizing on every save. The R2 folder
-    // (= id) never moves either way.
-    const slug = hasMeaningfulLatin(input.title)
+    // Keep the URL slug in sync with the title. slugify is deterministic, so
+    // re-saving the same title yields the same slug (exceptId prevents a
+    // self-collision). The R2 folder (= id) never moves regardless.
+    const slug = input.title.trim()
       ? await uniqueSlug(input.title, existing.id)
       : existing.slug
     const album: Album = { ...input, id: existing.id, slug }
