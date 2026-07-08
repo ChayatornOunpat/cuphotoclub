@@ -48,7 +48,9 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 <style scoped>
 .hero {
-  height: 100svh;
+  /* Full height on wide screens, easing down to 80svh as the viewport
+     narrows (fluid, so it shrinks gradually instead of snapping). */
+  height: clamp(80svh, 50svh + 40vw, 100svh);
   background: var(--hero-bg);
   position: relative;
   display: flex;
@@ -119,7 +121,6 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 }
 
 @media (max-width: 720px) {
-  .hero { height: 80svh; }
   .hero__body { padding-left: 1.5rem; padding-right: 1.5rem; }
   .hero__cut {
     grid-template-columns: 1fr;
