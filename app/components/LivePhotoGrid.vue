@@ -225,6 +225,21 @@ function rebuildLayout() {
   blocks.value = buildLayout()
 }
 
+function hasEmptyBlocks() {
+  return blocks.value.some(block => !block.layers[block.activeLayer])
+}
+
+function recycleActiveImages() {
+  const recycled: string[] = []
+  for (const block of blocks.value) {
+    const src = block.layers[block.activeLayer]
+    if (!src) continue
+    shown.delete(src)
+    if (!queue.value.includes(src)) recycled.push(src)
+  }
+  queue.value.unshift(...recycled)
+}
+
 function fillEmptyBlocks() {
   for (const block of blocks.value) {
     if (block.layers[block.activeLayer]) continue
@@ -263,10 +278,12 @@ function enqueueUnseen(images: string[]) {
 }
 
 async function refillIfLow() {
-  if (!shouldRun() || refilling || queue.value.length > REFILL_THRESHOLD) return
+  if (!shouldRun() || refilling) return
+  if (queue.value.length > REFILL_THRESHOLD && !hasEmptyBlocks()) return
   refilling = true
   const batch = await fetchBatch()
   enqueueUnseen(batch)
+  fillEmptyBlocks()
   refilling = false
 }
 
@@ -529,6 +546,7 @@ function handleUserActivity() {
 function handleResize() {
   const cfg = currentGridConfig()
   if (cfg.cols === gridConfig.value.cols && cfg.rows === gridConfig.value.rows) return
+  recycleActiveImages()
   gridConfig.value = cfg
   rebuildLayout()
   fillEmptyBlocks()

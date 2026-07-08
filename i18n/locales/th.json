@@ -25,6 +25,8 @@
   },
   "home": {
     "featuredWork": "ผลงานประจำวัน",
+    "featuredWorkInfoButton": "ส่วนนี้คืออะไร?",
+    "featuredWorkInfoBody": "รับชมภาพผลงานของชมรม คลิกที่ภาพเพื่อเปิดอัลบั้ม",
     "latest": "ล่าสุด",
     "viewAllAlbums": "ดูอัลบั้มทั้งหมด →",
     "viewAllPosts": "ดูโพสต์ทั้งหมด →",

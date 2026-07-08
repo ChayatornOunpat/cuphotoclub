@@ -422,9 +422,25 @@ watch(cover, measureCover, { immediate: true })
     padding-right: 1.5rem;
     padding-top: 38svh;
   }
-  .grid { gap: 0.5rem; }
-  .cell { height: 130px; }
-  .cell :deep(img) { max-width: 85vw; }
+  /* The variable-width flex filmstrip only reads as a contact sheet when many
+     frames fit per row. On phones just 1–2 fit, leaving big ragged gaps, so
+     switch to a uniform 2-column grid. Frames stay letterboxed (contain) on
+     the dark cell so the whole frame is still visible, like mounted slides. */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  .cell {
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+  .cell :deep(img) {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+  }
   .lb__top {
     align-items: flex-start;
     padding: 0.85rem;

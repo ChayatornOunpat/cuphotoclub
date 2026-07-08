@@ -25,6 +25,8 @@
   },
   "home": {
     "featuredWork": "Featured Work",
+    "featuredWorkInfoButton": "What is this?",
+    "featuredWorkInfoBody": "Enjoy a random selection of images from the club's history. Click any image to view the album it belongs to.",
     "latest": "Latest",
     "viewAllAlbums": "View All Albums →",
     "viewAllPosts": "View All Posts →",
