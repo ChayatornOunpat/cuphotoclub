@@ -5,7 +5,7 @@ const { t } = useI18n()
 const localizedPath = useLocalizedContentPath()
 const { data: albums } = await useAsyncData('albums-archive', async () => {
   const adminAlbums = await $fetch('/api/albums').catch(() => [])
-  if (adminAlbums.length) return adminAlbums.map(album => ({ ...album, path: `/albums/${album.id}` }))
+  if (adminAlbums.length) return adminAlbums.map(album => ({ ...album, path: `/albums/${album.slug}` }))
   return []
 })
 

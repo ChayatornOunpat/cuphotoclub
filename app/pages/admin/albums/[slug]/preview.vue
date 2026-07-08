@@ -7,9 +7,9 @@ import AlbumSticky from '~/components/AlbumSticky.vue'
 definePageMeta({ layout: 'site', middleware: 'admin' })
 
 const route = useRoute()
-const id = route.params.id as string
+const slug = route.params.slug as string
 
-const { data: album } = await useFetch(`/api/admin/albums/${id}`)
+const { data: album } = await useFetch(`/api/admin/albums/${slug}`)
 if (!album.value) throw createError({ statusCode: 404, statusMessage: 'Album not found', fatal: true })
 
 const styles = { essay: AlbumEssay, sticky: AlbumSticky, contact: AlbumContact, darkroom: AlbumDarkroom }

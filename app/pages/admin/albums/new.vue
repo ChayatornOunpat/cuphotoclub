@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AlbumInput } from '~~/shared/types'
+import type { Album, AlbumInput } from '~~/shared/types'
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { t } = useI18n()
@@ -7,29 +7,48 @@ const localePath = useLocalePath()
 const busy = ref(false)
 const saveError = ref<string | null>(null)
 const saved = ref(false)
-const draftMediaPrefix = useState('draft-album-media-prefix', () => `content-albums/drafts/${crypto.randomUUID()}`)
-const draftMediaStorageKey = 'cu-photo-draft-album-media-prefix'
+
+// Album-first: a real draft row is created up front so images upload straight
+// into content-albums/<id>/ (their permanent home). Saving is a plain PUT — no
+// post-save R2 migration. The draft id is remembered so reloading the page
+// reuses the same draft instead of leaking a new empty one each time.
+const draftStorageKey = 'cu-photo-draft-album-id'
+const draftId = ref<string | null>(null)
+const mediaPrefix = ref('')
+const ready = ref(false)
+
+async function ensureDraft() {
+  const savedId = localStorage.getItem(draftStorageKey)
+  if (savedId) {
+    const existing = await $fetch<Album>(`/api/admin/albums/${savedId}`).catch(() => null)
+    if (existing?.id) {
+      draftId.value = existing.id
+      mediaPrefix.value = `content-albums/${existing.id}`
+      ready.value = true
+      return
+    }
+  }
+  const draft = await $fetch<{ id: string, slug: string, mediaPrefix: string }>('/api/admin/albums/draft', { method: 'POST' })
+  draftId.value = draft.id
+  mediaPrefix.value = draft.mediaPrefix
+  localStorage.setItem(draftStorageKey, draft.id)
+  ready.value = true
+}
 
 onMounted(() => {
-  const savedPrefix = localStorage.getItem(draftMediaStorageKey)
-  if (savedPrefix?.startsWith('content-albums/drafts/')) {
-    draftMediaPrefix.value = savedPrefix
-  } else {
-    localStorage.setItem(draftMediaStorageKey, draftMediaPrefix.value)
-  }
+  ensureDraft().catch(() => {
+    saveError.value = t('admin.saveFailed')
+  })
 })
 
 async function save(value: AlbumInput) {
+  if (!draftId.value) return
   busy.value = true
   saveError.value = null
   try {
-    await $fetch('/api/admin/albums', {
-      method: 'POST',
-      body: { ...value, draftMediaPrefix: draftMediaPrefix.value }
-    })
+    await $fetch(`/api/admin/albums/${draftId.value}`, { method: 'PUT', body: value })
     saved.value = true
-    localStorage.removeItem(draftMediaStorageKey)
-    draftMediaPrefix.value = `content-albums/drafts/${crypto.randomUUID()}`
+    localStorage.removeItem(draftStorageKey)
     await navigateTo(localePath('/admin/albums'))
   } catch (e) {
     saveError.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || t('admin.saveFailed')
@@ -42,5 +61,17 @@ useHead({ title: () => `${t('admin.newAlbum')} — Admin` })
 </script>
 
 <template>
-  <AdminAlbumForm :media-prefix="draftMediaPrefix" :submit-label="t('admin.createAlbum')" :busy="busy" :error="saveError" :saved="saved" @submit="save" />
+  <AdminAlbumForm v-if="ready" :media-prefix="mediaPrefix" :submit-label="t('admin.createAlbum')" :busy="busy" :error="saveError" :saved="saved" @submit="save" />
+  <p v-else class="album-new__loading">{{ t('admin.loading') }}</p>
 </template>
+
+<style scoped>
+.album-new__loading {
+  padding: 3rem 1.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+</style>

@@ -108,8 +108,10 @@ function parseAlbumMarkdown(filename: string, source: string): Album | null {
 
   const { rows, coverSrc } = imagesToRows(data.images, Number(data.coverIndex) || 0)
 
+  const id = filenameToId(filename)
   return {
-    id: filenameToId(filename),
+    id,
+    slug: id,
     title: String(data.title),
     category: String(data.category),
     date: String(data.date),

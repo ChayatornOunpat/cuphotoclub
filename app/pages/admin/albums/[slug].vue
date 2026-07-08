@@ -5,11 +5,13 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 const { t } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
-const id = route.params.id as string
-const mediaPrefix = `content-albums/${id}`
+const slug = route.params.slug as string
 
-const { data: album } = await useFetch(`/api/admin/albums/${id}`)
+const { data: album } = await useFetch(`/api/admin/albums/${slug}`)
 if (!album.value) throw createError({ statusCode: 404, statusMessage: 'Album not found', fatal: true })
+
+// R2 media lives under the album's immutable id, never its (renamable) slug.
+const mediaPrefix = `content-albums/${album.value!.id}`
 
 const busy = ref(false)
 const saveError = ref<string | null>(null)
@@ -19,7 +21,8 @@ async function save(value: AlbumInput) {
   busy.value = true
   saveError.value = null
   try {
-    await $fetch(`/api/admin/albums/${id}`, { method: 'PUT', body: value })
+    // Save by id (immutable) — the slug in the URL may change when the title does.
+    await $fetch(`/api/admin/albums/${album.value!.id}`, { method: 'PUT', body: value })
     saved.value = true
     await navigateTo(localePath('/admin/albums'))
   } catch (e) {

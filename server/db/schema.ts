@@ -150,6 +150,9 @@ import type { AlbumRow, AlbumStyle, ContentStatus, HeroStyle, Placement, PostBlo
 // Lego-grid albums seeded from content/albums/*.md.
 export const contentAlbums = sqliteTable('content_albums', {
   id: text('id').primaryKey(),
+  // Human-readable URL slug. Decoupled from `id` (which is the immutable R2
+  // folder key) so albums can be renamed without moving any stored objects.
+  slug: text('slug').notNull().unique().default(''),
   title: text('title').notNull(),
   category: text('category').notNull(),
   date: text('date').notNull(),
