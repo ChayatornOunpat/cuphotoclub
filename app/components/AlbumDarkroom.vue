@@ -171,6 +171,7 @@ function plateSizes(span: number) {
   line-height: 0.95;
   letter-spacing: -0.02em;
   white-space: pre-line;
+  overflow-wrap: break-word;
   max-width: 18ch;
 }
 
@@ -288,5 +289,9 @@ function plateSizes(span: number) {
   .dk-head { padding: 7rem 1.25rem 3.5rem; }
   .dk-head__back { left: 1.5rem; top: 5.5rem; }
   .dk-flow { gap: 4.5rem; padding: 3.5rem 1.25rem 6rem; }
+  /* Keep each hanging print scannable — 84svh means a portrait image fills the
+     screen and demands a full swipe per photo. */
+  .dk-plate__print :deep(img) { max-height: 72svh; }
+  .dk-head__print :deep(img) { max-height: 54svh; }
 }
 </style>

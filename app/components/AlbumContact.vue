@@ -223,7 +223,7 @@ watch(cover, measureCover, { immediate: true })
 }
 .head__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.25rem; }
 .head__kicker-category, .head__kicker-date { display: inline; }
-.head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; }
+.head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; overflow-wrap: break-word; }
 .head__sub { margin-top: 1.5rem; max-width: 520px; font-size: 0.82rem; color: rgba(245, 244, 240, 0.5); line-height: 1.8; white-space: pre-line; }
 
 .sheet { padding: 4rem 3rem 6rem; max-width: 1380px; margin: 0 auto; }

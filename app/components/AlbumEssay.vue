@@ -255,7 +255,7 @@ watch(() => props.album.coverSrc, measureCover, { immediate: true })
 .albnav__back.is-disabled:hover { color: var(--muted); }
 .cover__body { position: relative; z-index: 2; padding: 0 3rem 3.5rem; max-width: 1380px; margin: 0 auto; width: 100%; }
 .cover__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.5rem; }
-.cover__title { font-family: var(--font-serif); font-size: clamp(3.5rem, 9vw, 9rem); font-weight: 200; line-height: 0.9; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; }
+.cover__title { font-family: var(--font-serif); font-size: clamp(3.5rem, 9vw, 9rem); font-weight: 200; line-height: 0.9; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; overflow-wrap: break-word; }
 .cover__meta { margin-top: 2rem; display: flex; gap: 1.5rem; align-items: center; font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245, 244, 240, 0.5); }
 .cover__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
 
@@ -288,6 +288,14 @@ figcaption .n { color: var(--accent); font-weight: 500; flex-shrink: 0; }
 .albnav__back { font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.2s; }
 .albnav__back:hover { color: var(--accent); }
 
+@media (max-width: 1000px) {
+  /* Collapse the 6-col Lego grid to 3 columns so span-1/2 images don't render
+     as tiny slivers on tablets and landscape phones. Grid clamps larger spans
+     (3/4/6) down to the available track count automatically. */
+  .lego-row { grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin-bottom: 3.5rem; }
+  .intro { padding-top: 4.5rem; }
+}
+
 @media (max-width: 720px) {
   .cover__back { left: 1.5rem; }
   .cover__body { padding: 0 1.5rem 2.5rem; }
@@ -308,7 +316,11 @@ figcaption .n { color: var(--accent); font-weight: 500; flex-shrink: 0; }
     font-size: clamp(2.8rem, 17vw, 5rem);
   }
   .intro, .essay, .albnav { padding-left: 1.5rem; padding-right: 1.5rem; }
-  .lego-row { grid-template-columns: 1fr; gap: 1rem; }
+  /* Reclaim vertical space: full-viewport cover + 6rem intro + 4.5rem row gaps
+     forces a lot of scrolling on phones. */
+  .intro { padding-top: 3rem; padding-bottom: 1.5rem; }
+  .essay { padding-top: 2rem; padding-bottom: 4rem; }
+  .lego-row { grid-template-columns: 1fr; gap: 1rem; margin-bottom: 2.5rem; }
   .cell--image, .cell--text { grid-column: 1 / -1; }
 }
 </style>

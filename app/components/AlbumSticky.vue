@@ -89,7 +89,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 .meta__thumb { width: 100%; overflow: hidden; margin-bottom: 1.75rem; background: var(--hero-bg); }
 .meta__thumb :deep(img) { width: 100%; height: auto; display: block; object-fit: contain; }
 .meta__cat { font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1rem; }
-.meta__title { font-family: var(--font-serif); font-size: clamp(2rem, 3vw, 3rem); font-weight: 200; line-height: 1; letter-spacing: -0.02em; margin-bottom: 1.5rem; white-space: pre-line; }
+.meta__title { font-family: var(--font-serif); font-size: clamp(2rem, 3vw, 3rem); font-weight: 200; line-height: 1; letter-spacing: -0.02em; margin-bottom: 1.5rem; white-space: pre-line; overflow-wrap: break-word; }
 .meta__excerpt { font-size: 0.82rem; color: var(--muted); line-height: 1.85; margin-bottom: 2rem; white-space: pre-line; }
 .meta__facts { border-top: 1px solid var(--subtle); }
 .meta__fact { display: flex; justify-content: space-between; padding: 0.85rem 0; border-bottom: 1px solid var(--subtle); font-size: 0.62rem; letter-spacing: 0.08em; }
