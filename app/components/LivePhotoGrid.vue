@@ -28,6 +28,7 @@ const SWAP_INTERVAL_MS = 3500
 const SWAPS_PER_TICK = 3
 const REFILL_THRESHOLD = 20
 const BATCH_COUNT = 250
+const IDLE_PAUSE_MS = 2 * 60 * 1000
 
 type SizeClass = 'sm' | 'wide' | 'tall' | 'big'
 const DIMS: Record<SizeClass, { w: number, h: number }> = {
@@ -97,6 +98,10 @@ let intervalId: ReturnType<typeof setInterval> | null = null
 let observer: IntersectionObserver | null = null
 let visible = false
 let refilling = false
+let initialLoaded = false
+let initialLoading = false
+let idlePaused = false
+let idleTimerId: ReturnType<typeof setTimeout> | null = null
 
 // ── Modal state ──
 const modalOpen = ref(false)
@@ -258,7 +263,7 @@ function enqueueUnseen(images: string[]) {
 }
 
 async function refillIfLow() {
-  if (refilling || queue.value.length > REFILL_THRESHOLD) return
+  if (!shouldRun() || refilling || queue.value.length > REFILL_THRESHOLD) return
   refilling = true
   const batch = await fetchBatch()
   enqueueUnseen(batch)
@@ -435,13 +440,25 @@ function performSwap(reserved: Set<number>) {
 }
 
 function tick() {
-  if (!visible) return
+  if (!shouldRun()) {
+    stop()
+    return
+  }
   const reserved = new Set<number>()
   for (let i = 0; i < SWAPS_PER_TICK; i++) performSwap(reserved)
   void refillIfLow()
 }
 
+function isPageActive() {
+  return !document.hidden && document.hasFocus()
+}
+
+function shouldRun() {
+  return visible && isPageActive() && !idlePaused
+}
+
 function start() {
+  if (!shouldRun()) return
   if (intervalId) return
   intervalId = setInterval(tick, SWAP_INTERVAL_MS)
 }
@@ -452,9 +469,61 @@ function stop() {
   intervalId = null
 }
 
+function clearIdleTimer() {
+  if (!idleTimerId) return
+  clearTimeout(idleTimerId)
+  idleTimerId = null
+}
+
+function scheduleIdlePause() {
+  clearIdleTimer()
+  idleTimerId = setTimeout(() => {
+    idlePaused = true
+    stop()
+  }, IDLE_PAUSE_MS)
+}
+
+function markActive() {
+  idlePaused = false
+  scheduleIdlePause()
+  syncActivity()
+}
+
+async function ensureInitialLoad() {
+  if (initialLoaded || initialLoading || !shouldRun()) return
+  initialLoading = true
+  const batch = await fetchBatch()
+  enqueueUnseen(batch)
+  fillEmptyBlocks()
+  initialLoaded = batch.length > 0 || queue.value.length > 0 || blocks.value.some(block => block.layers[block.activeLayer])
+  initialLoading = false
+  if (shouldRun()) {
+    start()
+    void refillIfLow()
+  }
+}
+
+function syncActivity() {
+  if (!shouldRun()) {
+    stop()
+    return
+  }
+  void ensureInitialLoad()
+  start()
+}
+
 function handleVisibilityChange() {
-  if (document.hidden) stop()
-  else if (visible) start()
+  syncActivity()
+}
+
+function handleFocusChange() {
+  if (document.hasFocus() && !document.hidden) markActive()
+  else syncActivity()
+}
+
+function handleUserActivity() {
+  if (document.hidden) return
+  markActive()
 }
 
 function handleResize() {
@@ -463,7 +532,7 @@ function handleResize() {
   gridConfig.value = cfg
   rebuildLayout()
   fillEmptyBlocks()
-  void refillIfLow()
+  if (shouldRun()) void refillIfLow()
 }
 
 onMounted(async () => {
@@ -473,23 +542,35 @@ onMounted(async () => {
   if (root.value) {
     observer = new IntersectionObserver(([entry]) => {
       visible = entry?.isIntersecting ?? false
-      if (visible && !document.hidden) start()
-      else stop()
+      syncActivity()
     }, { threshold: 0.1 })
     observer.observe(root.value)
   }
   document.addEventListener('visibilitychange', handleVisibilityChange)
-
-  const batch = await fetchBatch()
-  enqueueUnseen(batch)
-  fillEmptyBlocks()
+  window.addEventListener('focus', handleFocusChange)
+  window.addEventListener('blur', handleFocusChange)
+  window.addEventListener('pointerdown', handleUserActivity, { passive: true })
+  window.addEventListener('keydown', handleUserActivity)
+  window.addEventListener('wheel', handleUserActivity, { passive: true })
+  window.addEventListener('scroll', handleUserActivity, { passive: true })
+  window.addEventListener('touchstart', handleUserActivity, { passive: true })
+  scheduleIdlePause()
+  await ensureInitialLoad()
 })
 
 onBeforeUnmount(() => {
   stop()
+  clearIdleTimer()
   observer?.disconnect()
   window.removeEventListener('resize', handleResize)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('focus', handleFocusChange)
+  window.removeEventListener('blur', handleFocusChange)
+  window.removeEventListener('pointerdown', handleUserActivity)
+  window.removeEventListener('keydown', handleUserActivity)
+  window.removeEventListener('wheel', handleUserActivity)
+  window.removeEventListener('scroll', handleUserActivity)
+  window.removeEventListener('touchstart', handleUserActivity)
 })
 </script>
 
