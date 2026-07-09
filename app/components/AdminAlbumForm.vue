@@ -952,16 +952,16 @@ function onCanvasClick(event: MouseEvent) {
     return
   }
 
-  if (target.closest('.cover__title, .head__title, .meta__title')) {
+  if (target.closest('.cover__title, .head__title, .meta__title, .dk-head__title')) {
     editContent('title', titleInput); return
   }
-  if (target.closest('.cover__kicker, .head__kicker-category, .meta__cat')) {
+  if (target.closest('.cover__kicker, .head__kicker-category, .meta__cat, .dk-head__kicker')) {
     editContent('category', categoryInput); return
   }
-  if (target.closest('.cover__meta, .head__kicker-date, .meta__facts')) {
+  if (target.closest('.cover__meta, .head__kicker-date, .meta__facts, .dk-head__meta')) {
     editContent('date', dateInput); return
   }
-  if (target.closest('.intro__lead, .head__sub, .meta__excerpt')) {
+  if (target.closest('.intro__lead, .head__sub, .meta__excerpt, .dk-head__excerpt')) {
     editContent('excerpt', excerptInput); return
   }
 
