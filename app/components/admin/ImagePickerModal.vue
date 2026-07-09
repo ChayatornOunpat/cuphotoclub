@@ -24,12 +24,20 @@ interface LibraryImage {
 }
 
 type SortMode = 'newest' | 'oldest' | 'name-asc' | 'name-desc'
+type ThumbnailSize = 'small' | 'medium' | 'large'
+
+const THUMBNAIL_SIZE_OPTIONS: { value: ThumbnailSize, labelKey: string, height: number, maxWidth: number }[] = [
+  { value: 'small', labelKey: 'adminPicker.sizeSmall', height: 112, maxWidth: 210 },
+  { value: 'medium', labelKey: 'adminPicker.sizeMedium', height: 150, maxWidth: 280 },
+  { value: 'large', labelKey: 'adminPicker.sizeLarge', height: 210, maxWidth: 390 }
+]
 
 const libraryImages = ref<LibraryImage[]>([])
 const loading = ref(false)
 const selected = ref(new Set<string>())
 const managerOpen = ref(false)
 const sortMode = ref<SortMode>('newest')
+const thumbnailSize = ref<ThumbnailSize>('medium')
 const lastSelectedKey = ref<string | null>(null)
 
 // orderAt is the upload queue-order stamp; uploadedAt (completion time) covers
@@ -45,6 +53,14 @@ const sortedImages = computed(() => {
     if (sortMode.value === 'name-desc') return b.key.localeCompare(a.key)
     return imageTime(b) - imageTime(a) || a.key.localeCompare(b.key)
   })
+})
+
+const thumbnailGridStyle = computed(() => {
+  const option = THUMBNAIL_SIZE_OPTIONS.find(item => item.value === thumbnailSize.value) ?? THUMBNAIL_SIZE_OPTIONS[1]
+  return {
+    '--picker-thumb-height': `${option.height}px`,
+    '--picker-thumb-max-width': `${option.maxWidth}px`
+  }
 })
 
 async function loadLibrary() {
@@ -129,18 +145,35 @@ function selectionOrder(key: string) {
         </p>
         <template v-else>
           <div class="picker__toolbar">
-            <label class="picker__sort">
-              <span>{{ t('adminPicker.sortBy') }}</span>
-              <select v-model="sortMode">
-                <option value="newest">{{ t('adminPicker.sortNewest') }}</option>
-                <option value="oldest">{{ t('adminPicker.sortOldest') }}</option>
-                <option value="name-asc">{{ t('adminPicker.sortNameAsc') }}</option>
-                <option value="name-desc">{{ t('adminPicker.sortNameDesc') }}</option>
-              </select>
-            </label>
+            <div class="picker__controls">
+              <label class="picker__sort">
+                <span>{{ t('adminPicker.sortBy') }}</span>
+                <select v-model="sortMode">
+                  <option value="newest">{{ t('adminPicker.sortNewest') }}</option>
+                  <option value="oldest">{{ t('adminPicker.sortOldest') }}</option>
+                  <option value="name-asc">{{ t('adminPicker.sortNameAsc') }}</option>
+                  <option value="name-desc">{{ t('adminPicker.sortNameDesc') }}</option>
+                </select>
+              </label>
+              <div class="picker__size" role="group" :aria-label="t('adminPicker.sizeLabel')">
+                <span>{{ t('adminPicker.sizeLabel') }}</span>
+                <div class="picker__size-options">
+                  <button
+                    v-for="option in THUMBNAIL_SIZE_OPTIONS"
+                    :key="option.value"
+                    type="button"
+                    :class="{ 'is-active': thumbnailSize === option.value }"
+                    :aria-pressed="thumbnailSize === option.value"
+                    @click="thumbnailSize = option.value"
+                  >
+                    {{ t(option.labelKey) }}
+                  </button>
+                </div>
+              </div>
+            </div>
             <span class="picker__total">{{ t('adminPicker.imageCount', { count: sortedImages.length }) }}</span>
           </div>
-          <div class="picker__grid">
+          <div class="picker__grid" :style="thumbnailGridStyle">
             <button
               v-for="image in sortedImages"
               :key="image.key"
@@ -231,12 +264,19 @@ function selectionOrder(key: string) {
   background: var(--body-bg);
 }
 
+.picker__controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
 .picker__sort {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
 }
 .picker__sort span,
+.picker__size > span,
 .picker__total {
   font-size: 0.48rem;
   letter-spacing: 0.16em;
@@ -258,7 +298,44 @@ function selectionOrder(key: string) {
   border-color: var(--accent);
 }
 
+.picker__size {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.picker__size-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-height: 2.1rem;
+  border: 1px solid var(--subtle);
+  background: #fff;
+}
+.picker__size-options button {
+  min-width: 3.2rem;
+  border: 0;
+  border-left: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.picker__size-options button:first-child {
+  border-left: 0;
+}
+.picker__size-options button:hover {
+  color: var(--dark);
+}
+.picker__size-options button.is-active {
+  background: var(--dark);
+  color: #fff;
+}
+
 .picker__grid {
+  --picker-thumb-height: 150px;
+  --picker-thumb-max-width: 280px;
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
@@ -269,7 +346,7 @@ function selectionOrder(key: string) {
 
 .picker__item {
   position: relative;
-  height: 150px;
+  height: var(--picker-thumb-height);
   overflow: hidden;
   background: var(--paper);
   border: 1px solid var(--subtle);
@@ -279,7 +356,7 @@ function selectionOrder(key: string) {
 .picker__item img {
   height: 100%;
   width: auto;
-  max-width: 280px;
+  max-width: var(--picker-thumb-max-width);
   object-fit: contain;
   display: block;
   transition: opacity 0.15s;
@@ -353,14 +430,21 @@ function selectionOrder(key: string) {
     flex-direction: column;
     gap: 0.55rem;
   }
+  .picker__controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
   .picker__sort select {
     width: 100%;
   }
+  .picker__size-options {
+    width: 100%;
+  }
   .picker__item {
-    height: 110px;
+    height: min(var(--picker-thumb-height), 150px);
   }
   .picker__item img {
-    max-width: 200px;
+    max-width: min(var(--picker-thumb-max-width), 260px);
   }
 }
 </style>

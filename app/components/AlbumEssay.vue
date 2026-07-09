@@ -213,9 +213,9 @@ watch(() => props.album.coverSrc, measureCover, { immediate: true })
   position: absolute;
   z-index: 1;
   top: 7rem;
-  right: 3rem;
+  right: 8vw;
   bottom: 5rem;
-  width: min(38vw, 520px);
+  width: min(36vw, 480px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -244,7 +244,7 @@ watch(() => props.album.coverSrc, measureCover, { immediate: true })
 }
 .cover--portrait .cover__body,
 .cover--square .cover__body {
-  padding-right: min(46vw, 620px);
+  padding-right: min(44vw, 580px);
 }
 .cover__back {
   position: absolute; top: 6rem; left: 3rem; z-index: 3;
