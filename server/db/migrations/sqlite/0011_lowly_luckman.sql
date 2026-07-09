@@ -1,0 +1,1 @@
+ALTER TABLE `content_albums` ADD `text_defaults_json` text;
