@@ -149,8 +149,18 @@ const deleteConfirm = reactive({
   confirmLabel: 'Delete',
   warningTitle: '',
   warningItems: [] as string[],
+  countdown: 0,
   resolve: null as null | ((confirmed: boolean) => void)
 })
+let deleteCountdownTimer: ReturnType<typeof setInterval> | null = null
+
+function clearDeleteCountdown() {
+  if (deleteCountdownTimer) {
+    clearInterval(deleteCountdownTimer)
+    deleteCountdownTimer = null
+  }
+  deleteConfirm.countdown = 0
+}
 const passwordGate = reactive({
   active: false,
   title: '',
@@ -183,7 +193,9 @@ function askDeleteConfirmation(options: {
   confirmLabel?: string
   warningTitle?: string
   warningItems?: string[]
+  countdownSeconds?: number
 }) {
+  clearDeleteCountdown()
   deleteConfirm.active = true
   deleteConfirm.title = options.title
   deleteConfirm.message = options.message
@@ -191,12 +203,21 @@ function askDeleteConfirmation(options: {
   deleteConfirm.confirmLabel = options.confirmLabel || 'Delete'
   deleteConfirm.warningTitle = options.warningTitle || ''
   deleteConfirm.warningItems = options.warningItems || []
+  deleteConfirm.countdown = options.countdownSeconds || 0
+  if (deleteConfirm.countdown > 0) {
+    deleteCountdownTimer = setInterval(() => {
+      deleteConfirm.countdown -= 1
+      if (deleteConfirm.countdown <= 0) clearDeleteCountdown()
+    }, 1000)
+  }
   return new Promise<boolean>((resolve) => {
     deleteConfirm.resolve = resolve
   })
 }
 
 function resolveDeleteConfirmation(confirmed: boolean) {
+  if (confirmed && deleteConfirm.countdown > 0) return
+  clearDeleteCountdown()
   deleteConfirm.active = false
   deleteConfirm.resolve?.(confirmed)
   deleteConfirm.resolve = null
@@ -730,8 +751,9 @@ async function purgeSelected() {
     message: 'This removes the selected objects from R2 for good. This cannot be undone.',
     detail: `${keys.length} selected`,
     confirmLabel: 'Delete permanently',
-    warningTitle: 'PERMANENT DELETE',
-    warningItems: ['These files will be gone for good — restore will no longer be possible.']
+    warningTitle: 'MASS R2 DELETE',
+    warningItems: ['These files will be gone for good — restore will no longer be possible.'],
+    countdownSeconds: 10
   })) await purgeKeys(keys)
 }
 async function emptyTrash() {
@@ -742,8 +764,9 @@ async function emptyTrash() {
     message: 'Permanently deletes every image in the trash. This cannot be undone.',
     detail: `${keys.length} image${keys.length === 1 ? '' : 's'}`,
     confirmLabel: 'Empty trash',
-    warningTitle: 'PERMANENT DELETE',
-    warningItems: ['Every trashed file will be gone for good.']
+    warningTitle: 'MASS R2 DELETE',
+    warningItems: ['Every trashed file will be gone for good.'],
+    countdownSeconds: 10
   })) await purgeKeys(keys)
 }
 
@@ -756,6 +779,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (autoRefreshTimer) clearInterval(autoRefreshTimer)
   if (deleteResourcePauseTimer) clearInterval(deleteResourcePauseTimer)
+  clearDeleteCountdown()
 })
 </script>
 
@@ -800,8 +824,8 @@ onBeforeUnmount(() => {
             <p v-if="deleteConfirm.detail" class="delete-modal__current">{{ deleteConfirm.detail }}</p>
             <div class="delete-modal__actions">
               <button type="button" class="delete-modal__cancel" @click="resolveDeleteConfirmation(false)">Cancel</button>
-              <button type="button" class="delete-modal__danger" @click="resolveDeleteConfirmation(true)">
-                {{ deleteConfirm.confirmLabel }}
+              <button type="button" class="delete-modal__danger" :disabled="deleteConfirm.countdown > 0" @click="resolveDeleteConfirmation(true)">
+                {{ deleteConfirm.countdown > 0 ? `${deleteConfirm.confirmLabel} (${deleteConfirm.countdown})` : deleteConfirm.confirmLabel }}
               </button>
             </div>
           </div>
@@ -1418,6 +1442,13 @@ onBeforeUnmount(() => {
 .delete-modal__danger:hover {
   border-color: #8f1c30 !important;
   background: #8f1c30;
+}
+
+.delete-modal__danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: #b0243c;
+  border-color: #b0243c !important;
 }
 
 .delete-modal-enter-active,
