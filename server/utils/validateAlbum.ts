@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const STYLES = ['essay', 'sticky', 'contact', 'darkroom']
+const STYLES = ['essay', 'sticky', 'contact', 'darkroom', 'chapters']
 const VISIBILITY = ['draft', 'link-only', 'public']
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 

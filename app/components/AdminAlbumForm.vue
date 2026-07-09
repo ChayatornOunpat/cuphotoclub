@@ -5,6 +5,7 @@ import AlbumEssay from '~/components/AlbumEssay.vue'
 import AlbumSticky from '~/components/AlbumSticky.vue'
 import AlbumContact from '~/components/AlbumContact.vue'
 import AlbumDarkroom from '~/components/AlbumDarkroom.vue'
+import AlbumChapters from '~/components/AlbumChapters.vue'
 import { PLACEHOLDER_IMG } from '~/utils/placeholder'
 
 const props = defineProps<{
@@ -550,7 +551,7 @@ onMounted(() => {
 onUnmounted(() => clearTimeout(hintTimer))
 
 // Preview
-const styles = { essay: AlbumEssay, sticky: AlbumSticky, contact: AlbumContact, darkroom: AlbumDarkroom }
+const styles = { essay: AlbumEssay, sticky: AlbumSticky, contact: AlbumContact, darkroom: AlbumDarkroom, chapters: AlbumChapters }
 const styleComponent = computed(() => styles[form.style] ?? AlbumEssay)
 
 const previewAlbum = computed(() => ({
@@ -995,6 +996,22 @@ function onSubmit() {
 const SPANS: CellSpan[] = [2, 3, 4, 6]
 const isEssay = computed(() => form.style === 'essay')
 
+// Style picker modal. Thumbnails are CSS-drawn layout sketches for now —
+// swap .sp-thumb for <img> screenshots when real captures are available.
+const STYLE_OPTIONS = [
+  { value: 'essay', nameKey: 'adminForm.styleEssay', descKey: 'adminForm.styleEssayDesc' },
+  { value: 'sticky', nameKey: 'adminForm.styleSticky', descKey: 'adminForm.styleStickyDesc' },
+  { value: 'contact', nameKey: 'adminForm.styleContact', descKey: 'adminForm.styleContactDesc' },
+  { value: 'darkroom', nameKey: 'adminForm.styleDarkroom', descKey: 'adminForm.styleDarkroomDesc' },
+  { value: 'chapters', nameKey: 'adminForm.styleChapters', descKey: 'adminForm.styleChaptersDesc' }
+] as const
+const showStylePicker = ref(false)
+const currentStyleKey = computed(() => STYLE_OPTIONS.find(o => o.value === form.style)?.nameKey ?? 'adminForm.styleEssay')
+function pickStyle(value: typeof STYLE_OPTIONS[number]['value']) {
+  form.style = value
+  showStylePicker.value = false
+}
+
 const ALIGN_OPTIONS: { value: TextAlign, key: string }[] = [
   { value: 'left', key: 'adminForm.cellAlignLeft' },
   { value: 'center', key: 'adminForm.cellAlignCenter' },
@@ -1032,13 +1049,35 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
         <p class="tray__label">{{ t('adminEditor.layout') }}</p>
         <div class="field">
           <label>{{ t('adminForm.style') }}</label>
-          <select v-model="form.style">
-            <option value="essay">{{ t('adminForm.styleEssay') }}</option>
-            <option value="sticky">{{ t('adminForm.styleSticky') }}</option>
-            <option value="contact">{{ t('adminForm.styleContact') }}</option>
-            <option value="darkroom">{{ t('adminForm.styleDarkroom') }}</option>
-          </select>
+          <button type="button" class="style-trigger" @click="showStylePicker = true">
+            <span>{{ t(currentStyleKey) }}</span>
+            <Icon name="heroicons:squares-2x2" class="style-trigger__icon" />
+          </button>
+          <p v-if="form.style === 'chapters'" class="field__hint">{{ t('adminForm.styleChaptersHint') }}</p>
         </div>
+
+        <UiModal v-model="showStylePicker" :title="t('adminForm.style')" size="lg">
+          <div class="sp-grid">
+            <button
+              v-for="opt in STYLE_OPTIONS"
+              :key="opt.value"
+              type="button"
+              class="sp-card"
+              :class="{ 'is-selected': form.style === opt.value }"
+              @click="pickStyle(opt.value)"
+            >
+              <!-- Placeholder thumbnail: a CSS sketch of the layout's structure -->
+              <span class="sp-thumb" :class="`sp-thumb--${opt.value}`" aria-hidden="true">
+                <i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i />
+              </span>
+              <span class="sp-card__name">
+                {{ t(opt.nameKey) }}
+                <Icon v-if="form.style === opt.value" name="heroicons:check" class="sp-card__check" />
+              </span>
+              <span class="sp-card__desc">{{ t(opt.descKey) }}</span>
+            </button>
+          </div>
+        </UiModal>
         <div class="field">
           <label>{{ t('adminForm.publishedSort') }}</label>
           <UiDateInput ref="publishedInput" v-model="form.published" :disabled="publishedMatchesEvent" />
@@ -2552,6 +2591,62 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .dock-fields { display: grid; gap: 0.5rem; }
 .field { display: flex; flex-direction: column; gap: 0.28rem; }
 .field label { font-size: 0.46rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.field__hint { font-size: 0.58rem; color: var(--muted); line-height: 1.55; }
+
+/* ── Style picker ── */
+.style-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  width: 100%; border: 1px solid var(--subtle); background: #fff; color: var(--dark);
+  font-family: var(--font-sans); font-size: 0.72rem; padding: 0.38rem 0.45rem; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.style-trigger:hover { border-color: var(--accent); }
+.style-trigger__icon { width: 0.8rem; height: 0.8rem; color: var(--muted); flex-shrink: 0; }
+
+.sp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; }
+.sp-card {
+  display: grid; gap: 0.45rem; align-content: start;
+  background: none; border: 1px solid var(--subtle); padding: 0.55rem;
+  font-family: var(--font-sans); text-align: left; cursor: pointer; transition: border-color 0.15s;
+}
+.sp-card:hover { border-color: var(--muted); }
+.sp-card.is-selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.sp-card__name { display: flex; align-items: center; gap: 0.4rem; color: var(--dark); font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; }
+.sp-card__check { width: 0.75rem; height: 0.75rem; color: var(--accent); }
+.sp-card__desc { color: var(--muted); font-size: 0.6rem; line-height: 1.5; }
+
+/* Placeholder thumbnails: CSS sketches of each layout's structure. Replace the
+   .sp-thumb block with an <img> per style once real screenshots exist. */
+.sp-thumb { display: grid; gap: 0.22rem; height: 6rem; padding: 0.5rem; background: #fff; border: 1px solid var(--subtle); }
+.sp-thumb i { display: none; background: var(--subtle); }
+
+.sp-thumb--essay { grid-template-columns: repeat(3, 1fr); grid-template-rows: 2fr 1fr; }
+.sp-thumb--essay i:nth-child(-n+3) { display: block; }
+.sp-thumb--essay i:nth-child(1) { grid-column: 1 / -1; }
+.sp-thumb--essay i:nth-child(2) { grid-column: 1 / 3; }
+
+.sp-thumb--sticky { grid-template-columns: 1.2fr 1fr; grid-template-rows: repeat(3, 1fr); }
+.sp-thumb--sticky i:nth-child(-n+4) { display: block; }
+.sp-thumb--sticky i:nth-child(1) { grid-row: 1 / -1; background: var(--paper); }
+
+.sp-thumb--contact { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, 1fr); }
+.sp-thumb--contact i { display: block; }
+
+.sp-thumb--darkroom { background: #131210; border-color: #131210; place-items: center; }
+.sp-thumb--darkroom i:nth-child(1) { display: block; width: 52%; height: 62%; background: #45433F; }
+
+.sp-thumb--chapters { grid-template-columns: repeat(6, 1fr); grid-template-rows: auto 2.2fr 1fr; }
+.sp-thumb--chapters i:nth-child(-n+6) { display: block; }
+.sp-thumb--chapters i:nth-child(1) { grid-column: 1 / 3; height: 0.24rem; align-self: center; background: var(--accent); opacity: 0.65; }
+.sp-thumb--chapters i:nth-child(2) { grid-column: 1 / -1; }
+.sp-thumb--chapters i:nth-child(3) { grid-column: 1 / 3; }
+.sp-thumb--chapters i:nth-child(4) { grid-column: 3 / 4; }
+.sp-thumb--chapters i:nth-child(5) { grid-column: 4 / 6; }
+.sp-thumb--chapters i:nth-child(6) { grid-column: 6 / 7; }
+
+@media (max-width: 720px) {
+  .sp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .field input, .field select, .field textarea {
   width: 100%; border: 1px solid var(--subtle); background: #fff; color: var(--dark);
   font-family: var(--font-sans); font-size: 0.72rem; padding: 0.38rem 0.5rem; outline: none; min-height: 2rem;

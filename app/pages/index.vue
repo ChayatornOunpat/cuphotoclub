@@ -291,7 +291,7 @@ useSeoMeta({
 .construction-notice__heading {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: clamp(1rem, 4vw, 2rem);
 }
 
 .construction-notice__heading h2 {
@@ -303,12 +303,14 @@ useSeoMeta({
   place-items: center;
   flex-shrink: 0;
   color: var(--accent);
+  font-size: clamp(3.25rem, 9vw, 4.6rem);
 }
 
-.construction-notice__mark :deep(svg) {
-  width: 1.6rem;
-  height: 1.6rem;
-  stroke-width: 1.45;
+.construction-notice__mark :deep(svg),
+.construction-notice__mark :deep(.iconify) {
+  width: 1em;
+  height: 1em;
+  stroke-width: 1.15;
 }
 
 .construction-notice__kicker {

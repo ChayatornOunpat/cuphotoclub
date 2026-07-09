@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AlbumChapters from '~/components/AlbumChapters.vue'
 import AlbumContact from '~/components/AlbumContact.vue'
 import AlbumDarkroom from '~/components/AlbumDarkroom.vue'
 import AlbumEssay from '~/components/AlbumEssay.vue'
@@ -12,7 +13,7 @@ const slug = route.params.slug as string
 const { data: album } = await useFetch(`/api/admin/albums/${slug}`)
 if (!album.value) throw createError({ statusCode: 404, statusMessage: 'Album not found', fatal: true })
 
-const styles = { essay: AlbumEssay, sticky: AlbumSticky, contact: AlbumContact, darkroom: AlbumDarkroom }
+const styles = { essay: AlbumEssay, sticky: AlbumSticky, contact: AlbumContact, darkroom: AlbumDarkroom, chapters: AlbumChapters }
 const styleComponent = computed(() => styles[album.value!.style] ?? AlbumEssay)
 
 useHead({ title: () => `${album.value?.title?.replace(/\n+/g, ' ')} — CU Photo Club` })

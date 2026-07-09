@@ -64,6 +64,13 @@ const secondarySections = computed(() => [
     to: localePath('/admin/r2-images')
   },
   {
+    key: 'cost',
+    title: t('admin.costTitle'),
+    count: null as number | null,
+    meta: t('admin.costMeta'),
+    to: localePath('/admin/cost')
+  },
+  {
     key: 'account',
     title: t('admin.account'),
     count: null as number | null,

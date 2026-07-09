@@ -29,7 +29,7 @@ export interface AlbumRow {
   cells: AlbumCell[]
 }
 
-export type AlbumStyle = 'essay' | 'sticky' | 'contact' | 'darkroom'
+export type AlbumStyle = 'essay' | 'sticky' | 'contact' | 'darkroom' | 'chapters'
 export type Placement = 'blog' | 'gallery' | 'both'
 
 export interface Album {

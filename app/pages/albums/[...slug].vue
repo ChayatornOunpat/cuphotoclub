@@ -3,6 +3,7 @@ import AlbumEssay from '~/components/AlbumEssay.vue'
 import AlbumSticky from '~/components/AlbumSticky.vue'
 import AlbumContact from '~/components/AlbumContact.vue'
 import AlbumDarkroom from '~/components/AlbumDarkroom.vue'
+import AlbumChapters from '~/components/AlbumChapters.vue'
 
 definePageMeta({ layout: 'site' })
 
@@ -22,7 +23,7 @@ if (!album.value) {
 
 // The admin's chosen style maps to a render component (set-and-forget). Explicit
 // imports (not a string name) so the components are bundled and resolve for <component :is>.
-const styles = { essay: AlbumEssay, sticky: AlbumSticky, contact: AlbumContact, darkroom: AlbumDarkroom }
+const styles = { essay: AlbumEssay, sticky: AlbumSticky, contact: AlbumContact, darkroom: AlbumDarkroom, chapters: AlbumChapters }
 const styleComponent = computed(() => styles[album.value!.style] ?? AlbumEssay)
 
 // Social link previews: without og:description/og:image scrapers fall back to
