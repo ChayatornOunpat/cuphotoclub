@@ -54,9 +54,27 @@ async function handleShare() {
 }
 
 useHead(() => ({
-  title: `${post.value?.title?.replace(/\n+/g, ' ')} — CU Photo Club`,
   bodyAttrs: { style: isDark.value ? 'background:#0C0C0A' : '' },
 }))
+
+// Social link previews: og:image must be an absolute URL or scrapers ignore it.
+// app.vue's titleTemplate appends "· CU Photo Club" — don't add a suffix here.
+const origin = useRequestURL().origin
+const coverUrl = computed(() => {
+  const src = post.value?.image
+  if (!src) return undefined
+  return /^https?:\/\//i.test(src) ? src : `${origin}${src.startsWith('/') ? '' : '/images/'}${src}`
+})
+
+useSeoMeta({
+  title: () => post.value?.title?.replace(/\n+/g, ' '),
+  ogTitle: () => post.value?.title?.replace(/\n+/g, ' '),
+  description: () => (post.value?.excerpt || post.value?.title || '').replace(/\n+/g, ' '),
+  ogDescription: () => (post.value?.excerpt || post.value?.title || '').replace(/\n+/g, ' '),
+  ogImage: () => coverUrl.value,
+  ogType: 'article',
+  twitterCard: () => (coverUrl.value ? 'summary_large_image' : 'summary')
+})
 </script>
 
 <template>

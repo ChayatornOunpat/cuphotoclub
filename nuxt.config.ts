@@ -79,24 +79,18 @@ export default defineNuxtConfig({
         : process.env.NODE_ENV === 'production'
           || process.env.NUXT_PUBLIC_REAL_DATA_ONLY === 'true'
           || process.env.NUXT_REAL_DATA_ONLY === 'true',
-      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === 'production' ? 'https://cuphotoclub.pages.dev' : 'http://localhost:3000')
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === 'production' ? 'https://cuphotoclub.com' : 'http://localhost:3000')
     }
   },
 
   app: {
     head: {
       // <html lang> is set reactively per-locale in app.vue (useHead).
+      // Fonts are self-hosted by @nuxt/fonts (see `fonts` below) — no external
+      // Google Fonts <link> here, which would be a render-blocking duplicate.
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' }
-      ],
-      link: [
-        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: 'anonymous' },
-        {
-          rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Serif+Thai:wght@300;400;500;600&display=swap'
-        }
       ]
     }
   },
@@ -114,10 +108,10 @@ export default defineNuxtConfig({
     ]
   },
 
-  // picsum: design placeholders. localhost / pages.dev: R2 blob images are served
+  // picsum: design placeholders. localhost / prod: R2 blob images are served
   // via a server route (/images/**), not from public/, so IPX must HTTP-fetch them.
   image: {
-    domains: ['picsum.photos', 'localhost', 'cuphotoclub.pages.dev'],
+    domains: ['picsum.photos', 'localhost', 'cuphotoclub.com', 'www.cuphotoclub.com', 'cuphotoclub.pages.dev'],
   },
 
   icon: {
@@ -126,6 +120,9 @@ export default defineNuxtConfig({
   },
 
   i18n: {
+    // Absolute base used by useLocaleHead() for canonical + hreflang URLs.
+    // Must match the production domain (same source as public.siteUrl).
+    baseUrl: process.env.NUXT_PUBLIC_SITE_URL || 'https://cuphotoclub.com',
     locales: [
       { code: 'en', language: 'en', name: 'English', file: 'en.json' },
       { code: 'th', language: 'th', name: 'ไทย', file: 'th.json' }

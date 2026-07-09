@@ -41,6 +41,19 @@ onMounted(() => {
   })
 })
 
+// Cancelling album creation: if the user navigates away without ever saving,
+// remove the empty draft row so it doesn't linger in the albums list. This runs
+// on unmount — i.e. only after the form's own unsaved-changes guard let the
+// navigation through. A reload/crash doesn't unmount, so the localStorage
+// resume path (ensureDraft above) still recovers the draft in that case.
+// Uploaded files stay in R2; without the album row they surface as
+// unreferenced in the R2 admin for cleanup.
+onUnmounted(() => {
+  if (saved.value || !draftId.value) return
+  localStorage.removeItem(draftStorageKey)
+  $fetch(`/api/admin/albums/${draftId.value}`, { method: 'DELETE' }).catch(() => {})
+})
+
 async function save(value: AlbumInput) {
   if (!draftId.value) return
   busy.value = true

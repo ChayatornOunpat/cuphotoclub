@@ -3,6 +3,7 @@
 // photogrid" museum-wall concept before wiring it into index.vue in place
 // of FeaturedWork.
 definePageMeta({ layout: false })
+useSeoMeta({ robots: 'noindex, nofollow' })
 </script>
 
 <template>

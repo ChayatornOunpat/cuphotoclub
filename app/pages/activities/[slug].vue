@@ -25,11 +25,42 @@ if (error.value || !ev.value) {
 }
 
 const origin = useRequestURL().origin
+const coverUrl = computed(() => (ev.value!.coverR2Key ? `${origin}/images/${ev.value!.coverR2Key}` : undefined))
+
 useSeoMeta({
   title: () => ev.value!.title,
   description: () => ev.value!.summary || ev.value!.title,
-  ogImage: () => (ev.value!.coverR2Key ? `${origin}/images/${ev.value!.coverR2Key}` : undefined)
+  ogImage: () => coverUrl.value,
+  ogType: 'article',
+  twitterCard: () => (coverUrl.value ? 'summary_large_image' : 'summary')
 })
+
+// Event structured data — eligible for the event rich result / experiences.
+useHead(() => ({
+  script: [
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Event',
+        name: ev.value!.title,
+        description: ev.value!.summary || ev.value!.title,
+        image: coverUrl.value ? [coverUrl.value] : undefined,
+        startDate: ev.value!.eventDate || undefined,
+        endDate: ev.value!.endDate || ev.value!.eventDate || undefined,
+        eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+        location: ev.value!.location
+          ? { '@type': 'Place', name: ev.value!.location }
+          : undefined,
+        url: `${origin}/activities/${ev.value!.slug}`,
+        organizer: { '@type': 'Organization', name: 'CU Photo Club', url: origin },
+        offers: ev.value!.registerUrl
+          ? { '@type': 'Offer', url: ev.value!.registerUrl, availability: 'https://schema.org/InStock' }
+          : undefined
+      })
+    }
+  ]
+}))
 </script>
 
 <template>

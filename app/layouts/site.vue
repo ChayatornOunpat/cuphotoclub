@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { defaultSite } from '~/utils/defaultSite'
 
+// Emit per-locale SEO head tags for all public pages: <html lang/dir>,
+// <link rel="canonical">, hreflang alternates (en/th/x-default), and og:locale.
+// Uses i18n.baseUrl (nuxt.config) so URLs are absolute on the real domain.
+const localeHead = useLocaleHead()
+useHead(localeHead)
+
 // Shared chrome for inner pages (albums, and later blog): reading-progress bar,
 // the dark→light nav handoff, header parallax, and the footer — all driven by
 // the page's own markup via data-attributes:

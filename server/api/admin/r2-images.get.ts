@@ -148,9 +148,28 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // Images upload into content-albums/<id>/ the moment they're dropped on the
+  // canvas — before the album is saved. Recent uploads (within the grace
+  // window) count as referenced by folder membership so they don't show as
+  // "unreferenced" and get cleaned up while the author is still composing.
+  // Older unplaced images (removed from the canvas) fall back to unreferenced.
+  const editorialById = new Map(editorialAlbums.map(album => [album.id, album]))
+  const folderCutoff = Date.now() - R2_ALBUM_FOLDER_GRACE_MS
+
   const images: R2InventoryImage[] = blobs.map(item => {
     const albums = albumUsage.get(item.pathname) ?? []
     const usages = otherUsage.get(item.pathname) ?? []
+    const folderId = item.pathname.match(/^content-albums\/([^/]+)\//)?.[1]
+    const folderAlbum = folderId ? editorialById.get(folderId) : undefined
+    const uploadedRecently = (item.uploadedAt?.getTime() ?? 0) > folderCutoff
+    if (folderAlbum && uploadedRecently && !usages.some(u => u.kind === 'editorial-album')) {
+      usages.push({
+        kind: 'editorial-album',
+        label: folderAlbum.title || 'Album in progress',
+        href: `/admin/albums/${folderAlbum.id}`,
+        role: 'album folder'
+      })
+    }
     // Queue-order stamp written at upload time; uploadedAt (completion time)
     // is the fallback for images uploaded before the stamp existed.
     const seq = Number(item.customMetadata?.seq)

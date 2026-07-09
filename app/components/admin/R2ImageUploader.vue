@@ -454,15 +454,9 @@ async function upload(files: File[], retry = false) {
   const images = uniqueUncompleted(files.filter(file => file.type.startsWith('image/')))
   if (!images.length) return
 
-  // While an upload is already running, queue and update the counter. The drain
-  // loop below counts only what it pulls off the queue, so this is the single
-  // place queued files enter `total` (no double count). Single-file mode never
-  // drains the queue, so concurrent drops are ignored rather than stranded.
+  // Do not accept another batch while an upload is in progress. Keeping the
+  // active batch as the only batch makes progress and failure reporting clear.
   if (uploading.value) {
-    if (props.multiple) {
-      pendingQueue.value.push(...images)
-      total.value += images.length
-    }
     return
   }
 
@@ -532,9 +526,13 @@ function onPick(e: Event) {
   if (input.files?.length) upload(Array.from(input.files))
 }
 
+function onDragOver() {
+  dragOver.value = !uploading.value && canAddMore.value
+}
+
 function onDrop(e: DragEvent) {
   dragOver.value = false
-  if (!canAddMore.value || !e.dataTransfer?.files?.length) return
+  if (uploading.value || !canAddMore.value || !e.dataTransfer?.files?.length) return
   upload(Array.from(e.dataTransfer.files))
 }
 </script>
@@ -546,10 +544,11 @@ function onDrop(e: DragEvent) {
       class="r2up__zone"
       :class="[
         dragOver ? 'is-drag-over' : '',
+        uploading ? 'is-uploading' : '',
         !canAddMore ? 'is-full' : '',
         dropzoneClass
       ]"
-      @dragover.prevent="dragOver = canAddMore"
+      @dragover.prevent="onDragOver"
       @dragleave.prevent="dragOver = false"
       @drop.prevent="onDrop"
     >
@@ -663,6 +662,14 @@ function onDrop(e: DragEvent) {
 .r2up__zone.is-full {
   opacity: 0.6;
   cursor: default;
+}
+.r2up__zone.is-uploading {
+  cursor: progress;
+}
+.r2up__zone.is-uploading:hover {
+  border-color: var(--subtle);
+  border-style: dashed;
+  background: color-mix(in srgb, var(--body-bg) 60%, white);
 }
 
 /* Icon */

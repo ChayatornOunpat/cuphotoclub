@@ -124,6 +124,7 @@ onBeforeUnmount(() => {
             :aria-label="t('common.close') || 'Close'"
             @click="emit('close')"
           >
+            <span class="album-modal__close-label">{{ t('common.close') }}</span>
             <Icon name="heroicons:x-mark" class="album-modal__close-icon" />
           </button>
 
@@ -185,26 +186,42 @@ onBeforeUnmount(() => {
 
 .album-modal__close {
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
+  top: 1rem;
+  right: 1rem;
   z-index: 2;
-  width: 2rem;
-  height: 2rem;
-  display: grid;
-  place-items: center;
-  border: none;
-  background: rgba(12, 12, 10, 0.6);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2rem;
+  padding: 0 0.65rem 0 0.8rem;
+  border: 1px solid rgba(245, 244, 240, 0.62);
+  background: rgba(12, 12, 10, 0.48);
   color: #F5F4F0;
-  border-radius: 50%;
+  font-family: var(--font-sans, sans-serif);
+  font-size: 0.52rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.2s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 .album-modal__close:hover {
-  background: rgba(12, 12, 10, 0.9);
+  background: var(--accent, #E8186E);
+  border-color: var(--accent, #E8186E);
+  color: #F5F4F0;
+}
+.album-modal__close:focus-visible {
+  outline: 2px solid var(--accent, #E8186E);
+  outline-offset: 3px;
+}
+.album-modal__close-label {
+  line-height: 1;
 }
 .album-modal__close-icon {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
 }
 
 .album-modal__hero {
@@ -324,9 +341,12 @@ onBeforeUnmount(() => {
   .album-modal__content {
     width: 100%;
     max-height: 85vh;
-    border-radius: 1rem 1rem 0 0;
     border: none;
     border-top: 1px solid rgba(245, 244, 240, 0.08);
+  }
+  .album-modal__close {
+    top: 0.85rem;
+    right: 0.85rem;
   }
   .modal-enter-from .album-modal__content {
     transform: translateY(100%);

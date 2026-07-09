@@ -17,6 +17,13 @@ async function selectChunked<R>(keys: string[], run: (chunk: string[]) => Promis
   return results.flat()
 }
 
+// How long folder membership alone (content-albums/<id>/...) keeps an image
+// listed as referenced in the R2 admin inventory after upload — long enough to
+// cover an editing session, so in-progress uploads don't show up in the
+// "unreferenced" cleanup view while their author is still composing. Display
+// only: it never blocks deletion.
+export const R2_ALBUM_FOLDER_GRACE_MS = 24 * 60 * 60 * 1000
+
 export interface R2DeleteReferenceInfo {
   galleryPhoto: boolean
   post: boolean

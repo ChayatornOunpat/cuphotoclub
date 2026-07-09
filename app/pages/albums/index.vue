@@ -2,6 +2,8 @@
 definePageMeta({ layout: 'site' })
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const localizedPath = useLocalizedContentPath()
 const { data: albums } = await useAsyncData('albums-archive', async () => {
   const adminAlbums = await $fetch('/api/albums').catch(() => [])
@@ -26,7 +28,11 @@ const categories = computed(() => {
   return [...counts.entries()].map(([name, count]) => ({ name, count }))
 })
 
-const activeCat = ref('all')
+function queryCategory(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value : 'all'
+}
+
+const activeCat = ref(queryCategory(route.query.category))
 const categoryMenuOpen = ref(false)
 const inlineCategoryLimit = 4
 const sortedCategories = computed(() =>
@@ -55,6 +61,9 @@ watch(activeCat, () => {
   page.value = 1
   categoryMenuOpen.value = false
 })
+watch(() => route.query.category, value => {
+  activeCat.value = queryCategory(value)
+})
 watch(totalPages, () => {
   if (page.value > totalPages.value) page.value = totalPages.value
 })
@@ -68,6 +77,15 @@ function goToPage(n: number) {
   if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function selectCategory(category: string) {
+  activeCat.value = category
+  const query = { ...route.query }
+  delete query.category
+  router.replace({
+    query: category === 'all' ? query : { ...query, category }
+  })
+}
+
 function imageCount(a: NonNullable<typeof albums.value>[number]): number {
   // Photo count is precomputed server-side (full `rows` no longer sent).
   return a.photoCount ?? 0
@@ -75,7 +93,13 @@ function imageCount(a: NonNullable<typeof albums.value>[number]): number {
 const totalFrames = computed(() => galleryAlbums.value.reduce((n, a) => n + imageCount(a), 0))
 const headerBg = computed(() => (galleryAlbums.value[0] ? coverOf(galleryAlbums.value[0]) : ''))
 
-useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
+// app.vue's titleTemplate appends "· CU Photo Club" — don't add a suffix here.
+useSeoMeta({
+  title: () => t('albums.pageTitle'),
+  ogTitle: () => t('albums.pageTitle'),
+  description: () => t('albums.pageLead'),
+  ogDescription: () => t('albums.pageLead')
+})
 </script>
 
 <template>
@@ -116,7 +140,7 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
             <h2 class="index-bar__title">{{ t('albums.sequencedBy') }}</h2>
           </div>
           <div class="filter">
-            <button :class="{ active: activeCat === 'all' }" @click="activeCat = 'all'">
+            <button :class="{ active: activeCat === 'all' }" @click="selectCategory('all')">
               {{ t('common.all') }} <sup>{{ galleryAlbums.length }}</sup>
             </button>
             <button
@@ -124,7 +148,7 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
               :key="cat.name"
               :class="{ active: activeCat === cat.name }"
               :lang="textLang(cat.name)"
-              @click="activeCat = cat.name"
+              @click="selectCategory(cat.name)"
             >
               {{ cat.name }} <sup>{{ cat.count }}</sup>
             </button>
@@ -148,7 +172,7 @@ useHead({ title: () => `${t('admin.albums')} — CU Photo Club` })
                   :aria-checked="activeCat === cat.name"
                   :class="{ active: activeCat === cat.name }"
                   :lang="textLang(cat.name)"
-                  @click="activeCat = cat.name"
+                  @click="selectCategory(cat.name)"
                 >
                   <span>{{ cat.name }}</span>
                   <sup>{{ cat.count }}</sup>

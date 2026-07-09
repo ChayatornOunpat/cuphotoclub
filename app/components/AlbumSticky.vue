@@ -14,6 +14,7 @@ const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedR
 const { t } = useI18n()
 const localePath = useLocalePath()
 const cover = computed(() => props.album.coverSrc)
+const categoryAlbumsPath = computed(() => `${localePath('/albums')}?category=${encodeURIComponent(props.album.category)}`)
 
 // Flat list of image cells with their row/cell coordinates for admin selection
 const imageCells = computed(() => {
@@ -39,7 +40,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
           <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ t('albums.stickyBreadcrumb') }}</span>
           <NuxtLink v-else :to="localePath('/albums')">{{ t('albums.stickyBreadcrumb') }}</NuxtLink><span>/</span>
           <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ album.category }}</span>
-          <NuxtLink v-else :to="localePath('/albums')">{{ album.category }}</NuxtLink><span>/</span>
+          <NuxtLink v-else :to="categoryAlbumsPath">{{ album.category }}</NuxtLink><span>/</span>
           <span class="here" :lang="textLang(album.title)">{{ album.title }}</span>
         </div>
         <div class="meta__thumb"><AppImg :src="cover" :alt="album.title" sizes="sm:100vw lg:360px" /></div>

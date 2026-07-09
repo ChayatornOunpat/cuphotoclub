@@ -8,7 +8,7 @@ const env = {
   ...process.env,
   NUXT_REAL_DATA_ONLY: 'true',
   NUXT_PUBLIC_REAL_DATA_ONLY: 'true',
-  NUXT_PUBLIC_SITE_URL: process.env.NUXT_PUBLIC_SITE_URL || 'https://cuphotoclub.pages.dev'
+  NUXT_PUBLIC_SITE_URL: process.env.NUXT_PUBLIC_SITE_URL || 'https://cuphotoclub.com'
 }
 
 const child = spawn('pnpm', ['run', 'dev', '--', ...process.argv.slice(2)], {

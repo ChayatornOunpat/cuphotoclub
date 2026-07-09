@@ -127,14 +127,35 @@ onMounted(() => {
 })
 onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
+// The homepage sets its own full title, so opt out of app.vue's titleTemplate
+// (which would append a second "· CU Photo Club").
+const origin = useRequestURL().origin
 useHead({
+  titleTemplate: null,
   title: () => `${t('nav.logo')} — Chulalongkorn University`,
-  meta: [
+  script: [
     {
-      name: 'description',
-      content: () => t('home.metaDescription')
+      // WebSite structured data + sitelinks search box.
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'CU Photo Club',
+        url: origin,
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: `${origin}/search?q={search_term_string}`,
+          'query-input': 'required name=search_term_string'
+        }
+      })
     }
   ]
+})
+useSeoMeta({
+  description: () => t('home.metaDescription'),
+  ogTitle: () => `${t('nav.logo')} — Chulalongkorn University`,
+  ogDescription: () => t('home.metaDescription'),
+  ogImage: `${origin}/club-icon.jpg`
 })
 </script>
 

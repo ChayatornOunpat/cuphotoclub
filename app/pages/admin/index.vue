@@ -3,9 +3,10 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { t } = useI18n()
 const localePath = useLocalePath()
-const [{ data: albums }, { data: posts }, { data: members }, { data: heroImages }] = await Promise.all([
+const [{ data: albums }, { data: posts }, { data: events }, { data: members }, { data: heroImages }] = await Promise.all([
   useFetch('/api/admin/albums'),
   useFetch('/api/admin/posts'),
+  useFetch('/api/admin/events'),
   useFetch('/api/admin/members'),
   useFetch('/api/admin/hero-images')
 ])
@@ -30,6 +31,13 @@ const primarySections = computed(() => [
     to: localePath('/admin/posts'),
     newTo: localePath('/admin/posts/new'),
     quickLabel: t('admin.newPost')
+  },
+  {
+    key: 'activities',
+    title: t('admin.activities'),
+    count: events.value?.length ?? 0,
+    meta: t('admin.activityWork'),
+    to: localePath('/admin/activities')
   }
 ])
 
@@ -54,6 +62,21 @@ const secondarySections = computed(() => [
     count: null as number | null,
     meta: t('admin.r2ImagesMeta'),
     to: localePath('/admin/r2-images')
+  },
+  {
+    key: 'account',
+    title: t('admin.account'),
+    count: null as number | null,
+    meta: t('admin.accountMeta'),
+    to: localePath('/admin/account')
+  },
+  {
+    key: 'viewSite',
+    title: t('admin.viewSite'),
+    count: null as number | null,
+    meta: t('admin.viewSiteMeta'),
+    to: localePath('/'),
+    target: '_blank'
   }
 ])
 
@@ -95,7 +118,7 @@ useHead({ title: () => `${t('admin.dashboard')} - Admin` })
                 <small>{{ section.meta }}</small>
               </span>
             </NuxtLink>
-            <NuxtLink :to="section.newTo" class="pcard__new">{{ section.quickLabel }}</NuxtLink>
+            <NuxtLink v-if="section.newTo && section.quickLabel" :to="section.newTo" class="pcard__new">{{ section.quickLabel }}</NuxtLink>
           </article>
         </div>
       </div>
@@ -103,7 +126,15 @@ useHead({ title: () => `${t('admin.dashboard')} - Admin` })
       <div class="dash__group">
         <p class="dash__label">{{ t('admin.sectionUtilities') }}</p>
         <div class="secondary" role="list">
-          <NuxtLink v-for="section in secondarySections" :key="section.key" :to="section.to" class="scard" role="listitem">
+          <NuxtLink
+            v-for="section in secondarySections"
+            :key="section.key"
+            :to="section.to"
+            class="scard"
+            role="listitem"
+            :target="section.target"
+            :rel="section.target === '_blank' ? 'noopener noreferrer' : undefined"
+          >
             <span v-if="section.count !== null" class="scard__count">{{ section.count }}</span>
             <span class="scard__text">
               <strong>{{ section.title }}</strong>

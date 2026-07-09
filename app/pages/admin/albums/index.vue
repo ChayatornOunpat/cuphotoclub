@@ -114,7 +114,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
       </thead>
       <tbody>
         <tr v-for="a in visibleAlbums" :key="a.id">
-          <td class="t-title">{{ a.title }}</td>
+          <td class="t-title" :class="{ 't-title--draft': !a.title }">{{ a.title || t('admin.untitledDraft') }}</td>
           <td>{{ a.category }}</td>
           <td><span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span></td>
           <td><span class="pill">{{ a.style }}</span></td>
@@ -123,7 +123,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           <td class="t-actions">
             <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
             <NuxtLink :to="localePath(`/admin/albums/${a.slug}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
-            <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title)">
+            <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title || t('admin.untitledDraft'))">
               {{ deleting === a.id ? '...' : t('admin.delete') }}
             </button>
           </td>
@@ -136,7 +136,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
         <img v-if="coverFor(a)" :src="coverFor(a) as string" :alt="a.title">
         <div class="card__body">
           <p class="card__meta">{{ a.category }} · {{ a.date }}</p>
-          <h2>{{ a.title }}</h2>
+          <h2 :class="{ 'card__title--draft': !a.title }">{{ a.title || t('admin.untitledDraft') }}</h2>
           <p>{{ a.excerpt }}</p>
           <div class="card__facts">
             <span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span>
@@ -146,7 +146,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           <div class="card__actions">
             <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
             <NuxtLink :to="localePath(`/admin/albums/${a.slug}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
-            <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title)">
+            <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title || t('admin.untitledDraft'))">
               {{ deleting === a.id ? '...' : t('admin.delete') }}
             </button>
           </div>
@@ -183,6 +183,8 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 .tbl th { text-align: left; font-size: 0.5rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); font-weight: 500; padding: 0 0.75rem 0.85rem; border-bottom: 1px solid var(--subtle); }
 .tbl td { padding: 0.9rem 0.75rem; border-bottom: 1px solid var(--subtle); vertical-align: middle; }
 .t-title { font-weight: 500; }
+.t-title--draft,
+.card__title--draft { color: var(--muted); font-style: italic; font-weight: 400; }
 .t-muted { color: var(--muted); }
 .pill { font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--subtle); padding: 0.2rem 0.5rem; }
 .visibility-pill {

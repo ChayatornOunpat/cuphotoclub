@@ -22,6 +22,7 @@ async function readDims(file: File): Promise<{ w: number, h: number } | null> {
 }
 
 async function upload(files: File[]) {
+  if (uploading.value) return
   const images = files.filter(f => f.type.startsWith('image/'))
   if (!images.length) return
   uploading.value = true
@@ -52,8 +53,12 @@ function onPick(e: Event) {
   const input = e.target as HTMLInputElement
   if (input.files?.length) upload(Array.from(input.files))
 }
+function onDragOver() {
+  dragOver.value = !uploading.value
+}
 function onDrop(e: DragEvent) {
   dragOver.value = false
+  if (uploading.value) return
   if (e.dataTransfer?.files?.length) upload(Array.from(e.dataTransfer.files))
 }
 </script>
@@ -63,14 +68,14 @@ function onDrop(e: DragEvent) {
     <div
       class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors"
       :class="dragOver ? 'border-accent bg-accent-soft/40' : 'border-line bg-paper-soft'"
-      @dragover.prevent="dragOver = true"
+      @dragover.prevent="onDragOver"
       @dragleave.prevent="dragOver = false"
       @drop.prevent="onDrop"
     >
       <Icon name="heroicons:photo" class="size-9 text-ink-soft" />
       <p class="mt-3 text-sm text-ink-soft">
         {{ t('uploader.dragHere') }}
-        <button type="button" class="font-semibold text-accent hover:underline" @click="fileInput?.click()">{{ t('uploader.browse') }}</button>
+        <button type="button" class="font-semibold text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50" :disabled="uploading" @click="fileInput?.click()">{{ t('uploader.browse') }}</button>
       </p>
       <p class="mt-1 text-xs text-ink-soft/70">{{ t('uploader.hint15') }}</p>
       <input ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onPick">

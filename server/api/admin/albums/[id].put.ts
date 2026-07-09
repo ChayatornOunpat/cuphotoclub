@@ -13,10 +13,12 @@ export default defineEventHandler(async (event) => {
   body.visibility ??= 'public'
 
   const before = await albumStore.get(id)
-  const updated = await albumStore.update(id, body)
+  // createIfMissing: if another editor deleted this draft while the author was
+  // still editing, re-create it under the same id so their work isn't lost.
+  const updated = await albumStore.update(id, body, { createIfMissing: true })
   if (!updated) throw createError({ statusCode: 404, statusMessage: 'Album not found' })
   await recordAdminAudit(user, {
-    action: 'update',
+    action: before ? 'update' : 'create',
     entityType: 'album',
     entityId: updated.id,
     entityTitle: updated.title,
@@ -25,7 +27,8 @@ export default defineEventHandler(async (event) => {
       previousVisibility: before?.visibility,
       nextVisibility: updated.visibility,
       published: updated.published,
-      style: updated.style
+      style: updated.style,
+      ...(before ? {} : { recreatedAfterDelete: true })
     }
   })
   return updated

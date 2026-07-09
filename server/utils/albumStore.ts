@@ -215,18 +215,21 @@ export const albumStore = {
     return album
   },
 
-  async update(id: string, input: AlbumInput): Promise<Album | null> {
+  async update(id: string, input: AlbumInput, opts?: { createIfMissing?: boolean }): Promise<Album | null> {
     await seedFromContentOnce()
     const existing = await this.get(id)
-    if (!existing) return null
+    // createIfMissing: another editor may delete a draft row while its creator
+    // still has the canvas open — that save must re-create the album, not 404.
+    if (!existing && !opts?.createIfMissing) return null
 
     // Keep the URL slug in sync with the title. slugify is deterministic, so
     // re-saving the same title yields the same slug (exceptId prevents a
     // self-collision). The R2 folder (= id) never moves regardless.
+    const targetId = existing?.id ?? id
     const slug = input.title.trim()
-      ? await uniqueSlug(input.title, existing.id)
-      : existing.slug
-    const album: Album = { ...input, id: existing.id, slug }
+      ? await uniqueSlug(input.title, targetId)
+      : (existing?.slug ?? await uniqueSlug(`draft-${targetId.slice(0, 8)}`))
+    const album: Album = { ...input, id: targetId, slug }
     await writeAlbum(album)
     return album
   },

@@ -1,29 +1,76 @@
 import { eq } from 'drizzle-orm'
 
-export default defineEventHandler(async (event) => {
-  const base = getRequestURL(event).origin
+// Locales configured in nuxt.config i18n. `en` is the default locale and is
+// served without a path prefix; `th` lives under /th (strategy:
+// prefix_except_default). Keep this in sync with nuxt.config.
+const LOCALES = ['en', 'th'] as const
+const DEFAULT_LOCALE = 'en'
 
-  const [albums, posts, events] = await Promise.all([
-    db.select({ slug: schema.albums.slug }).from(schema.albums).where(eq(schema.albums.status, 'published')),
-    db.select({ slug: schema.posts.slug }).from(schema.posts).where(eq(schema.posts.status, 'published')),
-    db.select({ slug: schema.events.slug }).from(schema.events).where(eq(schema.events.status, 'published'))
+function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+// Absolute, locale-aware URL for a path. Slugs may contain Thai characters
+// (album/event slugs), so each path segment is percent-encoded to stay valid.
+function buildUrl(base: string, locale: string, path: string): string {
+  const prefix = locale === DEFAULT_LOCALE ? '' : `/${locale}`
+  const segments = path.split('/').filter(Boolean).map(encodeURIComponent)
+  const rel = segments.length ? `/${segments.join('/')}` : ''
+  if (!rel) return prefix ? `${base}${prefix}` : `${base}/`
+  return `${base}${prefix}${rel}`
+}
+
+export default defineEventHandler(async (event) => {
+  const config = useRuntimeConfig()
+  const base = (config.public.siteUrl || getRequestURL(event).origin).replace(/\/+$/, '')
+
+  const [albums, posts, eventRows] = await Promise.all([
+    albumStore.list(),
+    postStore.list(),
+    db.select({ slug: schema.events.slug })
+      .from(schema.events)
+      .where(eq(schema.events.status, 'published'))
   ])
 
+  const albumSlugs = albums.filter(a => a.visibility === 'public').map(a => a.slug)
+  const postSlugs = posts.filter(p => p.visibility === 'public').map(p => p.id)
+  const eventSlugs = eventRows.map(e => e.slug)
+
   const paths = [
-    '',
-    '/galleries',
+    '/',
+    '/albums',
     '/blog',
     '/activities',
     '/about',
     '/contact',
-    ...albums.map(a => `/galleries/${a.slug}`),
-    ...posts.map(p => `/blog/${p.slug}`),
-    ...events.map(e => `/activities/${e.slug}`)
+    '/members',
+    ...albumSlugs.map(slug => `/albums/${slug}`),
+    ...postSlugs.map(slug => `/blog/${slug}`),
+    ...eventSlugs.map(slug => `/activities/${slug}`)
   ]
 
+  const urls = paths.map((path) => {
+    // hreflang alternates shared by every locale variant of this path.
+    const alternates = [
+      ...LOCALES.map(locale => `    <xhtml:link rel="alternate" hreflang="${locale}" href="${xmlEscape(buildUrl(base, locale, path))}"/>`),
+      `    <xhtml:link rel="alternate" hreflang="x-default" href="${xmlEscape(buildUrl(base, DEFAULT_LOCALE, path))}"/>`
+    ].join('\n')
+
+    // One <url> entry per locale, each carrying the full alternate set.
+    return LOCALES.map(locale => `  <url>
+    <loc>${xmlEscape(buildUrl(base, locale, path))}</loc>
+${alternates}
+  </url>`).join('\n')
+  }).join('\n')
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${paths.map(p => `  <url><loc>${base}${p}</loc></url>`).join('\n')}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+${urls}
 </urlset>`
 
   setHeader(event, 'content-type', 'application/xml; charset=utf-8')

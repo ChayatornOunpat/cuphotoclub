@@ -35,6 +35,7 @@ const featuredAlbums = computed(() =>
 )
 
 useHead({ title: 'Intro pattern bench — internal' })
+useSeoMeta({ robots: 'noindex, nofollow' })
 </script>
 
 <template>
