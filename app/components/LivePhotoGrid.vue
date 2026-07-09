@@ -52,10 +52,10 @@ const GAP = 3
 
 function currentGridConfig(): GridConfig {
   const w = window.innerWidth
-  if (w <= 460) return { cols: 4, rows: 9, rowHeight: 64 }
-  if (w <= 700) return { cols: 6, rows: 8, rowHeight: 70 }
-  if (w <= 1100) return { cols: 10, rows: 7, rowHeight: 80 }
-  return { cols: 16, rows: 8, rowHeight: 70 }
+  if (w <= 460) return { cols: 4, rows: 11, rowHeight: 64 }
+  if (w <= 700) return { cols: 6, rows: 10, rowHeight: 70 }
+  if (w <= 1100) return { cols: 10, rows: 9, rowHeight: 80 }
+  return { cols: 16, rows: 10, rowHeight: 70 }
 }
 
 // Picks a target shape from a photo's real aspect ratio (width / height).

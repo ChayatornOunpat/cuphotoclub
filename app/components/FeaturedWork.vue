@@ -152,13 +152,13 @@ onBeforeUnmount(() => {
 }
 
 .gallery__fallback {
-  min-height: 557px;
+  min-height: 727px;
   background: var(--paper);
 }
 
 @media (max-width: 1100px) {
   .gallery__fallback {
-    min-height: 578px;
+    min-height: 744px;
   }
 }
 
@@ -176,13 +176,13 @@ onBeforeUnmount(() => {
   }
 
   .gallery__fallback {
-    min-height: 581px;
+    min-height: 727px;
   }
 }
 
 @media (max-width: 460px) {
   .gallery__fallback {
-    min-height: 603px;
+    min-height: 734px;
   }
 }
 </style>
