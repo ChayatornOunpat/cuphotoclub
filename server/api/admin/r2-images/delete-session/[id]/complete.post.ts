@@ -41,6 +41,9 @@ export default defineEventHandler(async (event) => {
   const blocked = session.items.filter(item => item.status === 'blocked')
 
   if (deleted.length) {
+    // A permanent delete also clears any trash record for the key, so purging
+    // from the trash view leaves no dangling row pointing at a missing blob.
+    await removeFromR2Trash(deleted.map(item => item.key))
     await recordAdminAudit(actor, {
       action: 'delete',
       entityType: 'media',

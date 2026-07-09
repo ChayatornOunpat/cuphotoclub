@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const prefix = String(query.prefix || '').replace(/[^a-z0-9/_-]/gi, '') || undefined
 
-  const [blobs, galleryPhotos, posts, events, members, heroRows, editorialAlbums] = await Promise.all([
+  const [blobs, galleryPhotos, posts, events, members, heroRows, editorialAlbums, trashedKeys] = await Promise.all([
     listImageBlobs(prefix),
     db
       .select({
@@ -77,7 +77,8 @@ export default defineEventHandler(async (event) => {
       photoR2Key: schema.members.photoR2Key
     }).from(schema.members).orderBy(schema.members.sortOrder),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'heroImages')),
-    albumStore.list()
+    albumStore.list(),
+    trashedKeySet()
   ])
 
   const albumUsage = new Map<string, ImageUsage[]>()
@@ -156,7 +157,9 @@ export default defineEventHandler(async (event) => {
   const editorialById = new Map(editorialAlbums.map(album => [album.id, album]))
   const folderCutoff = Date.now() - R2_ALBUM_FOLDER_GRACE_MS
 
-  const images: R2InventoryImage[] = blobs.map(item => {
+  const images: R2InventoryImage[] = blobs
+    .filter(item => !trashedKeys.has(item.pathname))
+    .map(item => {
     const albums = albumUsage.get(item.pathname) ?? []
     const usages = otherUsage.get(item.pathname) ?? []
     const folderId = item.pathname.match(/^content-albums\/([^/]+)\//)?.[1]

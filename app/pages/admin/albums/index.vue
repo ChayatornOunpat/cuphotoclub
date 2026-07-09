@@ -5,6 +5,8 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 const { data: albums, refresh } = await useFetch('/api/admin/albums')
 const deleting = ref('')
+const confirmTarget = ref<{ id: string; title: string } | null>(null)
+const deleteError = ref('')
 const query = ref('')
 const sortBy = ref('newest')
 const viewMode = ref<'list' | 'cards'>('list')
@@ -65,14 +67,36 @@ function albumDateDisplay(album: NonNullable<typeof albums.value>[number]) {
   return formatAlbumDateRange(album.date, album.dateEnd)
 }
 
-async function del(id: string, title: string) {
-  if (!confirm(t('admin.deleteConfirm', { title }))) return
+function del(id: string, title: string) {
+  deleteError.value = ''
+  confirmTarget.value = { id, title }
+}
+
+function cancelDelete() {
+  if (deleting.value) return
+  confirmTarget.value = null
+  deleteError.value = ''
+}
+
+if (import.meta.client) {
+  const onKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && confirmTarget.value) cancelDelete()
+  }
+  onMounted(() => window.addEventListener('keydown', onKeydown))
+  onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+}
+
+async function confirmDelete() {
+  if (!confirmTarget.value) return
+  const { id } = confirmTarget.value
+  deleteError.value = ''
   deleting.value = id
   try {
     await $fetch(`/api/admin/albums/${id}`, { method: 'DELETE' })
     await refresh()
+    confirmTarget.value = null
   } catch (e) {
-    alert((e as { data?: { statusMessage?: string } })?.data?.statusMessage || t('admin.deleteFailed'))
+    deleteError.value = (e as { data?: { statusMessage?: string } })?.data?.statusMessage || t('admin.deleteFailed')
   } finally {
     deleting.value = ''
   }
@@ -165,6 +189,30 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
     <p v-else-if="albums && albums.length" class="empty">{{ t('admin.noMatches') }}</p>
     <p v-else class="empty">{{ t('admin.noAlbums') }} <NuxtLink :to="localePath('/admin/albums/new')">{{ t('admin.createFirst') }}</NuxtLink></p>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="confirmTarget"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-modal-title"
+    >
+      <div class="modal__backdrop" @click="cancelDelete" />
+      <section class="modal__panel">
+        <p class="modal__kicker">{{ t('admin.delete') }}</p>
+        <h2 id="delete-modal-title" class="modal__title">{{ t('admin.deleteHeading') }}</h2>
+        <p class="modal__body">{{ t('admin.deleteConfirm', { title: confirmTarget.title }) }}</p>
+        <p v-if="deleteError" class="modal__error">{{ deleteError }}</p>
+        <div class="modal__actions">
+          <button type="button" class="modal__btn" :disabled="!!deleting" @click="cancelDelete">{{ t('admin.cancel') }}</button>
+          <button type="button" class="modal__btn modal__btn--danger" :disabled="!!deleting" @click="confirmDelete">
+            {{ deleting ? '…' : t('admin.delete') }}
+          </button>
+        </div>
+      </section>
+    </div>
+  </Teleport>
   </div>
 </template>
 
@@ -265,4 +313,37 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 @media (max-width: 520px) {
   .card { grid-template-columns: 1fr; }
 }
+
+.modal { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; padding: 1.25rem; }
+.modal__backdrop { position: absolute; inset: 0; background: rgba(12, 12, 10, 0.6); }
+.modal__panel {
+  position: relative;
+  width: min(100%, 420px);
+  background: var(--body-bg);
+  color: var(--dark);
+  border-top: 2px solid #b0243c;
+  padding: 1.75rem;
+  box-shadow: 0 1.5rem 4rem rgba(12, 12, 10, 0.34);
+}
+.modal__kicker { font-size: 0.52rem; letter-spacing: 0.2em; text-transform: uppercase; color: #b0243c; margin-bottom: 0.7rem; }
+.modal__title { font-family: var(--font-serif); font-size: 1.6rem; font-weight: 300; line-height: 1.15; }
+.modal__body { margin-top: 0.75rem; color: var(--muted); font-size: 0.85rem; line-height: 1.7; }
+.modal__error { margin-top: 0.75rem; color: #b0243c; font-size: 0.78rem; }
+.modal__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.6rem; }
+.modal__btn {
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 0.7rem 1.4rem;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--dark);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.modal__btn:hover:not(:disabled) { border-color: var(--dark); }
+.modal__btn--danger { border-color: #b0243c; background: #b0243c; color: #F5F4F0; }
+.modal__btn--danger:hover:not(:disabled) { background: #921d31; border-color: #921d31; }
+.modal__btn:disabled { opacity: 0.55; cursor: default; }
 </style>

@@ -55,6 +55,31 @@ const { data, pending, error, refresh } = await useFetch<R2Inventory>('/api/admi
   query: computed(() => ({ prefix: activePrefix.value || undefined }))
 })
 
+// ── View toggle + trash inventory ──────────────────────────────────────────
+const view = ref<'inventory' | 'trash'>('inventory')
+
+interface TrashItem {
+  key: string
+  contentType: string | null
+  size: number | null
+  referenced: boolean
+  references: Record<string, boolean> | null
+  deletedBy: number | null
+  deletedByEmail: string | null
+  deletedByName: string | null
+  deletedAt: string
+}
+interface TrashInventory {
+  total: number
+  totalSize: number
+  items: TrashItem[]
+}
+
+const { data: trashData, pending: trashPending, refresh: refreshTrash } =
+  await useFetch<TrashInventory>('/api/admin/r2-images/trash')
+const trashItems = computed(() => trashData.value?.items ?? [])
+const trashCount = computed(() => trashData.value?.total ?? 0)
+
 const AUTO_REFRESH_MS = 45_000
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 
@@ -290,36 +315,38 @@ async function requestDelete(key: string, force = false) {
 
 async function deleteImage(image: R2Image) {
   deletingKey.value = image.key
-  beginDeleteProgress('Deleting image', 1)
+  beginDeleteProgress('Moving image to trash', 1)
   await nextTick()
   try {
     await requestDelete(image.key)
     stepDeleteProgress(image.key)
     await refresh()
+    await refreshTrash()
   } catch (err: any) {
     if (err?.statusCode === 409) {
       stepDeleteProgress(image.key, 'blocked')
       if (await askDeleteConfirmation({
-        title: 'Delete referenced image?',
+        title: 'Trash referenced image?',
         message: err.data?.message || 'This image is still referenced elsewhere.',
         detail: image.key,
-        confirmLabel: 'Delete anyway'
+        confirmLabel: 'Move to trash anyway'
       })) {
         extendDeleteProgress(1)
         try {
           await requestDelete(image.key, true)
           stepDeleteProgress(image.key)
           await refresh()
+          await refreshTrash()
         } catch (forceErr: any) {
           if (isDeleteResourceLimitError(forceErr)) await beginDeleteResourceLimitPause()
           stepDeleteProgress(image.key, 'failed')
-          alert(forceErr?.data?.message || 'Could not delete image.')
+          alert(forceErr?.data?.message || 'Could not move image to trash.')
         }
       }
     } else {
       if (isDeleteResourceLimitError(err)) await beginDeleteResourceLimitPause()
       stepDeleteProgress(image.key, 'failed')
-      alert(err?.data?.message || 'Could not delete image.')
+      alert(err?.data?.message || 'Could not move image to trash.')
     }
   } finally {
     deletingKey.value = null
@@ -330,16 +357,17 @@ async function deleteImage(image: R2Image) {
 async function confirmDelete(image: R2Image) {
   const hasReferences = image.albums.length > 0 || image.usages.length > 0
   const confirmed = await askDeleteConfirmation({
-    title: hasReferences ? 'Delete referenced image?' : 'Delete image?',
+    title: hasReferences ? 'Trash referenced image?' : 'Move image to trash?',
     message: hasReferences
-      ? 'This image is currently used by the site. The server will block deletion unless you force it in the next step.'
-      : 'This removes the object from R2. This cannot be undone.',
+      ? 'This image is currently used by the site. The server will block trashing unless you force it in the next step.'
+      : 'This moves the image to Trash. The file is kept and you can restore it from the Trash tab.',
     detail: image.key,
+    confirmLabel: 'Move to trash',
     warningTitle: hasReferences ? 'REFERENCED IMAGE' : '',
     warningItems: hasReferences
       ? [
           `${image.albums.length + image.usages.length} known reference${image.albums.length + image.usages.length === 1 ? '' : 's'}`,
-          'Deleting it can break covers, hero images, gallery tiles, or album layouts.'
+          'Trashing it clears the covers, hero images, gallery tiles, or album layouts that use it. Restoring brings back the file, not those references.'
         ]
       : []
   })
@@ -501,6 +529,31 @@ async function runDeleteSessions(keys: string[], force: boolean, blocked: string
   }
 }
 
+async function runTrashSessions(keys: string[], force: boolean, blocked: string[], trashedOut: string[]) {
+  for (const chunk of chunkKeys(keys)) {
+    await waitForDeleteResourceLimitPause()
+    try {
+      const res = await $fetch<{ items: { key: string; status: 'trashed' | 'blocked'; referenced: boolean }[] }>(
+        '/api/admin/r2-images/trash-session',
+        { method: 'POST', body: { keys: chunk, force } }
+      )
+      for (const item of res.items) {
+        if (item.status === 'blocked') {
+          blocked.push(item.key)
+          stepDeleteProgress(item.key, 'blocked')
+        } else {
+          trashedOut.push(item.key)
+          stepDeleteProgress(item.key)
+        }
+      }
+    } catch (err: any) {
+      if (isDeleteResourceLimitError(err)) await beginDeleteResourceLimitPause()
+      for (const key of chunk) stepDeleteProgress(key, 'failed')
+      alert(rawDeleteError(err) || 'Could not move images to trash.')
+    }
+  }
+}
+
 async function bulkDelete() {
   const keys = [...selected.value]
   if (!keys.length) return
@@ -516,22 +569,23 @@ async function bulkDelete() {
   }
   if (referencedCount) {
     warningItems.push(`${referencedCount} selected image${referencedCount === 1 ? ' is' : 's are'} referenced by albums, heroes, posts, events, members, or layouts.`)
-    warningItems.push('Referenced deletions can break visible public pages unless their references are removed or force-cleared.')
+    warningItems.push('Trashing referenced images clears those references. Restoring brings back the file, not the references.')
   }
 
   const confirmed = await askDeleteConfirmation({
     title: deletingAllLoaded
-      ? 'Delete every selected R2 image?'
+      ? 'Move every selected image to trash?'
       : referencedCount
-        ? 'Delete referenced R2 images?'
-        : `Delete ${keys.length} image${keys.length === 1 ? '' : 's'}?`,
-    message: 'This removes the selected objects from R2. This cannot be undone.',
+        ? 'Trash referenced R2 images?'
+        : `Move ${keys.length} image${keys.length === 1 ? '' : 's'} to trash?`,
+    message: 'The files are kept and can be restored from the Trash tab.',
     detail: `${keys.length} selected`,
+    confirmLabel: 'Move to trash',
     warningTitle: warningItems.length
       ? deletingAllLoaded
-        ? 'DANGER: MASS R2 DELETE'
+        ? 'MASS TRASH'
         : referencedCount
-          ? 'DANGER: REFERENCED IMAGES'
+          ? 'REFERENCED IMAGES'
           : ''
       : '',
     warningItems
@@ -541,40 +595,156 @@ async function bulkDelete() {
   if (referencedCount > 50) {
     const verified = await askPasswordGate({
       title: 'Admin password required',
-      message: `You are deleting ${referencedCount} referenced images. Enter your admin password to continue.`
+      message: `You are trashing ${referencedCount} referenced images. Enter your admin password to continue.`
     })
     if (!verified) return
   }
 
   bulkDeleting.value = true
-  beginDeleteProgress(`Deleting ${keys.length} image${keys.length === 1 ? '' : 's'}`, keys.length)
+  beginDeleteProgress(`Moving ${keys.length} image${keys.length === 1 ? '' : 's'} to trash`, keys.length)
   await nextTick()
   const blocked: string[] = []
-  const failed: string[] = []
+  const trashed: string[] = []
   try {
-    await runDeleteSessions(keys, false, blocked, failed)
+    await runTrashSessions(keys, false, blocked, trashed)
 
     if (blocked.length && await askDeleteConfirmation({
-      title: `Delete ${blocked.length} referenced image${blocked.length === 1 ? '' : 's'}?`,
+      title: `Trash ${blocked.length} referenced image${blocked.length === 1 ? '' : 's'}?`,
       message: `${blocked.length} of the selected images are still referenced elsewhere.`,
-      detail: 'Delete them anyway?',
-      confirmLabel: 'Delete anyway'
+      detail: 'Move them to trash anyway?',
+      confirmLabel: 'Move to trash anyway'
     })) {
       extendDeleteProgress(blocked.length)
-      const forceBlocked: string[] = []
-      await runDeleteSessions(blocked, true, forceBlocked, failed)
+      const stillBlocked: string[] = []
+      await runTrashSessions(blocked, true, stillBlocked, trashed)
     }
 
     clearSelection()
     await refresh()
-
-    if (failed.length) {
-      alert(`Could not delete ${failed.length} image${failed.length === 1 ? '' : 's'}.`)
-    }
+    await refreshTrash()
   } finally {
     bulkDeleting.value = false
     await finishDeleteProgress()
   }
+}
+
+// ── Trash view ─────────────────────────────────────────────────────────────
+const trashSelected = ref<Set<string>>(new Set())
+const trashBusy = ref(false)
+
+function isTrashSelected(key: string) {
+  return trashSelected.value.has(key)
+}
+function toggleTrashSelected(key: string) {
+  const next = new Set(trashSelected.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  trashSelected.value = next
+}
+const allTrashSelected = computed(() =>
+  trashItems.value.length > 0 && trashItems.value.every(item => trashSelected.value.has(item.key))
+)
+function toggleSelectAllTrash() {
+  trashSelected.value = allTrashSelected.value ? new Set() : new Set(trashItems.value.map(item => item.key))
+}
+function clearTrashSelection() {
+  trashSelected.value = new Set()
+}
+
+function trashReferenceLabels(item: TrashItem): string[] {
+  if (!item.references) return []
+  const labels: Record<string, string> = {
+    galleryPhoto: 'Gallery',
+    post: 'Post cover',
+    activity: 'Activity cover',
+    member: 'Member photo',
+    hero: 'Hero',
+    editorialAlbum: 'Album'
+  }
+  return Object.entries(item.references)
+    .filter(([, value]) => value)
+    .map(([key]) => labels[key] || key)
+}
+
+async function restoreKeys(keys: string[]) {
+  if (!keys.length) return
+  trashBusy.value = true
+  try {
+    for (const chunk of chunkKeys(keys)) {
+      await $fetch('/api/admin/r2-images/trash/restore', { method: 'POST', body: { keys: chunk } })
+    }
+    clearTrashSelection()
+    await refreshTrash()
+    await refresh()
+  } catch (err: any) {
+    alert(rawDeleteError(err) || 'Could not restore images.')
+  } finally {
+    trashBusy.value = false
+  }
+}
+function restoreImage(item: TrashItem) {
+  return restoreKeys([item.key])
+}
+function restoreSelected() {
+  return restoreKeys([...trashSelected.value])
+}
+
+async function purgeKeys(keys: string[]) {
+  if (!keys.length) return
+  trashBusy.value = true
+  bulkDeleting.value = true
+  beginDeleteProgress(`Permanently deleting ${keys.length} image${keys.length === 1 ? '' : 's'}`, keys.length)
+  await nextTick()
+  const blocked: string[] = []
+  const failed: string[] = []
+  try {
+    // force=true: trashed items are already unreferenced, but forcing guarantees
+    // the purge even if a key was re-referenced after being trashed.
+    await runDeleteSessions(keys, true, blocked, failed)
+    clearTrashSelection()
+    await refreshTrash()
+    await refresh()
+    if (failed.length) alert(`Could not delete ${failed.length} image${failed.length === 1 ? '' : 's'}.`)
+  } finally {
+    bulkDeleting.value = false
+    trashBusy.value = false
+    await finishDeleteProgress()
+  }
+}
+
+async function permanentlyDelete(item: TrashItem) {
+  if (await askDeleteConfirmation({
+    title: 'Delete permanently?',
+    message: 'This removes the object from R2 for good. This cannot be undone.',
+    detail: item.key,
+    confirmLabel: 'Delete permanently',
+    warningTitle: 'PERMANENT DELETE',
+    warningItems: ['The file will be gone for good — restore will no longer be possible.']
+  })) await purgeKeys([item.key])
+}
+async function purgeSelected() {
+  const keys = [...trashSelected.value]
+  if (!keys.length) return
+  if (await askDeleteConfirmation({
+    title: `Delete ${keys.length} image${keys.length === 1 ? '' : 's'} permanently?`,
+    message: 'This removes the selected objects from R2 for good. This cannot be undone.',
+    detail: `${keys.length} selected`,
+    confirmLabel: 'Delete permanently',
+    warningTitle: 'PERMANENT DELETE',
+    warningItems: ['These files will be gone for good — restore will no longer be possible.']
+  })) await purgeKeys(keys)
+}
+async function emptyTrash() {
+  const keys = trashItems.value.map(item => item.key)
+  if (!keys.length) return
+  if (await askDeleteConfirmation({
+    title: `Empty trash (${keys.length})?`,
+    message: 'Permanently deletes every image in the trash. This cannot be undone.',
+    detail: `${keys.length} image${keys.length === 1 ? '' : 's'}`,
+    confirmLabel: 'Empty trash',
+    warningTitle: 'PERMANENT DELETE',
+    warningItems: ['Every trashed file will be gone for good.']
+  })) await purgeKeys(keys)
 }
 
 onMounted(() => {
@@ -672,14 +842,30 @@ onBeforeUnmount(() => {
       <div>
         <p class="r2__kicker">Admin inventory</p>
         <h1 class="r2__title">R2 Images</h1>
-        <p class="r2__lead">Browse uploaded image objects and see which video (placeholder) entries or site surfaces still point to them.</p>
+        <p class="r2__lead">Browse uploaded image objects and see which surfaces point to them, or manage images you've moved to the trash.</p>
       </div>
-      <button type="button" class="r2__refresh" :disabled="pending" @click="refresh">
+      <button
+        type="button"
+        class="r2__refresh"
+        :disabled="view === 'trash' ? trashPending : pending"
+        @click="view === 'trash' ? refreshTrash() : refresh()"
+      >
         <Icon name="heroicons:arrow-path" />
         Refresh
       </button>
     </header>
 
+    <nav class="r2__tabs" aria-label="R2 views">
+      <button type="button" :class="{ 'is-active': view === 'inventory' }" @click="view = 'inventory'">
+        Inventory
+      </button>
+      <button type="button" :class="{ 'is-active': view === 'trash' }" @click="view = 'trash'">
+        Trash
+        <span v-if="trashCount" class="r2__tab-count">{{ trashCount }}</span>
+      </button>
+    </nav>
+
+    <template v-if="view === 'inventory'">
     <section class="r2__stats" aria-label="R2 image summary">
       <div>
         <strong>{{ data?.total ?? 0 }}</strong>
@@ -831,6 +1017,127 @@ onBeforeUnmount(() => {
           <button type="button" :disabled="page === totalPages" @click="goToPage(page + 1)">Next →</button>
         </div>
       </nav>
+    </template>
+    </template>
+
+    <template v-else>
+      <section class="r2__stats" aria-label="Trash summary">
+        <div>
+          <strong>{{ trashData?.total ?? 0 }}</strong>
+          <span>In trash</span>
+        </div>
+        <div>
+          <strong>{{ formatBytes(trashData?.totalSize) }}</strong>
+          <span>Reclaimable</span>
+        </div>
+        <div>
+          <strong>{{ trashSelected.size }}</strong>
+          <span>Selected</span>
+        </div>
+      </section>
+
+      <p class="r2__lead r2__trash-note">
+        Trashed images are removed from the site but kept in R2. Restore brings the file back (not its former references); deleting here is permanent.
+      </p>
+
+      <div v-if="trashPending" class="r2__empty">
+        <UiSpinner />
+        <span>Loading trash</span>
+      </div>
+      <div v-else-if="!trashItems.length" class="r2__empty">Trash is empty.</div>
+
+      <template v-else>
+        <div class="r2__bulk">
+          <label class="r2__select-all">
+            <input type="checkbox" :checked="allTrashSelected" :disabled="trashBusy" @change="toggleSelectAllTrash">
+            <span class="r2__select-box" aria-hidden="true" />
+            <span>Select all</span>
+          </label>
+          <div class="r2__bulk-actions">
+            <template v-if="trashSelected.size">
+              <span>{{ trashSelected.size }} selected</span>
+              <button type="button" class="r2__bulk-clear" :disabled="trashBusy" @click="clearTrashSelection">Clear</button>
+              <button type="button" class="r2__bulk-restore" :disabled="trashBusy" @click="restoreSelected">
+                <Icon name="heroicons:arrow-uturn-left" />
+                Restore {{ trashSelected.size }}
+              </button>
+              <button type="button" class="r2__bulk-delete" :disabled="trashBusy" @click="purgeSelected">
+                <Icon name="heroicons:trash" />
+                Delete {{ trashSelected.size }}
+              </button>
+            </template>
+            <button type="button" class="r2__bulk-delete" :disabled="trashBusy" @click="emptyTrash">
+              <Icon name="heroicons:trash" />
+              Empty trash
+            </button>
+          </div>
+        </div>
+
+        <section class="r2__list" aria-label="Trashed image list">
+          <article
+            v-for="item in trashItems"
+            :key="item.key"
+            class="image-row"
+            :class="{ 'is-selected': isTrashSelected(item.key) }"
+          >
+            <div class="image-row__thumb">
+              <label class="image-row__check">
+                <input type="checkbox" :checked="isTrashSelected(item.key)" :disabled="trashBusy" @change="toggleTrashSelected(item.key)">
+                <span class="image-row__check-box" aria-hidden="true" />
+              </label>
+              <a :href="`/images/${item.key}`" target="_blank" rel="noopener">
+                <img :src="`/images/${item.key}`" alt="" loading="lazy">
+              </a>
+            </div>
+
+            <div class="image-row__body">
+              <div class="image-row__main">
+                <div class="image-row__title">
+                  <h2>{{ item.key }}</h2>
+                  <div class="image-row__trash-actions">
+                    <button type="button" class="image-row__restore" :disabled="trashBusy" @click="restoreImage(item)">
+                      <Icon name="heroicons:arrow-uturn-left" />
+                      Restore
+                    </button>
+                    <button type="button" class="image-row__delete" :disabled="trashBusy" @click="permanentlyDelete(item)">
+                      <Icon name="heroicons:trash" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Type</dt>
+                    <dd>{{ item.contentType || 'image' }}</dd>
+                  </div>
+                  <div>
+                    <dt>Size</dt>
+                    <dd>{{ formatBytes(item.size ?? undefined) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Trashed</dt>
+                    <dd>{{ formatDateTime(item.deletedAt) }}</dd>
+                  </div>
+                  <div v-if="item.deletedByName || item.deletedByEmail">
+                    <dt>By</dt>
+                    <dd>{{ item.deletedByName || item.deletedByEmail }}</dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div class="image-row__refs">
+                <div>
+                  <p>Was referenced</p>
+                  <div v-if="trashReferenceLabels(item).length" class="image-row__links">
+                    <span v-for="label in trashReferenceLabels(item)" :key="label" class="image-row__none">{{ label }}</span>
+                  </div>
+                  <span v-else class="image-row__none">No references</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </template>
     </template>
   </div>
 </template>
@@ -1195,6 +1502,88 @@ onBeforeUnmount(() => {
 .r2__refresh:hover { border-color: var(--accent); background: var(--accent); }
 .r2__refresh:disabled { opacity: 0.55; cursor: wait; }
 .r2__refresh svg { width: 1rem; height: 1rem; }
+
+.r2__tabs {
+  display: flex;
+  border-bottom: 1px solid var(--subtle);
+}
+.r2__tabs button {
+  position: relative;
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: 0.6rem 0.2rem;
+  margin-right: 1.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.r2__tabs button:hover { color: var(--dark); }
+.r2__tabs button.is-active { color: var(--accent); }
+.r2__tabs button.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+}
+.r2__tab-count {
+  min-width: 1.2rem;
+  padding: 0 0.32rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.5rem;
+  line-height: 1.35;
+  text-align: center;
+}
+.r2__trash-note { max-width: 720px; margin-top: 0; }
+
+.r2__bulk-restore {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--dark);
+  background: none;
+  color: var(--dark);
+  padding: 0.5rem 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.r2__bulk-restore:hover { border-color: var(--accent); color: var(--accent); }
+.r2__bulk-restore:disabled { opacity: 0.55; cursor: wait; }
+.r2__bulk-restore svg { width: 0.85rem; height: 0.85rem; }
+
+.image-row__trash-actions {
+  display: inline-flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+.image-row__restore {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--subtle);
+  background: none;
+  color: var(--dark);
+  padding: 0.35rem 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.image-row__restore:hover { border-color: var(--accent); color: var(--accent); }
+.image-row__restore:disabled { opacity: 0.55; cursor: wait; }
+.image-row__restore svg { width: 0.8rem; height: 0.8rem; }
 
 .r2__stats {
   display: grid;

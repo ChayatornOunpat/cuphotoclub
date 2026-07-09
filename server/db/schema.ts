@@ -251,3 +251,26 @@ export const r2DeleteSessionItems = sqliteTable('r2_delete_session_items', {
   primaryKey({ columns: [table.sessionId, table.key] }),
   index('r2_delete_session_items_session_idx').on(table.sessionId)
 ])
+
+// Soft-delete "trash can" for R2 images. A row here means the object has been
+// removed from active use (its live references are scrubbed) but the underlying
+// R2 object is kept in place, so it can be restored or purged later. The admin
+// inventory hides any key present in this table; the trash view lists them.
+export const r2Trash = sqliteTable('r2_trash', {
+  key: text('object_key').primaryKey(),
+  contentType: text('content_type'),
+  size: integer('size'),
+  // Whether the image was still referenced by a live surface when trashed
+  // (i.e. it was a forced delete whose references we scrubbed).
+  referenced: integer('referenced', { mode: 'boolean' }).notNull().default(false),
+  // Snapshot of which reference kinds pointed at it, for the trash UI/audit.
+  references: text('references_json', { mode: 'json' }).$type<Record<string, boolean>>(),
+  deletedBy: integer('deleted_by'),
+  deletedByEmail: text('deleted_by_email'),
+  deletedByName: text('deleted_by_name'),
+  deletedAt: integer('deleted_at', { mode: 'timestamp' })
+    .notNull()
+    .default(sql`(unixepoch())`)
+}, table => [
+  index('r2_trash_deleted_at_idx').on(table.deletedAt)
+])

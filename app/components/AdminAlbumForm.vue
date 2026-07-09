@@ -1336,51 +1336,51 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 
     <!-- FLOATING DOCK — Content (title / meta) -->
     <section v-show="!dockHidden && activeDock === 'content'" class="context-dock content-dock" aria-live="polite">
-      <div class="dock-fields">
-        <div class="field field--title" :class="{ active: activeField === 'title' }">
-          <label>{{ t('adminForm.title') }}</label>
-          <textarea ref="titleInput" v-model="form.title" rows="2" :placeholder="t('adminForm.titlePlaceholder')" @focus="activeField = 'title'" />
-        </div>
-        <div class="field field--category" :class="{ active: activeField === 'category' }">
-          <label>{{ t('adminForm.category') }}</label>
-          <input ref="categoryInput" v-model="form.category" type="text" :placeholder="t('adminForm.categoryPlaceholder')" @focus="activeField = 'category'">
-        </div>
-        <div class="field field--date-start" :class="{ active: activeField === 'date' }">
-          <label>{{ t('adminForm.dateDisplay') }}</label>
-          <UiDateInput ref="dateInput" v-model="form.date" @focus="activeField = 'date'" />
-        </div>
-        <div class="field field--date-end" :class="{ active: activeField === 'dateEnd' }">
-          <label>{{ t('adminForm.dateEnd') }} <span class="opt">{{ t('adminForm.dateEndOptional') }}</span></label>
-          <UiDateInput ref="dateEndInput" v-model="form.dateEnd" :disabled="!form.date" @focus="activeField = 'dateEnd'" />
-        </div>
-        <div class="field field--location" :class="{ active: activeField === 'location' }">
-          <label>{{ t('adminForm.location') }} <span class="opt">{{ t('adminForm.locationOptional') }}</span></label>
-          <input ref="locationInput" v-model="form.location" type="text" :placeholder="t('adminForm.locationPlaceholder')" @focus="activeField = 'location'">
-        </div>
-        <div class="field field--excerpt" :class="{ active: activeField === 'excerpt' }">
-          <label>{{ t('adminForm.excerpt') }}</label>
-          <textarea ref="excerptInput" v-model="form.excerpt" rows="4" :placeholder="t('adminForm.excerptPlaceholder')" @focus="activeField = 'excerpt'" />
-        </div>
-        <div class="field field--cover">
-          <label>{{ t('adminForm.coverLabel') }} <span class="opt">{{ t('adminForm.coverChooseHint') }}</span></label>
-          <div class="cover-dock">
+      <div class="dock-fields dock-fields--anchored">
+        <!-- Cover anchor: compact, always-visible thumbnail on the left -->
+        <div class="cover-anchor">
+          <div class="cover-anchor__frame" :class="{ 'is-empty': !form.coverSrc }">
+            <img :src="form.coverSrc || PLACEHOLDER_IMG" alt="">
             <button
+              v-if="form.coverSrc"
               type="button"
-              class="cover-preview"
-              :class="{ 'is-empty': !form.coverSrc }"
-              :title="form.coverSrc ? t('adminForm.clearCover') : t('adminForm.noCoverSelected')"
-              :disabled="!form.coverSrc"
+              class="cover-anchor__clear"
+              :title="t('adminForm.clearCover')"
               @click="form.coverSrc = ''"
-            >
-              <img :src="form.coverSrc || PLACEHOLDER_IMG" alt="">
-              <span>{{ form.coverSrc ? t('adminForm.clear') : t('adminForm.noImageSelected') }}</span>
-            </button>
+            >{{ t('adminForm.clear') }}</button>
+            <span v-else class="cover-anchor__empty">{{ t('adminForm.noImageSelected') }}</span>
+          </div>
+          <button type="button" class="cover-pick" :disabled="!hasMedia && !mediaLoading" @click="coverPickerOpen = true">
+            {{ form.coverSrc ? t('adminForm.coverChange') : t('adminPicker.chooseFromLibrary') }}
+          </button>
+          <p v-if="!hasMedia && mediaLoading" class="media-empty">{{ t('adminForm.loadingPhotos') }}</p>
+          <p v-else-if="!hasMedia" class="media-empty">{{ t('adminForm.uploadFirst') }}</p>
+        </div>
 
-            <button type="button" class="cover-pick" :disabled="!hasMedia && !mediaLoading" @click="coverPickerOpen = true">
-              {{ t('adminPicker.chooseFromLibrary') }}
-            </button>
-            <p v-if="!hasMedia && mediaLoading" class="media-empty">{{ t('adminForm.loadingPhotos') }}</p>
-            <p v-else-if="!hasMedia" class="media-empty">{{ t('adminForm.uploadFirst') }}</p>
+        <div class="anchored-fields">
+          <div class="field field--title" :class="{ active: activeField === 'title' }">
+            <label>{{ t('adminForm.title') }}</label>
+            <textarea ref="titleInput" v-model="form.title" rows="2" :placeholder="t('adminForm.titlePlaceholder')" @focus="activeField = 'title'" />
+          </div>
+          <div class="field field--category" :class="{ active: activeField === 'category' }">
+            <label>{{ t('adminForm.category') }}</label>
+            <input ref="categoryInput" v-model="form.category" type="text" :placeholder="t('adminForm.categoryPlaceholder')" @focus="activeField = 'category'">
+          </div>
+          <div class="field field--dates" :class="{ active: activeField === 'date' || activeField === 'dateEnd' }">
+            <label>{{ t('adminForm.dates') }} <span class="opt">{{ t('adminForm.datesHint') }}</span></label>
+            <div class="date-range">
+              <UiDateInput ref="dateInput" v-model="form.date" @focus="activeField = 'date'" />
+              <span class="date-range__sep" aria-hidden="true">→</span>
+              <UiDateInput ref="dateEndInput" v-model="form.dateEnd" :disabled="!form.date" @focus="activeField = 'dateEnd'" />
+            </div>
+          </div>
+          <div class="field field--location" :class="{ active: activeField === 'location' }">
+            <label>{{ t('adminForm.location') }} <span class="opt">{{ t('adminForm.locationOptional') }}</span></label>
+            <input ref="locationInput" v-model="form.location" type="text" :placeholder="t('adminForm.locationPlaceholder')" @focus="activeField = 'location'">
+          </div>
+          <div class="field field--excerpt" :class="{ active: activeField === 'excerpt' }">
+            <label>{{ t('adminForm.excerpt') }}</label>
+            <textarea ref="excerptInput" v-model="form.excerpt" rows="4" :placeholder="t('adminForm.excerptPlaceholder')" @focus="activeField = 'excerpt'" />
           </div>
         </div>
       </div>
@@ -2220,29 +2220,78 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   -webkit-backdrop-filter: blur(20px) saturate(135%);
   box-shadow: 0 1rem 2.75rem rgba(26, 25, 24, 0.16);
 }
-.content-dock .dock-fields {
+/* Mock A — cover anchored on the left, all fields to the right. Keeps the
+   cover permanently visible without a full-width row, so the dock is shorter. */
+.content-dock .dock-fields--anchored {
   display: grid;
-  grid-template-columns:
-    minmax(15rem, 1.25fr)
-    minmax(8.5rem, 0.7fr)
-    minmax(8.75rem, 0.72fr)
-    minmax(8.75rem, 0.72fr);
-  gap: 0.64rem 0.72rem;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 0.8rem 0.9rem;
   align-items: start;
 }
-.content-dock .field--title,
-.content-dock .field--category,
-.content-dock .field--date-start,
-.content-dock .field--date-end {
+.cover-anchor {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 0.4rem;
+  align-self: stretch;
+  min-height: 7rem;
+}
+.cover-anchor__frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--subtle);
+  background: var(--paper);
+  min-height: 5rem;
+}
+.cover-anchor__frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cover-anchor__frame.is-empty img { opacity: 0.3; }
+.cover-anchor__clear {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  border: 0;
+  cursor: pointer;
+  background: rgba(245, 244, 240, 0.9);
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 0.44rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.4rem;
+}
+.cover-anchor__clear:hover { background: #fff; }
+.cover-anchor__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.46rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 0.5rem;
+}
+.cover-anchor .cover-pick { align-self: stretch; }
+.cover-anchor .media-empty { grid-column: 1; }
+
+.anchored-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.64rem 0.72rem;
+  align-items: start;
   min-width: 0;
 }
-.content-dock .field--location { grid-column: 1 / 2; }
-.content-dock .field--excerpt { grid-column: 2 / -1; }
-.content-dock .field--cover {
-  grid-column: 1 / -1;
-  padding-top: 0.62rem;
-  border-top: 1px solid color-mix(in srgb, var(--subtle) 72%, transparent);
-}
+.anchored-fields .field { min-width: 0; }
+.anchored-fields .field--title { grid-column: 1 / -1; }
+.anchored-fields .field--category { grid-column: 1 / 2; }
+.anchored-fields .field--dates { grid-column: 2 / -1; }
+.anchored-fields .field--location { grid-column: 1 / 2; }
+.anchored-fields .field--excerpt { grid-column: 2 / -1; }
+
+.date-range { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+.date-range > :deep(.ui-date-input) { flex: 1; min-width: 0; }
+.date-range__sep { flex: 0 0 auto; color: var(--muted); font-size: 0.72rem; }
+
 .content-dock .field.active label { color: var(--accent); }
 .content-dock .field.active textarea { resize: none; }
 .content-dock .field--title textarea,
@@ -2675,17 +2724,30 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   .context-dock.content-dock {
     width: min(860px, calc(100vw - 1.5rem));
   }
-  .content-dock .dock-fields {
+  .content-dock .dock-fields--anchored {
+    grid-template-columns: 1fr;
+  }
+  .cover-anchor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.5rem;
+    min-height: 0;
+  }
+  .cover-anchor__frame { flex: 0 0 7rem; height: 4.5rem; min-height: 0; }
+  .cover-anchor .cover-pick { flex: 1; }
+  .cover-anchor .media-empty { flex-basis: 100%; }
+  .anchored-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .content-dock .field--title,
-  .content-dock .field--location,
-  .content-dock .field--excerpt,
-  .content-dock .field--cover {
+  .anchored-fields .field--title,
+  .anchored-fields .field--dates,
+  .anchored-fields .field--excerpt {
     grid-column: 1 / -1;
   }
-  .cover-dock {
-    grid-template-columns: 1fr;
+  .anchored-fields .field--category,
+  .anchored-fields .field--location {
+    grid-column: auto;
   }
   .visibility-toggle {
     grid-template-columns: 1fr;
@@ -2722,8 +2784,12 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 }
 
 @media (max-width: 560px) {
-  .content-dock .dock-fields {
+  .anchored-fields {
     grid-template-columns: 1fr;
+  }
+  .anchored-fields .field--category,
+  .anchored-fields .field--location {
+    grid-column: 1 / -1;
   }
 }
 
