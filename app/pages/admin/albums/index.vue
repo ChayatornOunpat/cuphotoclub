@@ -24,7 +24,11 @@ function visibilityClass(value?: string) {
 }
 
 function previewPath(album: NonNullable<typeof albums.value>[number]) {
-  return `/admin/albums/${album.slug}/preview`
+  // Live ('public') and 'link-only' albums are reachable on their real public
+  // page (the API only 404s drafts), so open that directly — no preview/admin
+  // chrome. Only drafts fall back to the admin preview route.
+  if (album.visibility === 'draft') return `/admin/albums/${album.slug}/preview`
+  return `/albums/${album.slug}`
 }
 
 function modifiedValue(album: NonNullable<typeof albums.value>[number]) {
