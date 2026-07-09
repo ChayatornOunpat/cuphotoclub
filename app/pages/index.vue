@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { defaultSite } from '~/utils/defaultSite'
+import { prewarmPhotoGrid } from '~/utils/photoGridPreload'
 
 definePageMeta({ layout: 'site' })
 
@@ -122,6 +123,7 @@ function dismissConstructionNotice() {
 
 onMounted(() => {
   onScroll()
+  void prewarmPhotoGrid()
   constructionNoticeOpen.value = sessionStorage.getItem(constructionNoticeKey) !== '1'
   window.addEventListener('scroll', onScroll, { passive: true })
 })

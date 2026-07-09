@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PhotoGridImage } from '~~/server/api/photogrid.get'
+import { consumePrewarmedPhotoGrid, PHOTO_GRID_BATCH_COUNT, prewarmPhotoGrid } from '~/utils/photoGridPreload'
 
 // Museum-wall photogrid: a dense wall of small thumbnails randomly sourced
 // from published albums, that keep crossfading to new photos over time.
@@ -27,7 +28,6 @@ import type { PhotoGridImage } from '~~/server/api/photogrid.get'
 const SWAP_INTERVAL_MS = 3500
 const SWAPS_PER_TICK = 3
 const REFILL_THRESHOLD = 20
-const BATCH_COUNT = 250
 const IDLE_PAUSE_MS = 2 * 60 * 1000
 
 type SizeClass = 'sm' | 'wide' | 'tall' | 'big'
@@ -253,25 +253,29 @@ function fillEmptyBlocks() {
 
 async function fetchBatch(): Promise<string[]> {
   try {
-    const res = await $fetch<{ images: PhotoGridImage[] }>('/api/photogrid', { query: { count: BATCH_COUNT } })
-    const images = res.images ?? []
-    // Populate the album lookup map
-    for (const img of images) {
-      if (!albumMap.has(img.src)) {
-        albumMap.set(img.src, {
-          albumId: img.albumId,
-          albumTitle: img.albumTitle,
-          albumCover: img.albumCover,
-          albumDate: img.albumDate,
-          albumDateEnd: img.albumDateEnd,
-          photoCount: img.photoCount
-        })
-      }
-    }
-    return images.map(img => img.src)
+    const warmed = consumePrewarmedPhotoGrid()
+    const images = warmed ?? await prewarmPhotoGrid()
+    return mapPhotoGridImages(images)
   } catch {
     return []
   }
+}
+
+function mapPhotoGridImages(images: PhotoGridImage[]): string[] {
+  // Populate the album lookup map
+  for (const img of images) {
+    if (!albumMap.has(img.src)) {
+      albumMap.set(img.src, {
+        albumId: img.albumId,
+        albumTitle: img.albumTitle,
+        albumCover: img.albumCover,
+        albumDate: img.albumDate,
+        albumDateEnd: img.albumDateEnd,
+        photoCount: img.photoCount
+      })
+    }
+  }
+  return images.map(img => img.src)
 }
 
 function enqueueUnseen(images: string[]) {
@@ -284,7 +288,8 @@ async function refillIfLow() {
   if (!shouldRun() || refilling) return
   if (queue.value.length > REFILL_THRESHOLD && !hasEmptyBlocks()) return
   refilling = true
-  const batch = await fetchBatch()
+  const res = await $fetch<{ images: PhotoGridImage[] }>('/api/photogrid', { query: { count: PHOTO_GRID_BATCH_COUNT } }).catch(() => ({ images: [] }))
+  const batch = mapPhotoGridImages(res.images ?? [])
   enqueueUnseen(batch)
   fillEmptyBlocks()
   refilling = false

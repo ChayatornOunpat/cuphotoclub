@@ -996,20 +996,29 @@ function onSubmit() {
 const SPANS: CellSpan[] = [2, 3, 4, 6]
 const isEssay = computed(() => form.style === 'essay')
 
-// Style picker modal. Thumbnails are CSS-drawn layout sketches for now —
-// swap .sp-thumb for <img> screenshots when real captures are available.
+// Style picker modal. Drop real screenshots into
+// public/admin/album-style-previews/{style}-{1,2,3}.webp and the picker will use them.
 const STYLE_OPTIONS = [
-  { value: 'essay', nameKey: 'adminForm.styleEssay', descKey: 'adminForm.styleEssayDesc' },
-  { value: 'sticky', nameKey: 'adminForm.styleSticky', descKey: 'adminForm.styleStickyDesc' },
-  { value: 'contact', nameKey: 'adminForm.styleContact', descKey: 'adminForm.styleContactDesc' },
-  { value: 'darkroom', nameKey: 'adminForm.styleDarkroom', descKey: 'adminForm.styleDarkroomDesc' },
-  { value: 'chapters', nameKey: 'adminForm.styleChapters', descKey: 'adminForm.styleChaptersDesc' }
+  { value: 'essay', nameKey: 'adminForm.styleEssay', descKey: 'adminForm.styleEssayDesc', previewSrcs: ['/admin/album-style-previews/essay-1.webp', '/admin/album-style-previews/essay-2.webp', '/admin/album-style-previews/essay-3.webp'] },
+  { value: 'sticky', nameKey: 'adminForm.styleSticky', descKey: 'adminForm.styleStickyDesc', previewSrcs: ['/admin/album-style-previews/sticky-1.webp', '/admin/album-style-previews/sticky-2.webp'] },
+  { value: 'contact', nameKey: 'adminForm.styleContact', descKey: 'adminForm.styleContactDesc', previewSrcs: ['/admin/album-style-previews/contact-1.webp', '/admin/album-style-previews/contact-2.webp'] },
+  { value: 'darkroom', nameKey: 'adminForm.styleDarkroom', descKey: 'adminForm.styleDarkroomDesc', previewSrcs: [] },
+  { value: 'chapters', nameKey: 'adminForm.styleChapters', descKey: 'adminForm.styleChaptersDesc', previewSrcs: [] }
 ] as const
 const showStylePicker = ref(false)
+const missingStylePreviews = ref(new Set<string>())
 const currentStyleKey = computed(() => STYLE_OPTIONS.find(o => o.value === form.style)?.nameKey ?? 'adminForm.styleEssay')
 function pickStyle(value: typeof STYLE_OPTIONS[number]['value']) {
   form.style = value
   showStylePicker.value = false
+}
+function hasStylePreview(srcs: readonly string[]) {
+  return srcs.some(src => !missingStylePreviews.value.has(src))
+}
+function markStylePreviewMissing(src: string) {
+  const next = new Set(missingStylePreviews.value)
+  next.add(src)
+  missingStylePreviews.value = next
 }
 
 const ALIGN_OPTIONS: { value: TextAlign, key: string }[] = [
@@ -1056,7 +1065,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           <p v-if="form.style === 'chapters'" class="field__hint">{{ t('adminForm.styleChaptersHint') }}</p>
         </div>
 
-        <UiModal v-model="showStylePicker" :title="t('adminForm.style')" size="lg">
+        <UiModal v-model="showStylePicker" :title="t('adminForm.style')" size="xl">
           <div class="sp-grid">
             <button
               v-for="opt in STYLE_OPTIONS"
@@ -1066,9 +1075,28 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               :class="{ 'is-selected': form.style === opt.value }"
               @click="pickStyle(opt.value)"
             >
-              <!-- Placeholder thumbnail: a CSS sketch of the layout's structure -->
-              <span class="sp-thumb" :class="`sp-thumb--${opt.value}`" aria-hidden="true">
-                <i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i />
+              <span class="sp-preview" aria-hidden="true">
+                <span class="sp-thumb" :class="`sp-thumb--${opt.value}`">
+                  <i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i />
+                </span>
+                <span
+                  v-if="hasStylePreview(opt.previewSrcs)"
+                  class="sp-preview__shots"
+                  :class="`sp-preview__shots--${opt.previewSrcs.length}`"
+                >
+                  <template v-for="(src, shotIndex) in opt.previewSrcs" :key="src">
+                    <img
+                      v-if="!missingStylePreviews.has(src)"
+                      class="sp-preview__image"
+                      :class="{ 'sp-preview__image--lead': shotIndex === 0 }"
+                      :src="src"
+                      alt=""
+                      loading="eager"
+                      decoding="async"
+                      @error="markStylePreviewMissing(src)"
+                    >
+                  </template>
+                </span>
               </span>
               <span class="sp-card__name">
                 {{ t(opt.nameKey) }}
@@ -2603,22 +2631,109 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .style-trigger:hover { border-color: var(--accent); }
 .style-trigger__icon { width: 0.8rem; height: 0.8rem; color: var(--muted); flex-shrink: 0; }
 
-.sp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; }
-.sp-card {
-  display: grid; gap: 0.45rem; align-content: start;
-  background: none; border: 1px solid var(--subtle); padding: 0.55rem;
-  font-family: var(--font-sans); text-align: left; cursor: pointer; transition: border-color 0.15s;
+.sp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.95rem;
+  min-height: min(62vh, 37rem);
 }
-.sp-card:hover { border-color: var(--muted); }
-.sp-card.is-selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.sp-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(13.5rem, 1fr) auto auto;
+  gap: 0.55rem;
+  align-content: start;
+  min-height: 18rem;
+  background: color-mix(in srgb, #fff 68%, var(--body-bg));
+  border: 1px solid var(--subtle);
+  padding: 0.6rem;
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.sp-card:hover {
+  border-color: var(--muted);
+  background: #fff;
+  transform: translateY(-1px);
+}
+.sp-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
 .sp-card__name { display: flex; align-items: center; gap: 0.4rem; color: var(--dark); font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; }
 .sp-card__check { width: 0.75rem; height: 0.75rem; color: var(--accent); }
 .sp-card__desc { color: var(--muted); font-size: 0.6rem; line-height: 1.5; }
 
-/* Placeholder thumbnails: CSS sketches of each layout's structure. Replace the
-   .sp-thumb block with an <img> per style once real screenshots exist. */
-.sp-thumb { display: grid; gap: 0.22rem; height: 6rem; padding: 0.5rem; background: #fff; border: 1px solid var(--subtle); }
-.sp-thumb i { display: none; background: var(--subtle); }
+/* Style previews use screenshot assets when present; the CSS layer underneath
+   keeps the picker useful before final screenshots are dropped into public/. */
+.sp-preview {
+  position: relative;
+  min-height: 13.5rem;
+  overflow: hidden;
+  border: 1px solid var(--subtle);
+  background: #fff;
+}
+.sp-preview__shots {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.8fr);
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--subtle);
+}
+.sp-preview__image {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #fff;
+}
+.sp-preview__image--lead {
+  grid-row: 1 / -1;
+}
+.sp-preview__shots--1 {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+.sp-preview__shots--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: 1fr;
+}
+.sp-preview__shots--2 .sp-preview__image--lead,
+.sp-preview__shots--1 .sp-preview__image--lead {
+  grid-row: auto;
+}
+.sp-thumb {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 0.26rem;
+  padding: 0.65rem;
+  background:
+    linear-gradient(135deg, rgba(232, 24, 110, 0.08), transparent 34%),
+    #fff;
+}
+.sp-thumb i {
+  display: none;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(12, 12, 10, 0.16), rgba(12, 12, 10, 0.04)),
+    var(--paper);
+}
+.sp-thumb i::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(140deg, rgba(232, 24, 110, 0.2), transparent 32%),
+    linear-gradient(45deg, rgba(26, 25, 24, 0.24), rgba(26, 25, 24, 0.02));
+  opacity: 0.85;
+}
 
 .sp-thumb--essay { grid-template-columns: repeat(3, 1fr); grid-template-rows: 2fr 1fr; }
 .sp-thumb--essay i:nth-child(-n+3) { display: block; }
@@ -2632,8 +2747,20 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .sp-thumb--contact { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, 1fr); }
 .sp-thumb--contact i { display: block; }
 
-.sp-thumb--darkroom { background: #131210; border-color: #131210; place-items: center; }
-.sp-thumb--darkroom i:nth-child(1) { display: block; width: 52%; height: 62%; background: #45433F; }
+.sp-thumb--darkroom {
+  background:
+    radial-gradient(circle at 50% 46%, rgba(232, 24, 110, 0.16), transparent 20%),
+    #131210;
+  place-items: center;
+}
+.sp-thumb--darkroom i:nth-child(1) {
+  display: block;
+  width: 52%;
+  height: 62%;
+  background:
+    linear-gradient(135deg, rgba(245, 244, 240, 0.26), rgba(245, 244, 240, 0.05)),
+    #45433F;
+}
 
 .sp-thumb--chapters { grid-template-columns: repeat(6, 1fr); grid-template-rows: auto 2.2fr 1fr; }
 .sp-thumb--chapters i:nth-child(-n+6) { display: block; }
@@ -2646,6 +2773,11 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 
 @media (max-width: 720px) {
   .sp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sp-card { min-height: 15.5rem; grid-template-rows: minmax(11rem, 1fr) auto auto; }
+  .sp-preview { min-height: 11rem; }
+}
+@media (max-width: 520px) {
+  .sp-grid { grid-template-columns: 1fr; }
 }
 .field input, .field select, .field textarea {
   width: 100%; border: 1px solid var(--subtle); background: #fff; color: var(--dark);
