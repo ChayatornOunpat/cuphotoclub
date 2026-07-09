@@ -175,7 +175,9 @@ watch(cover, measureCover, { immediate: true })
 </template>
 
 <style scoped>
-.head { height: 58svh; background: var(--hero-bg); position: relative; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+/* min-height (not height) so a tall two-line title grows the hero instead of
+   climbing into the absolutely-positioned back link. */
+.head { min-height: 58svh; background: var(--hero-bg); position: relative; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
 .head__bg { position: absolute; inset: 0; will-change: transform; }
 .head__bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(12, 12, 10, 0.5), rgba(12, 12, 10, 0.9)); }
 :deep(.head__img) { width: 100%; height: 100%; object-fit: cover; opacity: 0.4; display: block; }
@@ -216,7 +218,8 @@ watch(cover, measureCover, { immediate: true })
 .head__back:hover { color: var(--accent); }
 .head__back.is-disabled { cursor: default; pointer-events: none; }
 .head__back.is-disabled:hover { color: rgba(245, 244, 240, 0.7); }
-.head__body { position: relative; z-index: 2; padding: 0 3rem 3rem; max-width: 1380px; margin: 0 auto; width: 100%; }
+/* padding-top keeps the title block clear of the back link (top: 6rem). */
+.head__body { position: relative; z-index: 2; padding: 8.5rem 3rem 3rem; max-width: 1380px; margin: 0 auto; width: 100%; }
 .head--portrait .head__body,
 .head--square .head__body {
   padding-right: min(42vw, 520px);
