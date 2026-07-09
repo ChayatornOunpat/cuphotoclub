@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 const createdAt = integer('created_at', { mode: 'timestamp' })
   .notNull()
@@ -150,6 +150,9 @@ import type { AlbumRow, AlbumStyle, ContentStatus, HeroStyle, Placement, PostBlo
 // Lego-grid albums seeded from content/albums/*.md.
 export const contentAlbums = sqliteTable('content_albums', {
   id: text('id').primaryKey(),
+  // Human-readable URL slug. Decoupled from `id` (which is the immutable R2
+  // folder key) so albums can be renamed without moving any stored objects.
+  slug: text('slug').notNull().unique().default(''),
   title: text('title').notNull(),
   category: text('category').notNull(),
   date: text('date').notNull(),
@@ -198,3 +201,52 @@ export const adminAuditLogs = sqliteTable('admin_audit_logs', {
   metadata: text('metadata', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default(sql`'{}'`),
   createdAt
 })
+
+export const uploadSessions = sqliteTable('upload_sessions', {
+  id: text('id').primaryKey(),
+  actorId: integer('actor_id').notNull(),
+  prefix: text('prefix').notNull(),
+  createdAt,
+  updatedAt
+})
+
+export const uploadSessionItems = sqliteTable('upload_session_items', {
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => uploadSessions.id, { onDelete: 'cascade' }),
+  id: text('id').notNull(),
+  position: integer('position').notNull().default(0),
+  name: text('name').notNull(),
+  hash: text('hash').notNull(),
+  ext: text('ext').notNull(),
+  r2Key: text('r2_key').notNull(),
+  size: integer('size').notNull().default(0),
+  type: text('type').notNull(),
+  status: text('status').notNull(),
+  error: text('error')
+}, table => [
+  primaryKey({ columns: [table.sessionId, table.id] }),
+  index('upload_session_items_session_idx').on(table.sessionId)
+])
+
+export const r2DeleteSessions = sqliteTable('r2_delete_sessions', {
+  id: text('id').primaryKey(),
+  actorId: integer('actor_id').notNull(),
+  force: integer('force', { mode: 'boolean' }).notNull().default(false),
+  createdAt,
+  updatedAt
+})
+
+export const r2DeleteSessionItems = sqliteTable('r2_delete_session_items', {
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => r2DeleteSessions.id, { onDelete: 'cascade' }),
+  key: text('object_key').notNull(),
+  position: integer('position').notNull().default(0),
+  status: text('status').notNull(),
+  referenced: integer('referenced', { mode: 'boolean' }).notNull().default(false),
+  error: text('error')
+}, table => [
+  primaryKey({ columns: [table.sessionId, table.key] }),
+  index('r2_delete_session_items_session_idx').on(table.sessionId)
+])

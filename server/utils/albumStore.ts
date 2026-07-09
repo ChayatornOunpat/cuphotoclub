@@ -2,12 +2,32 @@ import { desc, eq, sql } from 'drizzle-orm'
 import type { Album, AlbumInput } from '~~/shared/types'
 import { readContentAlbums } from './contentAlbumFiles'
 
+// Unicode-aware: keep letters (incl. Thai), digits, and combining marks (Thai
+// vowel/tone signs), replacing runs of anything else with a hyphen. A Thai title
+// like "รับน้องก้าวใหม่ 2012" becomes the slug "รับน้องก้าวใหม่-2012" (browsers show
+// the Thai in the address bar) instead of collapsing to a bare "2012".
 function slugify(s: string): string {
-  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return s.toLowerCase().trim().replace(/[^\p{L}\p{N}\p{M}]+/gu, '-').replace(/^-|-$/g, '')
 }
 
 function withoutOrderPrefix(s: string): string {
   return s.replace(/^\d+-/, '')
+}
+
+// Find a slug not already taken by a *different* album. `exceptId` lets an album
+// keep its own slug on update without colliding with itself.
+async function uniqueSlug(base: string, exceptId?: string): Promise<string> {
+  const root = slugify(base) || 'album'
+  let candidate = root
+  for (let n = 2; ; n++) {
+    const [row] = await db
+      .select({ id: schema.contentAlbums.id })
+      .from(schema.contentAlbums)
+      .where(eq(schema.contentAlbums.slug, candidate))
+      .limit(1)
+    if (!row || row.id === exceptId) return candidate
+    candidate = `${root}-${n}`
+  }
 }
 
 type AlbumRow = typeof schema.contentAlbums.$inferSelect
@@ -15,6 +35,7 @@ type AlbumRow = typeof schema.contentAlbums.$inferSelect
 function rowToAlbum(row: AlbumRow): Album {
   return {
     id: row.id,
+    slug: row.slug || row.id,
     title: row.title,
     category: row.category,
     date: row.date,
@@ -34,6 +55,7 @@ async function writeAlbum(album: Album): Promise<void> {
   const now = new Date()
   const values = {
     id: album.id,
+    slug: album.slug,
     title: album.title,
     category: album.category,
     date: album.date,
@@ -54,6 +76,7 @@ async function writeAlbum(album: Album): Promise<void> {
     .onConflictDoUpdate({
       target: schema.contentAlbums.id,
       set: {
+        slug: values.slug,
         title: values.title,
         category: values.category,
         date: values.date,
@@ -89,6 +112,7 @@ function seedFromContentOnce(): Promise<void> {
           .insert(schema.contentAlbums)
           .values({
             id: album.id,
+            slug: album.slug || album.id,
             title: album.title,
             category: album.category,
             date: album.date,
@@ -139,21 +163,70 @@ export const albumStore = {
     return all.find(album => withoutOrderPrefix(album.id) === id) ?? null
   },
 
+  // Resolve by human slug (the URL). Falls back to id so legacy links that used
+  // the id directly still work.
+  async getBySlug(slug: string): Promise<Album | null> {
+    await seedFromContentOnce()
+    const [bySlug] = await db
+      .select()
+      .from(schema.contentAlbums)
+      .where(eq(schema.contentAlbums.slug, slug))
+      .limit(1)
+    if (bySlug) {
+      const album = rowToAlbum(bySlug)
+      return realDataOnly() && containsMockMedia(album) ? null : album
+    }
+    return this.get(slug)
+  },
+
   async create(input: AlbumInput): Promise<Album> {
     await seedFromContentOnce()
-    let id = slugify(input.title) || `album-${Date.now()}`
-    if (await this.get(id)) id = `${id}-${Date.now().toString(36)}`
+    const id = crypto.randomUUID()
+    const slug = await uniqueSlug(input.title || 'album')
+    const album: Album = { ...input, id, slug }
+    await writeAlbum(album)
+    return album
+  },
 
-    const album: Album = { ...input, id }
+  // Album-first: an empty draft created before any title/photos exist. Its id is
+  // the permanent R2 folder; images upload straight into content-albums/<id>/.
+  async createDraft(): Promise<Album> {
+    await seedFromContentOnce()
+    const id = crypto.randomUUID()
+    // Placeholder slug while the draft is untitled; update() sets the real one
+    // from the title on first save.
+    const slug = await uniqueSlug(`draft-${id.slice(0, 8)}`)
+    const today = new Date().toISOString().slice(0, 10)
+    const album: Album = {
+      id,
+      slug,
+      title: '',
+      category: '',
+      date: today,
+      published: today,
+      visibility: 'draft',
+      excerpt: '',
+      style: 'essay',
+      placement: 'gallery',
+      coverSrc: '',
+      rows: []
+    }
     await writeAlbum(album)
     return album
   },
 
   async update(id: string, input: AlbumInput): Promise<Album | null> {
     await seedFromContentOnce()
-    if (!(await this.get(id))) return null
+    const existing = await this.get(id)
+    if (!existing) return null
 
-    const album: Album = { ...input, id }
+    // Keep the URL slug in sync with the title. slugify is deterministic, so
+    // re-saving the same title yields the same slug (exceptId prevents a
+    // self-collision). The R2 folder (= id) never moves regardless.
+    const slug = input.title.trim()
+      ? await uniqueSlug(input.title, existing.id)
+      : existing.slug
+    const album: Album = { ...input, id: existing.id, slug }
     await writeAlbum(album)
     return album
   },

@@ -10,7 +10,17 @@ export default defineEventHandler(async (event) => {
     .where(and(eq(schema.events.slug, slug), eq(schema.events.status, 'published')))
     .limit(1)
 
-  if (!row) throw createError({ statusCode: 404, message: 'ไม่พบกิจกรรม' })
+  if (!row) {
+    // Dev-only fallback so mock activities from /api/events open a detail page.
+    if (import.meta.dev) {
+      const mock = devMockEvents().find(ev => ev.slug === slug)
+      if (mock) {
+        const { body, ...rest } = mock
+        return { ...rest, bodyHtml: renderMarkdown(body) }
+      }
+    }
+    throw createError({ statusCode: 404, message: 'ไม่พบกิจกรรม' })
+  }
 
   return {
     id: row.id,

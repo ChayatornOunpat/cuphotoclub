@@ -146,7 +146,7 @@ nav.menu-open .burger .burger__line:nth-child(1) { transform: translateY(6.5px) 
 nav.menu-open .burger .burger__line:nth-child(2) { opacity: 0; }
 nav.menu-open .burger .burger__line:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
 
-@media (max-width: 860px) {
+@media (max-width: 1120px) {
   nav { padding: 1.25rem 1.5rem; }
   .nav-links { display: none; }
   .burger { display: flex; }

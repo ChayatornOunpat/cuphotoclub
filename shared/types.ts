@@ -29,11 +29,12 @@ export interface AlbumRow {
   cells: AlbumCell[]
 }
 
-export type AlbumStyle = 'essay' | 'sticky' | 'contact'
+export type AlbumStyle = 'essay' | 'sticky' | 'contact' | 'darkroom'
 export type Placement = 'blog' | 'gallery' | 'both'
 
 export interface Album {
-  id: string
+  id: string           // immutable key; also the R2 media folder (content-albums/<id>)
+  slug: string         // human-readable URL slug; renamable without moving media
   title: string
   category: string
   date: string // ISO date (YYYY-MM-DD) shown on the album
@@ -49,8 +50,8 @@ export interface Album {
   updatedAt?: string
 }
 
-/** Fields the admin supplies when creating/updating (no id). */
-export type AlbumInput = Omit<Album, 'id' | 'updatedAt'>
+/** Fields the admin supplies when creating/updating. `id`/`slug` are server-managed. */
+export type AlbumInput = Omit<Album, 'id' | 'slug' | 'updatedAt'>
 
 // ─── Post block types ──────────────────────────────────────────────────────
 

@@ -24,7 +24,7 @@ function visibilityClass(value?: string) {
 }
 
 function previewPath(album: NonNullable<typeof albums.value>[number]) {
-  return `/admin/albums/${album.id}/preview`
+  return `/admin/albums/${album.slug}/preview`
 }
 
 function modifiedValue(album: NonNullable<typeof albums.value>[number]) {
@@ -122,7 +122,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           <td class="t-muted">{{ a.date }}</td>
           <td class="t-actions">
             <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
-            <NuxtLink :to="localePath(`/admin/albums/${a.id}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
+            <NuxtLink :to="localePath(`/admin/albums/${a.slug}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
             <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title)">
               {{ deleting === a.id ? '...' : t('admin.delete') }}
             </button>
@@ -145,7 +145,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           </div>
           <div class="card__actions">
             <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
-            <NuxtLink :to="localePath(`/admin/albums/${a.id}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
+            <NuxtLink :to="localePath(`/admin/albums/${a.slug}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
             <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title)">
               {{ deleting === a.id ? '...' : t('admin.delete') }}
             </button>

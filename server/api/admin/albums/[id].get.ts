@@ -1,7 +1,10 @@
 export default defineEventHandler(async (event) => {
   await requireUserSession(event)
-  const id = getRouterParam(event, 'id')!
-  const album = await albumStore.get(id)
+  // decode: slugs may contain Thai (percent-encoded in the URL); h3 does not
+  // decode router params by default.
+  const id = getRouterParam(event, 'id', { decode: true })!
+  // Resolve by slug (the URL) or id (legacy links).
+  const album = await albumStore.getBySlug(id)
   if (!album) throw createError({ statusCode: 404, statusMessage: 'Album not found' })
   return album
 })

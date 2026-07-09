@@ -1,167 +1,188 @@
 <script setup lang="ts">
-interface Album {
-  title: string
-  category: string
-  cover: string
-  path: string
-}
-
-const props = defineProps<{
-  albums: Album[]
+defineProps<{
+  albums: Array<{
+    title: string
+    category: string
+    cover: string
+    path: string
+  }>
   seed: number
 }>()
+
 const { t } = useI18n()
+const infoOpen = ref(false)
+const infoRef = ref<HTMLElement | null>(null)
 
-// Each unit spans all 4 columns and is itself a perfect rectangle of height `h`
-// (its tile areas exactly fill 4 cols × h rows). Stacking any set of them yields
-// a complete rectangle — flush bottom edge, no holes — for ANY album count.
-// slots: c=startCol(1-4), r=startRow(1-based within unit), cs=colSpan, rs=rowSpan
-interface Slot { c: number, r: number, cs?: number, rs?: number }
-const UNITS: { h: number, slots: Slot[] }[] = [
-  // height-1 bands (slot areas sum to 4)
-  { h: 1, slots: [{ c: 1, r: 1 }, { c: 2, r: 1 }, { c: 3, r: 1 }, { c: 4, r: 1 }] },
-  { h: 1, slots: [{ c: 1, r: 1, cs: 2 }, { c: 3, r: 1, cs: 2 }] },
-  { h: 1, slots: [{ c: 1, r: 1, cs: 2 }, { c: 3, r: 1 }, { c: 4, r: 1 }] },
-  { h: 1, slots: [{ c: 1, r: 1 }, { c: 2, r: 1 }, { c: 3, r: 1, cs: 2 }] },
-  // height-2 bands (slot areas sum to 8)
-  { h: 2, slots: [{ c: 1, r: 1, cs: 2, rs: 2 }, { c: 3, r: 1 }, { c: 4, r: 1 }, { c: 3, r: 2, cs: 2 }] },
-  { h: 2, slots: [{ c: 1, r: 1 }, { c: 2, r: 1 }, { c: 3, r: 1, cs: 2, rs: 2 }, { c: 1, r: 2, cs: 2 }] },
-  { h: 2, slots: [{ c: 1, r: 1, rs: 2 }, { c: 2, r: 1, cs: 2, rs: 2 }, { c: 4, r: 1, rs: 2 }] },
-  { h: 2, slots: [{ c: 1, r: 1, cs: 2, rs: 2 }, { c: 3, r: 1, rs: 2 }, { c: 4, r: 1, rs: 2 }] },
-  { h: 2, slots: [{ c: 1, r: 1, rs: 2 }, { c: 2, r: 1, rs: 2 }, { c: 3, r: 1, cs: 2, rs: 2 }] }
-]
-
-// Seeded PRNG (mulberry32). Same seed → same sequence on server and client,
-// which keeps the SSR markup and the hydrated markup identical.
-function mulberry32(a: number) {
-  return function () {
-    a |= 0
-    a = (a + 0x6D2B79F5) | 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
+function closeInfo() {
+  infoOpen.value = false
 }
 
-interface Tile extends Album { col: string, row: string }
+function onDocumentPointerDown(event: PointerEvent) {
+  if (!infoOpen.value) return
+  const target = event.target
+  if (!(target instanceof Node)) return
+  if (infoRef.value?.contains(target)) return
+  closeInfo()
+}
 
-const tiles = computed<Tile[]>(() => {
-  const rand = mulberry32(props.seed)
-  const shuffle = <T,>(arr: T[]): T[] => {
-    const a = arr.slice()
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1))
-      ;[a[i], a[j]] = [a[j]!, a[i]!]
-    }
-    return a
-  }
+function onDocumentKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeInfo()
+}
 
-  const pool = shuffle(props.albums)
-  if (pool.length < 2) {
-    // Trivial cases still tile cleanly (single full-width / nothing).
-    return pool.map(a => ({ ...a, col: '1 / span 4', row: '1 / span 1' }))
-  }
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointerDown)
+  document.addEventListener('keydown', onDocumentKeyDown)
+})
 
-  // Pick how many to show: a little variety, capped at what we have.
-  const maxN = Math.min(pool.length, 12)
-  const minN = Math.min(8, maxN)
-  const count = minN + Math.floor(rand() * (maxN - minN + 1))
-  const picks = pool.slice(0, count)
-
-  // Choose a random set of units whose slot counts sum EXACTLY to `count`.
-  const decompose = (n: number): { h: number, slots: Slot[] }[] | null => {
-    if (n === 0) return []
-    for (const u of shuffle(UNITS)) {
-      if (u.slots.length <= n) {
-        const rest = decompose(n - u.slots.length)
-        if (rest) return [u, ...rest]
-      }
-    }
-    return null
-  }
-  const units = decompose(count) ?? []
-
-  const out: Tile[] = []
-  let baseRow = 1
-  let idx = 0
-  for (const u of units) {
-    for (const s of u.slots) {
-      const a = picks[idx++]!
-      out.push({
-        ...a,
-        col: `${s.c} / span ${s.cs ?? 1}`,
-        row: `${baseRow + s.r - 1} / span ${s.rs ?? 1}`
-      })
-    }
-    baseRow += u.h
-  }
-  return out
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocumentPointerDown)
+  document.removeEventListener('keydown', onDocumentKeyDown)
 })
 </script>
 
 <template>
   <section id="gallery" class="section-pad gallery">
     <div class="wrap">
-      <div class="eyebrow"><span class="num">01</span> {{ t('home.featuredWork') }}</div>
-      <div class="gallery__wall">
-        <NuxtLink
-          v-for="tile in tiles"
-          :key="tile.path + tile.col + tile.row"
-          :to="tile.path"
-          class="gitem"
-          :style="{ gridColumn: tile.col, gridRow: tile.row }"
+      <div class="gallery__heading">
+        <div class="eyebrow">
+          <span class="num">01</span>
+          <span>{{ t('home.featuredWork') }}</span>
+        </div>
+      </div>
+      <div class="gallery__live">
+        <ClientOnly>
+          <LivePhotoGrid />
+          <template #fallback>
+            <div class="gallery__fallback" aria-hidden="true" />
+          </template>
+        </ClientOnly>
+      </div>
+      <div ref="infoRef" class="gallery__help">
+        <button
+          type="button"
+          class="gallery__help-button"
+          :aria-expanded="infoOpen"
+          aria-controls="featured-work-note"
+          @click="infoOpen = !infoOpen"
         >
-          <AppImg :src="tile.cover" :alt="tile.title" sizes="sm:50vw md:33vw lg:25vw" />
-          <span class="gitem__label">{{ tile.title }} · {{ tile.category }}</span>
-        </NuxtLink>
+          {{ t('home.featuredWorkInfoButton') }}
+        </button>
+        <span v-if="infoOpen" id="featured-work-note" class="gallery__note" role="tooltip">
+          {{ t('home.featuredWorkInfoBody') }}
+        </span>
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.gallery { background: var(--body-bg); }
-
-/* 4-col grid; tiles placed explicitly (from the unit engine) so the wall is
-   always a complete rectangle. */
-.gallery__wall {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-auto-rows: 210px;
-  gap: 0.5rem;
+.gallery {
+  background: var(--body-bg);
 }
 
-.gitem {
-  overflow: hidden;
+.gallery__heading {
   position: relative;
+  z-index: 5;
+}
+
+.gallery__help {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 0.8rem;
+}
+
+.gallery__help-button {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--muted);
   cursor: pointer;
-  display: block;
-}
-.gitem :deep(img) {
-  width: 100%; height: 100%;
-  object-fit: cover; display: block;
-  transition: opacity 0.3s;
+  font-family: var(--font-sans);
+  font-size: 0.56rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  line-height: 1.2;
+  padding: 0 0 0.22rem;
+  text-transform: uppercase;
+  transition: border-color 0.2s ease, color 0.2s ease;
 }
 
-.gitem__label {
+.gallery__help-button:hover,
+.gallery__help-button:focus-visible,
+.gallery__help-button[aria-expanded='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.gallery__help-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.gallery__note {
   position: absolute;
-  bottom: 0; left: 0; right: 0;
-  padding: 2rem 1rem 0.85rem;
-  background: linear-gradient(transparent, rgba(12, 12, 10, 0.75));
-  font-size: 0.58rem;
-  letter-spacing: 0.1em;
-  color: rgba(245, 244, 240, 0.85);
-  opacity: 0;
-  transition: opacity 0.28s;
+  top: calc(100% + 0.65rem);
+  right: 0;
+  z-index: 10;
+  width: min(30rem, calc(100vw - 6rem));
+  max-width: 30rem;
+  margin: 0;
+  background: var(--body-bg);
+  border-top: 1px solid var(--accent);
+  box-shadow: 0 1rem 2.4rem rgba(12, 12, 10, 0.14);
+  padding: 0.85rem 0 0.95rem 1rem;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 300;
+  letter-spacing: 0;
+  line-height: 1.7;
+  text-transform: none;
+  white-space: normal;
 }
-.gitem:hover .gitem__label { opacity: 1; }
 
-/* Below the 4-col engine width, fall back to a clean uniform grid. */
-@media (max-width: 900px) {
-  .gallery__wall { grid-template-columns: repeat(2, 1fr); grid-auto-rows: 200px; }
-  .gitem { grid-column: auto !important; grid-row: auto !important; }
+.gallery__live {
+  overflow: hidden;
+  background: var(--body-bg);
 }
-@media (max-width: 540px) {
-  .gallery__wall { grid-template-columns: 1fr; grid-auto-rows: 220px; }
+
+.gallery__fallback {
+  min-height: 557px;
+  background: var(--paper);
+}
+
+@media (max-width: 1100px) {
+  .gallery__fallback {
+    min-height: 578px;
+  }
+}
+
+@media (max-width: 700px) {
+  .gallery__help {
+    justify-content: flex-start;
+  }
+
+  .gallery__note {
+    right: auto;
+    left: 0;
+    width: min(100%, calc(100vw - 3rem));
+    padding-left: 0;
+    padding-right: 1rem;
+  }
+
+  .gallery__fallback {
+    min-height: 581px;
+  }
+}
+
+@media (max-width: 460px) {
+  .gallery__fallback {
+    min-height: 603px;
+  }
 }
 </style>

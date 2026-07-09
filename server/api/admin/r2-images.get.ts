@@ -13,6 +13,7 @@ interface R2InventoryImage {
   contentType?: string
   size?: number
   uploadedAt?: string
+  orderAt: number
   albums: ImageUsage[]
   usages: ImageUsage[]
 }
@@ -150,21 +151,21 @@ export default defineEventHandler(async (event) => {
   const images: R2InventoryImage[] = blobs.map(item => {
     const albums = albumUsage.get(item.pathname) ?? []
     const usages = otherUsage.get(item.pathname) ?? []
+    // Queue-order stamp written at upload time; uploadedAt (completion time)
+    // is the fallback for images uploaded before the stamp existed.
+    const seq = Number(item.customMetadata?.seq)
     return {
       key: item.pathname,
       contentType: item.contentType,
       size: item.size,
       uploadedAt: item.uploadedAt?.toISOString(),
+      orderAt: Number.isFinite(seq) && seq > 0 ? seq : (item.uploadedAt?.getTime() ?? 0),
       albums,
       usages
     }
   })
 
-  images.sort((a, b) => {
-    const aTime = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0
-    const bTime = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0
-    return bTime - aTime || a.key.localeCompare(b.key)
-  })
+  images.sort((a, b) => b.orderAt - a.orderAt || a.key.localeCompare(b.key))
 
   return {
     prefix: prefix ?? '',

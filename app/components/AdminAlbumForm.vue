@@ -4,6 +4,7 @@ import type { AlbumCell, AlbumRow, AlbumInput, CellType, CellSpan, ContentStatus
 import AlbumEssay from '~/components/AlbumEssay.vue'
 import AlbumSticky from '~/components/AlbumSticky.vue'
 import AlbumContact from '~/components/AlbumContact.vue'
+import AlbumDarkroom from '~/components/AlbumDarkroom.vue'
 import { PLACEHOLDER_IMG } from '~/utils/placeholder'
 
 const props = defineProps<{
@@ -542,7 +543,7 @@ onMounted(() => {
 onUnmounted(() => clearTimeout(hintTimer))
 
 // Preview
-const styles = { essay: AlbumEssay, sticky: AlbumSticky, contact: AlbumContact }
+const styles = { essay: AlbumEssay, sticky: AlbumSticky, contact: AlbumContact, darkroom: AlbumDarkroom }
 const styleComponent = computed(() => styles[form.style] ?? AlbumEssay)
 
 const previewAlbum = computed(() => ({
@@ -1025,6 +1026,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
             <option value="essay">{{ t('adminForm.styleEssay') }}</option>
             <option value="sticky">{{ t('adminForm.styleSticky') }}</option>
             <option value="contact">{{ t('adminForm.styleContact') }}</option>
+            <option value="darkroom">{{ t('adminForm.styleDarkroom') }}</option>
           </select>
         </div>
         <div class="field">
@@ -1393,6 +1395,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       v-model="bulkPickerOpen"
       :prefix="mediaPrefix"
       multiple
+      initial-sort="oldest"
       :title="t('adminForm.autofillModalTitle')"
       @select="onBulkPick"
     />

@@ -26,6 +26,26 @@ interface R2Inventory {
   images: R2Image[]
 }
 
+interface DirectDeletePayload {
+  url: string
+  headers?: Record<string, string>
+  expiresAt?: string
+}
+
+interface DeleteSessionItem {
+  key: string
+  status: 'ready' | 'blocked' | 'deleted' | 'failed'
+  referenced: boolean
+  error?: string
+  delete?: DirectDeletePayload
+}
+
+interface DeleteSessionResponse {
+  id: string
+  force: boolean
+  items: DeleteSessionItem[]
+}
+
 const prefixInput = ref('')
 const activePrefix = ref('')
 const statusFilter = ref<'all' | 'album' | 'referenced' | 'unlinked'>('all')
@@ -34,6 +54,16 @@ const search = ref('')
 const { data, pending, error, refresh } = await useFetch<R2Inventory>('/api/admin/r2-images', {
   query: computed(() => ({ prefix: activePrefix.value || undefined }))
 })
+
+const AUTO_REFRESH_MS = 45_000
+let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+async function autoRefreshInventory() {
+  if (pending.value) return
+  if (deleteConfirm.active || passwordGate.active || deleteProgress.active || bulkDeleting.value) return
+  if (import.meta.client && document.visibilityState !== 'visible') return
+  await refresh()
+}
 
 const images = computed(() => data.value?.images ?? [])
 const filteredImages = computed(() => {
@@ -86,6 +116,170 @@ function usageLabel(item: ImageUsage) {
 }
 
 const deletingKey = ref<string | null>(null)
+const deleteConfirm = reactive({
+  active: false,
+  title: '',
+  message: '',
+  detail: '',
+  confirmLabel: 'Delete',
+  warningTitle: '',
+  warningItems: [] as string[],
+  resolve: null as null | ((confirmed: boolean) => void)
+})
+const passwordGate = reactive({
+  active: false,
+  title: '',
+  message: '',
+  password: '',
+  error: '',
+  loading: false,
+  resolve: null as null | ((confirmed: boolean) => void)
+})
+const deleteProgress = reactive({
+  active: false,
+  title: '',
+  current: '',
+  done: 0,
+  total: 0,
+  failed: 0,
+  blocked: 0,
+  pauseSeconds: 0
+})
+const deleteProgressPercent = computed(() =>
+  deleteProgress.total
+    ? Math.min(100, Math.round((deleteProgress.done / deleteProgress.total) * 100))
+    : 0
+)
+
+function askDeleteConfirmation(options: {
+  title: string
+  message: string
+  detail?: string
+  confirmLabel?: string
+  warningTitle?: string
+  warningItems?: string[]
+}) {
+  deleteConfirm.active = true
+  deleteConfirm.title = options.title
+  deleteConfirm.message = options.message
+  deleteConfirm.detail = options.detail || ''
+  deleteConfirm.confirmLabel = options.confirmLabel || 'Delete'
+  deleteConfirm.warningTitle = options.warningTitle || ''
+  deleteConfirm.warningItems = options.warningItems || []
+  return new Promise<boolean>((resolve) => {
+    deleteConfirm.resolve = resolve
+  })
+}
+
+function resolveDeleteConfirmation(confirmed: boolean) {
+  deleteConfirm.active = false
+  deleteConfirm.resolve?.(confirmed)
+  deleteConfirm.resolve = null
+}
+
+function askPasswordGate(options: { title: string; message: string }) {
+  passwordGate.active = true
+  passwordGate.title = options.title
+  passwordGate.message = options.message
+  passwordGate.password = ''
+  passwordGate.error = ''
+  passwordGate.loading = false
+  return new Promise<boolean>((resolve) => {
+    passwordGate.resolve = resolve
+  })
+}
+
+function resolvePasswordGate(confirmed: boolean) {
+  passwordGate.active = false
+  passwordGate.resolve?.(confirmed)
+  passwordGate.resolve = null
+}
+
+async function submitPasswordGate() {
+  if (passwordGate.loading || !passwordGate.password) return
+  passwordGate.loading = true
+  passwordGate.error = ''
+  try {
+    await $fetch('/api/admin/verify-password', {
+      method: 'POST',
+      body: { password: passwordGate.password }
+    })
+    resolvePasswordGate(true)
+  } catch (err: any) {
+    passwordGate.error = err?.data?.message || 'Password check failed.'
+  } finally {
+    passwordGate.loading = false
+  }
+}
+
+const DELETE_RESOURCE_LIMIT_PAUSE_MS = 30_000
+let deleteResourcePausePromise: Promise<void> | null = null
+let deleteResourcePauseTimer: ReturnType<typeof setInterval> | null = null
+
+function rawDeleteError(err: any) {
+  const data = err?.data
+  return typeof data === 'string'
+    ? data
+    : data?.message || data?.statusMessage || err?.message || ''
+}
+
+function isDeleteResourceLimitError(err: any) {
+  return /Worker exceeded resource limits|Error 1102/i.test(rawDeleteError(err))
+}
+
+function beginDeleteResourceLimitPause() {
+  if (deleteResourcePausePromise) return deleteResourcePausePromise
+
+  const pauseUntil = Date.now() + DELETE_RESOURCE_LIMIT_PAUSE_MS
+  deleteProgress.pauseSeconds = Math.ceil(DELETE_RESOURCE_LIMIT_PAUSE_MS / 1000)
+  deleteResourcePauseTimer = setInterval(() => {
+    deleteProgress.pauseSeconds = Math.max(0, Math.ceil((pauseUntil - Date.now()) / 1000))
+  }, 250)
+
+  deleteResourcePausePromise = new Promise((resolve) => {
+    setTimeout(() => {
+      if (deleteResourcePauseTimer) clearInterval(deleteResourcePauseTimer)
+      deleteResourcePauseTimer = null
+      deleteProgress.pauseSeconds = 0
+      deleteResourcePausePromise = null
+      resolve()
+    }, DELETE_RESOURCE_LIMIT_PAUSE_MS)
+  })
+
+  return deleteResourcePausePromise
+}
+
+async function waitForDeleteResourceLimitPause() {
+  if (deleteResourcePausePromise) await deleteResourcePausePromise
+}
+
+function beginDeleteProgress(title: string, total: number) {
+  deleteProgress.active = true
+  deleteProgress.title = title
+  deleteProgress.current = ''
+  deleteProgress.done = 0
+  deleteProgress.total = Math.max(1, total)
+  deleteProgress.failed = 0
+  deleteProgress.blocked = 0
+  deleteProgress.pauseSeconds = 0
+}
+
+function extendDeleteProgress(count: number) {
+  deleteProgress.total += count
+}
+
+function stepDeleteProgress(key: string, status: 'deleted' | 'failed' | 'blocked' = 'deleted') {
+  deleteProgress.current = key
+  deleteProgress.done = Math.min(deleteProgress.done + 1, deleteProgress.total)
+  if (status === 'failed') deleteProgress.failed++
+  if (status === 'blocked') deleteProgress.blocked++
+}
+
+async function finishDeleteProgress() {
+  if (!deleteProgress.active) return
+  await new Promise(resolve => setTimeout(resolve, 320))
+  deleteProgress.active = false
+}
 
 async function requestDelete(key: string, force = false) {
   await $fetch('/api/admin/r2-images/delete', {
@@ -94,28 +288,62 @@ async function requestDelete(key: string, force = false) {
   })
 }
 
-async function deleteImage(image: R2Image, force = false) {
+async function deleteImage(image: R2Image) {
   deletingKey.value = image.key
+  beginDeleteProgress('Deleting image', 1)
+  await nextTick()
   try {
-    await requestDelete(image.key, force)
+    await requestDelete(image.key)
+    stepDeleteProgress(image.key)
     await refresh()
   } catch (err: any) {
-    if (err?.statusCode === 409 && !force) {
-      if (confirm(`${err.data?.message || 'This image is still referenced elsewhere.'}\n\nDelete it anyway?`)) {
-        await deleteImage(image, true)
-        return
+    if (err?.statusCode === 409) {
+      stepDeleteProgress(image.key, 'blocked')
+      if (await askDeleteConfirmation({
+        title: 'Delete referenced image?',
+        message: err.data?.message || 'This image is still referenced elsewhere.',
+        detail: image.key,
+        confirmLabel: 'Delete anyway'
+      })) {
+        extendDeleteProgress(1)
+        try {
+          await requestDelete(image.key, true)
+          stepDeleteProgress(image.key)
+          await refresh()
+        } catch (forceErr: any) {
+          if (isDeleteResourceLimitError(forceErr)) await beginDeleteResourceLimitPause()
+          stepDeleteProgress(image.key, 'failed')
+          alert(forceErr?.data?.message || 'Could not delete image.')
+        }
       }
     } else {
+      if (isDeleteResourceLimitError(err)) await beginDeleteResourceLimitPause()
+      stepDeleteProgress(image.key, 'failed')
       alert(err?.data?.message || 'Could not delete image.')
     }
   } finally {
     deletingKey.value = null
+    await finishDeleteProgress()
   }
 }
 
-function confirmDelete(image: R2Image) {
-  if (!confirm(`Delete "${image.key}" from R2? This cannot be undone.`)) return
-  deleteImage(image)
+async function confirmDelete(image: R2Image) {
+  const hasReferences = image.albums.length > 0 || image.usages.length > 0
+  const confirmed = await askDeleteConfirmation({
+    title: hasReferences ? 'Delete referenced image?' : 'Delete image?',
+    message: hasReferences
+      ? 'This image is currently used by the site. The server will block deletion unless you force it in the next step.'
+      : 'This removes the object from R2. This cannot be undone.',
+    detail: image.key,
+    warningTitle: hasReferences ? 'REFERENCED IMAGE' : '',
+    warningItems: hasReferences
+      ? [
+          `${image.albums.length + image.usages.length} known reference${image.albums.length + image.usages.length === 1 ? '' : 's'}`,
+          'Deleting it can break covers, hero images, gallery tiles, or album layouts.'
+        ]
+      : []
+  })
+  if (confirmed) deleteImage(image)
 }
 
 // ── Bulk selection ───────────────────────────────────────────────────────
@@ -187,31 +415,154 @@ function goToPage(n: number) {
   if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+const DELETE_DIRECT_CONCURRENCY = 8
+const DELETE_SESSION_SIZE = 250
+
+function wait(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function runDeletePool<T>(items: T[], worker: (item: T) => Promise<void>) {
+  for (let index = 0; index < items.length; index += DELETE_DIRECT_CONCURRENCY) {
+    await waitForDeleteResourceLimitPause()
+    const batch = items.slice(index, index + DELETE_DIRECT_CONCURRENCY)
+    await Promise.all(batch.map(item => worker(item)))
+  }
+}
+
+function chunkKeys(keys: string[]) {
+  const chunks: string[][] = []
+  for (let index = 0; index < keys.length; index += DELETE_SESSION_SIZE) {
+    chunks.push(keys.slice(index, index + DELETE_SESSION_SIZE))
+  }
+  return chunks
+}
+
+async function createDeleteSession(keys: string[], force = false) {
+  return await $fetch<DeleteSessionResponse>('/api/admin/r2-images/delete-session', {
+    method: 'POST',
+    body: { keys, force }
+  })
+}
+
+async function completeDeleteSession(id: string, results: { key: string; status: 'deleted' | 'failed'; error?: string }[]) {
+  if (!results.length) return
+  await $fetch(`/api/admin/r2-images/delete-session/${encodeURIComponent(id)}/complete`, {
+    method: 'POST',
+    body: { results }
+  })
+}
+
+async function requestDirectDelete(item: DeleteSessionItem) {
+  if (!item.delete?.url) throw new Error(item.error || 'Direct R2 delete URL was not issued.')
+  const response = await fetch(item.delete.url, {
+    method: 'DELETE',
+    headers: item.delete.headers || {}
+  })
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(`Direct R2 delete failed (${response.status}). ${body}`.trim())
+  }
+}
+
+async function runDeleteSessions(keys: string[], force: boolean, blocked: string[], failed: string[]) {
+  for (const chunk of chunkKeys(keys)) {
+    const session = await createDeleteSession(chunk, force)
+    const ready = session.items.filter(item => item.status === 'ready')
+    const results: { key: string; status: 'deleted' | 'failed'; error?: string }[] = []
+
+    for (const item of session.items) {
+      if (item.status !== 'blocked') continue
+      blocked.push(item.key)
+      stepDeleteProgress(item.key, 'blocked')
+    }
+
+    await runDeletePool(ready, async (item) => {
+      try {
+        await requestDirectDelete(item)
+        results.push({ key: item.key, status: 'deleted' })
+        stepDeleteProgress(item.key)
+      } catch (err: any) {
+        failed.push(item.key)
+        results.push({ key: item.key, status: 'failed', error: err?.message || 'Direct R2 delete failed.' })
+        stepDeleteProgress(item.key, 'failed')
+      }
+    })
+
+    try {
+      await completeDeleteSession(session.id, results)
+    } catch (err: any) {
+      const message = err?.data?.message || err?.message || 'Could not complete delete session.'
+      for (const result of results) {
+        if (result.status === 'deleted') failed.push(result.key)
+      }
+      alert(message)
+    }
+  }
+}
+
 async function bulkDelete() {
   const keys = [...selected.value]
   if (!keys.length) return
-  if (!confirm(`Delete ${keys.length} image${keys.length === 1 ? '' : 's'} from R2? This cannot be undone.`)) return
+  const selectedImages = images.value.filter(image => selected.value.has(image.key))
+  const referencedCount = selectedImages.filter(image => image.albums.length || image.usages.length).length
+  const deletingAllLoaded = images.value.length > 0 && keys.length === images.value.length
+  const warningItems: string[] = []
+
+  if (deletingAllLoaded) {
+    warningItems.push(activePrefix.value
+      ? `This selects every image under prefix "${activePrefix.value}".`
+      : 'This selects every R2 image currently loaded in this inventory.')
+  }
+  if (referencedCount) {
+    warningItems.push(`${referencedCount} selected image${referencedCount === 1 ? ' is' : 's are'} referenced by albums, heroes, posts, events, members, or layouts.`)
+    warningItems.push('Referenced deletions can break visible public pages unless their references are removed or force-cleared.')
+  }
+
+  const confirmed = await askDeleteConfirmation({
+    title: deletingAllLoaded
+      ? 'Delete every selected R2 image?'
+      : referencedCount
+        ? 'Delete referenced R2 images?'
+        : `Delete ${keys.length} image${keys.length === 1 ? '' : 's'}?`,
+    message: 'This removes the selected objects from R2. This cannot be undone.',
+    detail: `${keys.length} selected`,
+    warningTitle: warningItems.length
+      ? deletingAllLoaded
+        ? 'DANGER: MASS R2 DELETE'
+        : referencedCount
+          ? 'DANGER: REFERENCED IMAGES'
+          : ''
+      : '',
+    warningItems
+  })
+  if (!confirmed) return
+
+  if (referencedCount > 50) {
+    const verified = await askPasswordGate({
+      title: 'Admin password required',
+      message: `You are deleting ${referencedCount} referenced images. Enter your admin password to continue.`
+    })
+    if (!verified) return
+  }
 
   bulkDeleting.value = true
+  beginDeleteProgress(`Deleting ${keys.length} image${keys.length === 1 ? '' : 's'}`, keys.length)
+  await nextTick()
   const blocked: string[] = []
   const failed: string[] = []
   try {
-    for (const key of keys) {
-      try {
-        await requestDelete(key)
-      } catch (err: any) {
-        if (err?.statusCode === 409) blocked.push(key)
-        else failed.push(key)
-      }
-    }
+    await runDeleteSessions(keys, false, blocked, failed)
 
-    if (blocked.length && confirm(
-      `${blocked.length} of the selected images are still referenced elsewhere. Delete them anyway?`
-    )) {
-      for (const key of blocked) {
-        try { await requestDelete(key, true) }
-        catch { failed.push(key) }
-      }
+    if (blocked.length && await askDeleteConfirmation({
+      title: `Delete ${blocked.length} referenced image${blocked.length === 1 ? '' : 's'}?`,
+      message: `${blocked.length} of the selected images are still referenced elsewhere.`,
+      detail: 'Delete them anyway?',
+      confirmLabel: 'Delete anyway'
+    })) {
+      extendDeleteProgress(blocked.length)
+      const forceBlocked: string[] = []
+      await runDeleteSessions(blocked, true, forceBlocked, failed)
     }
 
     clearSelection()
@@ -222,12 +573,101 @@ async function bulkDelete() {
     }
   } finally {
     bulkDeleting.value = false
+    await finishDeleteProgress()
   }
 }
+
+onMounted(() => {
+  autoRefreshTimer = setInterval(() => {
+    autoRefreshInventory().catch(() => {})
+  }, AUTO_REFRESH_MS)
+})
+
+onBeforeUnmount(() => {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer)
+  if (deleteResourcePauseTimer) clearInterval(deleteResourcePauseTimer)
+})
 </script>
 
 <template>
   <div class="r2">
+    <Teleport to="body">
+      <Transition name="delete-modal">
+        <div
+          v-if="deleteConfirm.active || passwordGate.active || deleteProgress.active"
+          class="delete-modal"
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="passwordGate.active ? 'password-gate-title' : deleteConfirm.active ? 'delete-confirm-title' : 'delete-progress-title'"
+        >
+          <div class="delete-modal__backdrop" />
+          <form v-if="passwordGate.active" class="delete-modal__panel" @submit.prevent="submitPasswordGate">
+            <p class="delete-modal__kicker">Admin password gate</p>
+            <h2 id="password-gate-title">{{ passwordGate.title }}</h2>
+            <p class="delete-modal__copy">{{ passwordGate.message }}</p>
+            <label class="delete-modal__field">
+              <span>Password</span>
+              <input v-model="passwordGate.password" type="password" autocomplete="current-password" autofocus>
+            </label>
+            <p v-if="passwordGate.error" class="delete-modal__field-error">{{ passwordGate.error }}</p>
+            <div class="delete-modal__actions">
+              <button type="button" class="delete-modal__cancel" :disabled="passwordGate.loading" @click="resolvePasswordGate(false)">Cancel</button>
+              <button type="submit" class="delete-modal__danger" :disabled="passwordGate.loading || !passwordGate.password">
+                {{ passwordGate.loading ? 'Checking...' : 'Confirm password' }}
+              </button>
+            </div>
+          </form>
+          <div v-else-if="deleteConfirm.active" class="delete-modal__panel">
+            <p class="delete-modal__kicker">R2 operation</p>
+            <h2 id="delete-confirm-title">{{ deleteConfirm.title }}</h2>
+            <p class="delete-modal__copy">{{ deleteConfirm.message }}</p>
+            <div v-if="deleteConfirm.warningTitle" class="delete-modal__warning">
+              <p>{{ deleteConfirm.warningTitle }}</p>
+              <ul>
+                <li v-for="item in deleteConfirm.warningItems" :key="item">{{ item }}</li>
+              </ul>
+            </div>
+            <p v-if="deleteConfirm.detail" class="delete-modal__current">{{ deleteConfirm.detail }}</p>
+            <div class="delete-modal__actions">
+              <button type="button" class="delete-modal__cancel" @click="resolveDeleteConfirmation(false)">Cancel</button>
+              <button type="button" class="delete-modal__danger" @click="resolveDeleteConfirmation(true)">
+                {{ deleteConfirm.confirmLabel }}
+              </button>
+            </div>
+          </div>
+          <div v-else class="delete-modal__panel">
+            <div class="delete-modal__mark" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <p class="delete-modal__kicker">R2 operation</p>
+            <h2 id="delete-progress-title">{{ deleteProgress.title }}</h2>
+            <p class="delete-modal__copy">
+              Removing objects from storage. Keep this page open until the progress completes.
+            </p>
+            <div class="delete-modal__meter" role="progressbar" :aria-valuenow="deleteProgressPercent" aria-valuemin="0" aria-valuemax="100">
+              <span :style="{ transform: `scaleX(${deleteProgressPercent / 100})` }" />
+            </div>
+            <div class="delete-modal__meta">
+              <span>{{ deleteProgress.done }} / {{ deleteProgress.total }}</span>
+              <strong>{{ deleteProgressPercent }}%</strong>
+            </div>
+            <p class="delete-modal__current">
+              {{ deleteProgress.current || 'Preparing delete queue' }}
+            </p>
+            <p v-if="deleteProgress.pauseSeconds" class="delete-modal__pause">
+              Worker limit hit · waiting {{ deleteProgress.pauseSeconds }}s before continuing
+            </p>
+            <div v-if="deleteProgress.failed || deleteProgress.blocked" class="delete-modal__notes">
+              <span v-if="deleteProgress.blocked">{{ deleteProgress.blocked }} referenced</span>
+              <span v-if="deleteProgress.failed">{{ deleteProgress.failed }} failed</span>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <header class="r2__head">
       <div>
         <p class="r2__kicker">Admin inventory</p>
@@ -294,13 +734,13 @@ async function bulkDelete() {
     <template v-else>
       <div class="r2__bulk">
         <label class="r2__select-all">
-          <input type="checkbox" :checked="allFilteredSelected" @change="toggleSelectAllFiltered">
+          <input type="checkbox" :checked="allFilteredSelected" :disabled="bulkDeleting" @change="toggleSelectAllFiltered">
           <span class="r2__select-box" aria-hidden="true" />
           <span>Select all shown</span>
         </label>
         <div v-if="selected.size" class="r2__bulk-actions">
           <span>{{ selected.size }} selected</span>
-          <button type="button" class="r2__bulk-clear" @click="clearSelection">Clear</button>
+          <button type="button" class="r2__bulk-clear" :disabled="bulkDeleting" @click="clearSelection">Clear</button>
           <button type="button" class="r2__bulk-delete" :disabled="bulkDeleting" @click="bulkDelete">
             <Icon name="heroicons:trash" />
             {{ bulkDeleting ? 'Deleting…' : `Delete ${selected.size}` }}
@@ -312,7 +752,7 @@ async function bulkDelete() {
         <article v-for="(image, index) in pagedImages" :key="image.key" class="image-row" :class="{ 'is-selected': isSelected(image.key) }">
           <div class="image-row__thumb">
             <label class="image-row__check">
-              <input type="checkbox" :checked="isSelected(image.key)" @click="onCheckboxClick($event, image.key, index)">
+              <input type="checkbox" :checked="isSelected(image.key)" :disabled="bulkDeleting" @click="onCheckboxClick($event, image.key, index)">
               <span class="image-row__check-box" aria-hidden="true">
                 {{ selectionOrder(image.key) || '' }}
               </span>
@@ -329,7 +769,7 @@ async function bulkDelete() {
                 <button
                   type="button"
                   class="image-row__delete"
-                  :disabled="deletingKey === image.key"
+                  :disabled="!!deletingKey || bulkDeleting"
                   @click="confirmDelete(image)"
                 >
                   <Icon name="heroicons:trash" />
@@ -396,6 +836,309 @@ async function bulkDelete() {
 </template>
 
 <style scoped>
+.delete-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.delete-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(12, 12, 10, 0.78), rgba(12, 12, 10, 0.78)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(245, 244, 240, 0.08) 0,
+      rgba(245, 244, 240, 0.08) 1px,
+      transparent 1px,
+      transparent 4.4rem
+    );
+}
+
+.delete-modal__panel {
+  position: relative;
+  width: min(100%, 30rem);
+  border: 1px solid var(--subtle);
+  border-top: 2px solid var(--accent);
+  background: var(--body-bg);
+  padding: 1.15rem;
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.28);
+}
+
+.delete-modal__mark {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.22rem;
+  height: 1.6rem;
+  margin-bottom: 1.2rem;
+}
+
+.delete-modal__mark span {
+  display: block;
+  width: 0.32rem;
+  height: 0.65rem;
+  background: var(--accent);
+  transform-origin: bottom;
+  animation: deletePulse 0.85s ease-in-out infinite;
+}
+
+.delete-modal__mark span:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.delete-modal__mark span:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+.delete-modal__kicker {
+  margin-bottom: 0.45rem;
+  color: var(--accent);
+  font-size: 0.5rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.delete-modal h2 {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 200;
+  line-height: 0.95;
+  color: var(--dark);
+}
+
+.delete-modal__copy {
+  max-width: 24rem;
+  margin-top: 0.85rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.65;
+}
+
+.delete-modal__warning {
+  margin-top: 1.05rem;
+  border: 2px solid #b0243c;
+  border-top-width: 0.45rem;
+  background:
+    linear-gradient(90deg, rgba(176, 36, 60, 0.1), rgba(176, 36, 60, 0.02)),
+    var(--body-bg);
+  padding: 0.9rem;
+  color: #8f1c30;
+}
+
+.delete-modal__warning p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(1.15rem, 5vw, 2.35rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.delete-modal__warning ul {
+  display: grid;
+  gap: 0.42rem;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.delete-modal__warning li {
+  position: relative;
+  padding-left: 1rem;
+  color: var(--dark);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.delete-modal__warning li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.58em;
+  width: 0.42rem;
+  height: 2px;
+  background: #b0243c;
+}
+
+.delete-modal__field {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.delete-modal__field span {
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.delete-modal__field input {
+  width: 100%;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  padding: 0.7rem 0.8rem;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.delete-modal__field input:focus {
+  border-color: var(--accent);
+}
+
+.delete-modal__field-error {
+  margin-top: 0.6rem;
+  color: #b0243c;
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.delete-modal__meter {
+  height: 0.42rem;
+  margin-top: 1.35rem;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.delete-modal__meter span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease-out;
+}
+
+.delete-modal__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.delete-modal__meta strong {
+  color: var(--dark);
+  font-weight: 500;
+}
+
+.delete-modal__current {
+  margin-top: 1rem;
+  border-top: 1px solid var(--subtle);
+  padding-top: 0.75rem;
+  color: var(--dark);
+  font-size: 0.66rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.delete-modal__notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.delete-modal__notes span {
+  border: 1px solid var(--subtle);
+  padding: 0.28rem 0.45rem;
+  color: #b0243c;
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.delete-modal__pause {
+  margin-top: 0.7rem;
+  border: 1px solid color-mix(in srgb, #b0243c 28%, var(--subtle));
+  padding: 0.38rem 0.52rem;
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  color: #8f1c30;
+  background: color-mix(in srgb, #b0243c 5%, var(--body-bg));
+}
+
+.delete-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--subtle);
+  padding-top: 0.85rem;
+}
+
+.delete-modal__actions button {
+  border: 1px solid var(--subtle);
+  padding: 0.55rem 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.delete-modal__cancel {
+  background: transparent;
+  color: var(--dark);
+}
+
+.delete-modal__cancel:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.delete-modal__danger {
+  border-color: #b0243c !important;
+  background: #b0243c;
+  color: #F5F4F0;
+}
+
+.delete-modal__danger:hover {
+  border-color: #8f1c30 !important;
+  background: #8f1c30;
+}
+
+.delete-modal-enter-active,
+.delete-modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.delete-modal-enter-active .delete-modal__panel,
+.delete-modal-leave-active .delete-modal__panel {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.delete-modal-enter-from,
+.delete-modal-leave-to {
+  opacity: 0;
+}
+
+.delete-modal-enter-from .delete-modal__panel,
+.delete-modal-leave-to .delete-modal__panel {
+  opacity: 0;
+  transform: translateY(0.5rem);
+}
+
+@keyframes deletePulse {
+  0%, 100% { transform: scaleY(0.45); opacity: 0.55; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
 .r2 {
   max-width: 1180px;
   margin: 0 auto;
@@ -599,6 +1342,10 @@ async function bulkDelete() {
 .r2__select-all:hover .r2__select-box {
   border-color: var(--accent);
 }
+.r2__select-all:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.55;
+}
 .r2__select-all input:focus-visible + .r2__select-box {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -628,6 +1375,7 @@ async function bulkDelete() {
   cursor: pointer;
 }
 .r2__bulk-clear:hover { color: var(--dark); }
+.r2__bulk-clear:disabled { opacity: 0.55; cursor: wait; }
 
 .r2__bulk-delete {
   display: inline-flex;

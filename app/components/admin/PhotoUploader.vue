@@ -37,7 +37,7 @@ async function upload(files: File[]) {
       fd.append('height', String(dims.h))
     }
     try {
-      await $fetch(`/api/admin/albums/${props.albumId}/photos`, { method: 'POST', body: fd })
+      await $fetch(`/api/admin/galleries/${props.albumId}/photos`, { method: 'POST', body: fd })
     } catch {
       errorCount.value++
     }

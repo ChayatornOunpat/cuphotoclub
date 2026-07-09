@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { PhotoGridImage } from '~~/server/api/photogrid.get'
+
 // Museum-wall photogrid: a dense wall of small thumbnails randomly sourced
 // from published albums, that keep crossfading to new photos over time.
 //
@@ -26,6 +28,7 @@ const SWAP_INTERVAL_MS = 3500
 const SWAPS_PER_TICK = 3
 const REFILL_THRESHOLD = 20
 const BATCH_COUNT = 250
+const IDLE_PAUSE_MS = 2 * 60 * 1000
 
 type SizeClass = 'sm' | 'wide' | 'tall' | 'big'
 const DIMS: Record<SizeClass, { w: number, h: number }> = {
@@ -65,11 +68,27 @@ function shapeForRatio(ratio: number): SizeClass {
   return Math.random() < 0.25 ? 'big' : 'sm'
 }
 
+const { t } = useI18n()
+
 const root = ref<HTMLElement | null>(null)
 const gridConfig = ref<GridConfig>(currentGridConfig())
 const blocks = ref<Block[]>([])
 const queue = ref<string[]>([])
 const shown = new Set<string>()
+
+// Id of the block currently under pointer/keyboard focus. We skip it in
+// performSwap so the tile a user is inspecting doesn't flip away mid-hover.
+const hoveredId = ref<number | null>(null)
+
+// The album title backing a block's currently-shown photo, for the hover
+// overlay affordance. albumMap is a plain (non-reactive) Map, but block
+// reactivity already re-renders the cell when its shown layer changes.
+function titleFor(block: Block): string {
+  return albumMap.get(block.layers[block.activeLayer])?.albumTitle || ''
+}
+
+// ── Album mapping: track which album each image belongs to ──
+const albumMap = new Map<string, Omit<PhotoGridImage, 'src'>>()
 
 let rows = 0
 let cols = 0
@@ -79,6 +98,44 @@ let intervalId: ReturnType<typeof setInterval> | null = null
 let observer: IntersectionObserver | null = null
 let visible = false
 let refilling = false
+let initialLoaded = false
+let initialLoading = false
+let idlePaused = false
+let idleTimerId: ReturnType<typeof setTimeout> | null = null
+
+// ── Modal state ──
+const modalOpen = ref(false)
+const modalData = ref({
+  albumId: '',
+  albumTitle: '',
+  albumCover: '',
+  albumDate: '',
+  photoCount: 0,
+  clickedSrc: ''
+})
+
+function openModal(src: string) {
+  const meta = albumMap.get(src)
+  if (!meta) return
+  modalData.value = {
+    albumId: meta.albumId,
+    albumTitle: meta.albumTitle,
+    albumCover: meta.albumCover,
+    albumDate: meta.albumDate,
+    photoCount: meta.photoCount,
+    clickedSrc: src
+  }
+  modalOpen.value = true
+}
+
+function closeModal() {
+  modalOpen.value = false
+}
+
+function handleCellClick(block: Block) {
+  const src = block.layers[block.activeLayer]
+  if (src) openModal(src)
+}
 
 const gridHeight = computed(() => {
   const { rows: r, rowHeight } = gridConfig.value
@@ -101,6 +158,36 @@ function markOccupancy(r: number, c: number, w: number, h: number, id: number) {
       occupancy[rr]![cc] = id
     }
   }
+}
+
+function mergeOriginsFor(block: Block, w: number, h: number): Array<{ row: number, col: number }> {
+  const rowsToTry = Array.from({ length: h }, (_, i) => block.row - (h - 1 - i))
+  const colsToTry = Array.from({ length: w }, (_, i) => block.col - (w - 1 - i))
+  const out: Array<{ row: number, col: number }> = []
+
+  for (const row of rowsToTry) {
+    for (const col of colsToTry) {
+      if (row < 0 || col < 0 || row + h > rows || col + w > cols) continue
+      out.push({ row, col })
+    }
+  }
+
+  return out
+}
+
+function blockCells(block: Block): Array<{ row: number, col: number }> {
+  const { w, h } = DIMS[block.shape]
+  const cells: Array<{ row: number, col: number }> = []
+  for (let rr = block.row; rr < block.row + h; rr++) {
+    for (let cc = block.col; cc < block.col + w; cc++) {
+      cells.push({ row: rr, col: cc })
+    }
+  }
+  return cells
+}
+
+function cellKey(row: number, col: number) {
+  return `${row}:${col}`
 }
 
 // First-fit greedy fill: guarantees full coverage with no holes, since 'sm'
@@ -138,6 +225,21 @@ function rebuildLayout() {
   blocks.value = buildLayout()
 }
 
+function hasEmptyBlocks() {
+  return blocks.value.some(block => !block.layers[block.activeLayer])
+}
+
+function recycleActiveImages() {
+  const recycled: string[] = []
+  for (const block of blocks.value) {
+    const src = block.layers[block.activeLayer]
+    if (!src) continue
+    shown.delete(src)
+    if (!queue.value.includes(src)) recycled.push(src)
+  }
+  queue.value.unshift(...recycled)
+}
+
 function fillEmptyBlocks() {
   for (const block of blocks.value) {
     if (block.layers[block.activeLayer]) continue
@@ -149,8 +251,21 @@ function fillEmptyBlocks() {
 
 async function fetchBatch(): Promise<string[]> {
   try {
-    const res = await $fetch<{ images: string[] }>('/api/photogrid', { query: { count: BATCH_COUNT } })
-    return res.images ?? []
+    const res = await $fetch<{ images: PhotoGridImage[] }>('/api/photogrid', { query: { count: BATCH_COUNT } })
+    const images = res.images ?? []
+    // Populate the album lookup map
+    for (const img of images) {
+      if (!albumMap.has(img.src)) {
+        albumMap.set(img.src, {
+          albumId: img.albumId,
+          albumTitle: img.albumTitle,
+          albumCover: img.albumCover,
+          albumDate: img.albumDate,
+          photoCount: img.photoCount
+        })
+      }
+    }
+    return images.map(img => img.src)
   } catch {
     return []
   }
@@ -163,10 +278,12 @@ function enqueueUnseen(images: string[]) {
 }
 
 async function refillIfLow() {
-  if (refilling || queue.value.length > REFILL_THRESHOLD) return
+  if (!shouldRun() || refilling) return
+  if (queue.value.length > REFILL_THRESHOLD && !hasEmptyBlocks()) return
   refilling = true
   const batch = await fetchBatch()
   enqueueUnseen(batch)
+  fillEmptyBlocks()
   refilling = false
 }
 
@@ -185,50 +302,86 @@ function crossfadeInPlace(block: Block, src: string) {
   blocks.value[idx] = { ...block, layers, activeLayer: nextLayer }
 }
 
-// Absorbs neighboring 'sm' blocks so `anchor` can grow into `targetShape`.
-// Only starts from an 'sm' anchor — merging out of an already-bigger block
-// is out of scope. Absorbed blocks' current photos go back to the front of
-// the queue instead of being discarded.
-function tryMerge(anchor: Block, targetShape: SizeClass, src: string): boolean {
-  if (anchor.shape !== 'sm') return false
+// Reshapes `block` into `targetShape`, even when the needed cells are owned by
+// larger neighboring blocks. Any displaced footprint is split back into fresh
+// 1x1 cells so a portrait can force the cell above it to update and the
+// leftovers do not keep stale cropped fragments.
+function tryReshape(block: Block, targetShape: SizeClass, src: string): boolean {
   const { w, h } = DIMS[targetShape]
   if (w === 1 && h === 1) return false
-  if (anchor.row + h > rows || anchor.col + w > cols) return false
 
-  const neighbors: Block[] = []
-  for (let rr = anchor.row; rr < anchor.row + h; rr++) {
-    for (let cc = anchor.col; cc < anchor.col + w; cc++) {
-      if (rr === anchor.row && cc === anchor.col) continue
-      const id = occupancy[rr]![cc]
-      const nb = blocks.value.find(b => b.id === id)
-      if (!nb || nb.shape !== 'sm' || nb.row !== rr || nb.col !== cc) return false
-      neighbors.push(nb)
+  for (const origin of mergeOriginsFor(block, w, h)) {
+    const affectedById = new Map<number, Block>()
+
+    for (let rr = origin.row; rr < origin.row + h; rr++) {
+      for (let cc = origin.col; cc < origin.col + w; cc++) {
+        const id = occupancy[rr]![cc]
+        const nb = blocks.value.find(b => b.id === id)
+        if (!nb) continue
+        affectedById.set(nb.id, nb)
+      }
     }
-  }
+    affectedById.set(block.id, block)
 
-  const absorbed = [anchor, ...neighbors]
-  for (const b of absorbed) {
-    const shownSrc = b.layers[b.activeLayer]
-    if (shownSrc) {
-      shown.delete(shownSrc)
-      queue.value.unshift(shownSrc)
+    const affected = [...affectedById.values()]
+    const freedCells = new Map<string, { row: number, col: number }>()
+    const targetCells = new Set<string>()
+
+    for (let rr = origin.row; rr < origin.row + h; rr++) {
+      for (let cc = origin.col; cc < origin.col + w; cc++) {
+        targetCells.add(cellKey(rr, cc))
+      }
     }
-  }
 
-  const absorbedIds = new Set(absorbed.map(b => b.id))
-  blocks.value = blocks.value.filter(b => !absorbedIds.has(b.id))
+    const retired: string[] = []
+    for (const b of affected) {
+      const shownSrc = b.layers[b.activeLayer]
+      if (shownSrc) {
+        shown.delete(shownSrc)
+        retired.push(shownSrc)
+      }
+      for (const cell of blockCells(b)) freedCells.set(cellKey(cell.row, cell.col), cell)
+    }
 
-  const merged: Block = {
-    id: nextBlockId++,
-    row: anchor.row,
-    col: anchor.col,
-    shape: targetShape,
-    layers: [src, ''],
-    activeLayer: 0
+    const affectedIds = new Set(affected.map(b => b.id))
+    blocks.value = blocks.value.filter(b => !affectedIds.has(b.id))
+    for (const b of affected) {
+      const { w: bw, h: bh } = DIMS[b.shape]
+      markOccupancy(b.row, b.col, bw, bh, -1)
+    }
+
+    const merged: Block = {
+      id: nextBlockId++,
+      row: origin.row,
+      col: origin.col,
+      shape: targetShape,
+      layers: [src, ''],
+      activeLayer: 0
+    }
+    blocks.value.push(merged)
+    markOccupancy(origin.row, origin.col, w, h, merged.id)
+
+    const leftovers = [...freedCells.values()]
+      .filter(cell => !targetCells.has(cellKey(cell.row, cell.col)))
+      .sort((a, b) => a.row - b.row || a.col - b.col)
+
+    for (const cell of leftovers) {
+      const id = nextBlockId++
+      blocks.value.push({
+        id,
+        row: cell.row,
+        col: cell.col,
+        shape: 'sm',
+        layers: [nextImage() ?? '', ''],
+        activeLayer: 0
+      })
+      markOccupancy(cell.row, cell.col, 1, 1, id)
+    }
+
+    queue.value.push(...retired)
+    return true
   }
-  blocks.value.push(merged)
-  markOccupancy(anchor.row, anchor.col, w, h, merged.id)
-  return true
+  return false
 }
 
 // Breaks `block` down into 1x1 'sm' blocks, giving the triggering photo to
@@ -276,11 +429,11 @@ function applySwap(reservedId: number, src: string, targetShape: SizeClass) {
   const targetArea = DIMS[targetShape].w * DIMS[targetShape].h
   const blockArea = DIMS[block.shape].w * DIMS[block.shape].h
 
-  if (targetArea > blockArea && tryMerge(block, targetShape, src)) return
+  if (targetShape !== 'sm' && tryReshape(block, targetShape, src)) return
   if (targetArea < blockArea && trySplit(block, src)) return
 
-  // Same area but different shape (wide <-> tall), or no compatible
-  // neighbors to merge with — just crossfade in the existing slot.
+  // No compatible footprint to reshape into — just crossfade in the existing
+  // slot rather than leaving the cell blank.
   crossfadeInPlace(block, src)
 }
 
@@ -288,7 +441,7 @@ function applySwap(reservedId: number, src: string, targetShape: SizeClass) {
 // this tick, so two simultaneous swaps can never target the same tile —
 // that would otherwise snap an in-progress flip backward mid-rotation.
 function performSwap(reserved: Set<number>) {
-  const candidates = blocks.value.filter(b => !reserved.has(b.id))
+  const candidates = blocks.value.filter(b => !reserved.has(b.id) && b.id !== hoveredId.value)
   if (!candidates.length) return
   const block = candidates[Math.floor(Math.random() * candidates.length)]!
   reserved.add(block.id)
@@ -304,13 +457,25 @@ function performSwap(reserved: Set<number>) {
 }
 
 function tick() {
-  if (!visible) return
+  if (!shouldRun()) {
+    stop()
+    return
+  }
   const reserved = new Set<number>()
   for (let i = 0; i < SWAPS_PER_TICK; i++) performSwap(reserved)
   void refillIfLow()
 }
 
+function isPageActive() {
+  return !document.hidden && document.hasFocus()
+}
+
+function shouldRun() {
+  return visible && isPageActive() && !idlePaused
+}
+
 function start() {
+  if (!shouldRun()) return
   if (intervalId) return
   intervalId = setInterval(tick, SWAP_INTERVAL_MS)
 }
@@ -321,18 +486,71 @@ function stop() {
   intervalId = null
 }
 
+function clearIdleTimer() {
+  if (!idleTimerId) return
+  clearTimeout(idleTimerId)
+  idleTimerId = null
+}
+
+function scheduleIdlePause() {
+  clearIdleTimer()
+  idleTimerId = setTimeout(() => {
+    idlePaused = true
+    stop()
+  }, IDLE_PAUSE_MS)
+}
+
+function markActive() {
+  idlePaused = false
+  scheduleIdlePause()
+  syncActivity()
+}
+
+async function ensureInitialLoad() {
+  if (initialLoaded || initialLoading || !shouldRun()) return
+  initialLoading = true
+  const batch = await fetchBatch()
+  enqueueUnseen(batch)
+  fillEmptyBlocks()
+  initialLoaded = batch.length > 0 || queue.value.length > 0 || blocks.value.some(block => block.layers[block.activeLayer])
+  initialLoading = false
+  if (shouldRun()) {
+    start()
+    void refillIfLow()
+  }
+}
+
+function syncActivity() {
+  if (!shouldRun()) {
+    stop()
+    return
+  }
+  void ensureInitialLoad()
+  start()
+}
+
 function handleVisibilityChange() {
-  if (document.hidden) stop()
-  else if (visible) start()
+  syncActivity()
+}
+
+function handleFocusChange() {
+  if (document.hasFocus() && !document.hidden) markActive()
+  else syncActivity()
+}
+
+function handleUserActivity() {
+  if (document.hidden) return
+  markActive()
 }
 
 function handleResize() {
   const cfg = currentGridConfig()
   if (cfg.cols === gridConfig.value.cols && cfg.rows === gridConfig.value.rows) return
+  recycleActiveImages()
   gridConfig.value = cfg
   rebuildLayout()
   fillEmptyBlocks()
-  void refillIfLow()
+  if (shouldRun()) void refillIfLow()
 }
 
 onMounted(async () => {
@@ -342,54 +560,92 @@ onMounted(async () => {
   if (root.value) {
     observer = new IntersectionObserver(([entry]) => {
       visible = entry?.isIntersecting ?? false
-      if (visible && !document.hidden) start()
-      else stop()
+      syncActivity()
     }, { threshold: 0.1 })
     observer.observe(root.value)
   }
   document.addEventListener('visibilitychange', handleVisibilityChange)
-
-  const batch = await fetchBatch()
-  enqueueUnseen(batch)
-  fillEmptyBlocks()
+  window.addEventListener('focus', handleFocusChange)
+  window.addEventListener('blur', handleFocusChange)
+  window.addEventListener('pointerdown', handleUserActivity, { passive: true })
+  window.addEventListener('keydown', handleUserActivity)
+  window.addEventListener('wheel', handleUserActivity, { passive: true })
+  window.addEventListener('scroll', handleUserActivity, { passive: true })
+  window.addEventListener('touchstart', handleUserActivity, { passive: true })
+  scheduleIdlePause()
+  await ensureInitialLoad()
 })
 
 onBeforeUnmount(() => {
   stop()
+  clearIdleTimer()
   observer?.disconnect()
   window.removeEventListener('resize', handleResize)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('focus', handleFocusChange)
+  window.removeEventListener('blur', handleFocusChange)
+  window.removeEventListener('pointerdown', handleUserActivity)
+  window.removeEventListener('keydown', handleUserActivity)
+  window.removeEventListener('wheel', handleUserActivity)
+  window.removeEventListener('scroll', handleUserActivity)
+  window.removeEventListener('touchstart', handleUserActivity)
 })
 </script>
 
 <template>
-  <div ref="root" class="photogrid" :style="{ height: gridHeight + 'px' }">
-    <div
-      v-for="block in blocks"
-      :key="block.id"
-      class="photogrid__cell"
-      :style="{
-        gridColumn: `${block.col + 1} / span ${DIMS[block.shape].w}`,
-        gridRow: `${block.row + 1} / span ${DIMS[block.shape].h}`
-      }"
-    >
-      <div class="cube" :class="{ 'is-flipped': block.activeLayer === 1 }">
-        <img
-          v-if="block.layers[0]"
-          :src="block.layers[0]"
-          alt=""
-          loading="lazy"
-          class="cube__face cube__face--front"
-        >
-        <img
-          v-if="block.layers[1]"
-          :src="block.layers[1]"
-          alt=""
-          loading="lazy"
-          class="cube__face cube__face--back"
-        >
+  <div ref="root" :style="{ height: gridHeight + 'px' }">
+    <TransitionGroup tag="div" name="tile" class="photogrid">
+      <div
+        v-for="block in blocks"
+        :key="block.id"
+        class="photogrid__cell"
+        :style="{
+          gridColumn: `${block.col + 1} / span ${DIMS[block.shape].w}`,
+          gridRow: `${block.row + 1} / span ${DIMS[block.shape].h}`
+        }"
+        role="button"
+        tabindex="0"
+        :aria-label="titleFor(block)"
+        @click="handleCellClick(block)"
+        @keydown.enter="handleCellClick(block)"
+        @mouseenter="hoveredId = block.id"
+        @mouseleave="hoveredId = null"
+        @focus="hoveredId = block.id"
+        @blur="hoveredId = null"
+      >
+        <div class="cube" :class="{ 'is-flipped': block.activeLayer === 1 }">
+          <img
+            v-if="block.layers[0]"
+            :src="block.layers[0]"
+            alt=""
+            loading="lazy"
+            class="cube__face cube__face--front"
+          >
+          <img
+            v-if="block.layers[1]"
+            :src="block.layers[1]"
+            alt=""
+            loading="lazy"
+            class="cube__face cube__face--back"
+          >
+        </div>
+        <div class="photogrid__overlay" aria-hidden="true">
+          <span class="photogrid__kicker">{{ t('common.album') }}</span>
+          <span v-if="titleFor(block)" class="photogrid__title">{{ titleFor(block) }}</span>
+        </div>
       </div>
-    </div>
+    </TransitionGroup>
+
+    <AlbumPreviewModal
+      :open="modalOpen"
+      :album-id="modalData.albumId"
+      :album-title="modalData.albumTitle"
+      :album-cover="modalData.albumCover"
+      :album-date="modalData.albumDate"
+      :photo-count="modalData.photoCount"
+      :clicked-src="modalData.clickedSrc"
+      @close="closeModal"
+    />
   </div>
 </template>
 
@@ -411,6 +667,63 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: hidden;
   perspective: 800px;
+  cursor: pointer;
+}
+.photogrid__cell:hover,
+.photogrid__cell:focus-visible {
+  z-index: 2;
+}
+.photogrid__cell:focus-visible {
+  outline: 2px solid var(--accent, #e63946);
+  outline-offset: -2px;
+}
+
+/* Editorial hover affordance: a soft bottom gradient that surfaces the album
+   name so the wall reads as a set of clickable album links. Lives as a sibling
+   of .cube (not inside it) so it never touches the cube's preserve-3d flip.
+   pointer-events:none keeps the click landing on the cell. */
+.photogrid__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.15em;
+  padding: 0.4rem 0.45rem;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    to top,
+    rgba(12, 12, 10, 0.9) 0%,
+    rgba(12, 12, 10, 0.55) 38%,
+    rgba(12, 12, 10, 0) 72%
+  );
+  transition: opacity 0.4s ease;
+}
+.photogrid__cell:hover .photogrid__overlay,
+.photogrid__cell:focus-visible .photogrid__overlay {
+  opacity: 1;
+}
+
+.photogrid__kicker {
+  font-family: var(--font-latin-sans, sans-serif);
+  font-size: 0.44rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent, #e63946);
+}
+.photogrid__title {
+  font-family: var(--font-serif, serif);
+  font-size: 0.68rem;
+  line-height: 1.15;
+  font-weight: 400;
+  color: #f5f4f0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .cube {
@@ -431,12 +744,62 @@ onBeforeUnmount(() => {
   object-fit: cover;
   display: block;
   backface-visibility: hidden;
+  /* Only the hover zoom animates here — the flip lives on the parent .cube, so
+     this transition never competes with rotateY. Composing scale after the
+     face's own rotateY keeps backface-visibility working. */
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .cube__face--front {
   transform: rotateY(0deg);
 }
 .cube__face--back {
   transform: rotateY(180deg);
+}
+.photogrid__cell:hover .cube__face--front,
+.photogrid__cell:focus-visible .cube__face--front {
+  transform: rotateY(0deg) scale(1.08);
+}
+.photogrid__cell:hover .cube__face--back,
+.photogrid__cell:focus-visible .cube__face--back {
+  transform: rotateY(180deg) scale(1.08);
+}
+
+/* Tiles created/destroyed by a reshape (merge/split) don't have a "before"
+   state to crossfade from via the cube flip — without this, they used to
+   just pop in/out instantly. TransitionGroup gives them a real enter/leave
+   animation instead. */
+.tile-enter-active,
+.tile-leave-active {
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.tile-enter-from {
+  opacity: 0;
+  transform: scale(0.85);
+}
+.tile-leave-to {
+  opacity: 0;
+  transform: scale(0.85);
+}
+.tile-leave-active {
+  /* Grid items are explicitly placed (grid-column/row), so a leaving tile
+     can safely stay in flow while it fades — no reflow risk of siblings. */
+  z-index: 0;
+}
+
+/* Under reduced-motion, keep the overlay reveal (opacity only) but drop the
+   image zoom so nothing scales. */
+@media (prefers-reduced-motion: reduce) {
+  .cube__face {
+    transition: none;
+  }
+  .photogrid__cell:hover .cube__face--front,
+  .photogrid__cell:focus-visible .cube__face--front {
+    transform: rotateY(0deg);
+  }
+  .photogrid__cell:hover .cube__face--back,
+  .photogrid__cell:focus-visible .cube__face--back {
+    transform: rotateY(180deg);
+  }
 }
 
 @media (max-width: 1100px) {

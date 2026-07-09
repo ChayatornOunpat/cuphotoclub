@@ -223,7 +223,7 @@ watch(cover, measureCover, { immediate: true })
 }
 .head__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.25rem; }
 .head__kicker-category, .head__kicker-date { display: inline; }
-.head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; }
+.head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; overflow-wrap: break-word; }
 .head__sub { margin-top: 1.5rem; max-width: 520px; font-size: 0.82rem; color: rgba(245, 244, 240, 0.5); line-height: 1.8; white-space: pre-line; }
 
 .sheet { padding: 4rem 3rem 6rem; max-width: 1380px; margin: 0 auto; }
@@ -422,9 +422,25 @@ watch(cover, measureCover, { immediate: true })
     padding-right: 1.5rem;
     padding-top: 38svh;
   }
-  .grid { gap: 0.5rem; }
-  .cell { height: 130px; }
-  .cell :deep(img) { max-width: 85vw; }
+  /* The variable-width flex filmstrip only reads as a contact sheet when many
+     frames fit per row. On phones just 1–2 fit, leaving big ragged gaps, so
+     switch to a uniform 2-column grid. Frames stay letterboxed (contain) on
+     the dark cell so the whole frame is still visible, like mounted slides. */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  .cell {
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+  .cell :deep(img) {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+  }
   .lb__top {
     align-items: flex-start;
     padding: 0.85rem;
