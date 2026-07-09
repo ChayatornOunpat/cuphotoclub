@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: 'admin' })
-useHead({ title: 'สมาชิก' })
+const { t } = useI18n()
+useHead({ title: () => t('adminMembers.title') })
 
 interface Member {
   id: number
@@ -76,10 +77,10 @@ const visibleMembers = computed(() => orderedMembers.value.filter((m) => {
 }))
 
 const filterOptions = computed<{ value: MemberFilter, label: string, count: number }[]>(() => [
-  { value: 'all', label: 'ทั้งหมด', count: memberList.value.length },
-  { value: 'staff', label: 'เจ้าหน้าที่', count: staffCount.value },
-  { value: 'members', label: 'สมาชิก', count: regularCount.value },
-  { value: 'hidden', label: 'ซ่อน', count: hiddenCount.value }
+  { value: 'all', label: t('adminMembers.filterAll'), count: memberList.value.length },
+  { value: 'staff', label: t('adminMembers.filterStaff'), count: staffCount.value },
+  { value: 'members', label: t('adminMembers.filterMembers'), count: regularCount.value },
+  { value: 'hidden', label: t('adminMembers.filterHidden'), count: hiddenCount.value }
 ])
 
 function resetForm() {
@@ -118,7 +119,7 @@ function openEdit(member: Member) {
 
 function errMsg(e: unknown) {
   const err = e as { data?: { message?: string, statusMessage?: string } }
-  return err?.data?.message || err?.data?.statusMessage || 'บันทึกไม่สำเร็จ'
+  return err?.data?.message || err?.data?.statusMessage || t('adminMembers.saveFailed')
 }
 
 function bodyFromForm() {
@@ -141,10 +142,10 @@ async function saveIntro() {
       method: 'PUT',
       body: { title: 'Members', body: JSON.stringify({ en: intro.en, th: intro.th }) }
     })
-    introMsg.value = 'บันทึกแล้ว'
+    introMsg.value = t('adminSettings.saved')
     await refreshPage()
   } catch {
-    introMsg.value = 'บันทึกไม่สำเร็จ'
+    introMsg.value = t('adminMembers.saveFailed')
   } finally {
     introSaving.value = false
   }
@@ -197,11 +198,11 @@ function initialFor(member: Member) {
 }
 
 function yearLabel(year: number | null) {
-  return year ? `ปี ${year}` : 'ไม่ระบุ'
+  return year ? t('adminMembers.yearN', { n: year }) : t('adminMembers.unspecified')
 }
 
 function roleLabel(member: Member) {
-  return member.position || 'สมาชิก'
+  return member.position || t('adminMembers.filterMembers')
 }
 </script>
 
@@ -210,31 +211,31 @@ function roleLabel(member: Member) {
     <header class="page-head">
       <div>
         <NuxtLink to="/admin" class="back">Dashboard</NuxtLink>
-        <h1>สมาชิก</h1>
-        <p>จัดการรายชื่อเจ้าหน้าที่ สมาชิก รูปโปรไฟล์ และข้อความนำบนหน้าสาธารณะ</p>
+        <h1>{{ t('adminMembers.title') }}</h1>
+        <p>{{ t('adminMembers.lead') }}</p>
       </div>
       <UiButton @click="openCreate">
         <Icon name="heroicons:plus" class="btn-icon" />
-        เพิ่มสมาชิก
+        {{ t('adminMembers.addMember') }}
       </UiButton>
     </header>
 
     <section class="overview" aria-label="Member overview">
       <div class="metric">
         <span>{{ memberList.length }}</span>
-        <p>ทั้งหมด</p>
+        <p>{{ t('adminMembers.filterAll') }}</p>
       </div>
       <div class="metric">
         <span>{{ activeCount }}</span>
-        <p>แสดงอยู่</p>
+        <p>{{ t('adminMembers.shown') }}</p>
       </div>
       <div class="metric">
         <span>{{ staffCount }}</span>
-        <p>เจ้าหน้าที่</p>
+        <p>{{ t('adminMembers.filterStaff') }}</p>
       </div>
       <div class="metric">
         <span>{{ hiddenCount }}</span>
-        <p>ซ่อน</p>
+        <p>{{ t('adminMembers.filterHidden') }}</p>
       </div>
     </section>
 
@@ -242,18 +243,18 @@ function roleLabel(member: Member) {
       <div class="section-head">
         <div>
           <p class="kicker">Public Page</p>
-          <h2>คำอธิบายหน้าสมาชิก</h2>
+          <h2>{{ t('adminMembers.introHeading') }}</h2>
         </div>
         <div class="intro-actions">
           <span v-if="introMsg" class="save-state">{{ introMsg }}</span>
-          <UiButton size="sm" :loading="introSaving" @click="saveIntro">บันทึกคำอธิบาย</UiButton>
+          <UiButton size="sm" :loading="introSaving" @click="saveIntro">{{ t('adminMembers.saveIntro') }}</UiButton>
         </div>
       </div>
 
       <div class="intro-grid">
         <label class="form-field" for="intro-th">
-          <span>ภาษาไทย</span>
-          <input id="intro-th" v-model="intro.th" type="text" placeholder="เจ้าหน้าที่และสมาชิกที่ร่วมกันสร้างชมรมถ่ายภาพแห่งนี้">
+          <span>{{ t('adminMembers.thai') }}</span>
+          <input id="intro-th" v-model="intro.th" type="text" :placeholder="t('adminMembers.introPlaceholderTh')">
         </label>
         <label class="form-field" for="intro-en">
           <span>English</span>
@@ -266,7 +267,7 @@ function roleLabel(member: Member) {
       <div class="directory-top">
         <div>
           <p class="kicker">Directory</p>
-          <h2>รายชื่อสมาชิก</h2>
+          <h2>{{ t('adminMembers.directoryHeading') }}</h2>
         </div>
         <div class="filters" role="tablist" aria-label="Member filters">
           <button
@@ -289,18 +290,18 @@ function roleLabel(member: Member) {
         <table v-if="visibleMembers.length" class="members-table">
           <thead>
             <tr>
-              <th>สมาชิก</th>
-              <th>ประเภท</th>
-              <th>ชั้นปี</th>
+              <th>{{ t('adminMembers.colMember') }}</th>
+              <th>{{ t('adminMembers.colType') }}</th>
+              <th>{{ t('adminMembers.colYear') }}</th>
               <th>Instagram</th>
-              <th>เรียง</th>
-              <th>สถานะ</th>
+              <th>{{ t('adminMembers.colOrder') }}</th>
+              <th>{{ t('adminMembers.colStatus') }}</th>
               <th />
             </tr>
           </thead>
           <tbody>
             <tr v-for="member in visibleMembers" :key="member.id" :class="{ 'is-hidden': !member.active }">
-              <td data-label="สมาชิก">
+              <td :data-label="t('adminMembers.colMember')">
                 <div class="member-cell">
                   <span class="avatar">
                     <img v-if="member.photoR2Key" :src="`/images/${member.photoR2Key}`" alt="">
@@ -312,27 +313,27 @@ function roleLabel(member: Member) {
                   </div>
                 </div>
               </td>
-              <td data-label="ประเภท">
+              <td :data-label="t('adminMembers.colType')">
                 <span class="pill" :class="member.position ? 'pill--staff' : 'pill--member'">{{ roleLabel(member) }}</span>
               </td>
-              <td data-label="ชั้นปี" class="muted">{{ yearLabel(member.schoolYear) }}</td>
+              <td :data-label="t('adminMembers.colYear')" class="muted">{{ yearLabel(member.schoolYear) }}</td>
               <td data-label="Instagram" class="muted">
                 <a v-if="member.instagram" :href="`https://instagram.com/${member.instagram}`" target="_blank" rel="noopener noreferrer">@{{ member.instagram }}</a>
                 <span v-else>—</span>
               </td>
-              <td data-label="เรียง" class="muted">{{ member.sortOrder }}</td>
-              <td data-label="สถานะ">
-                <span class="pill" :class="member.active ? 'pill--active' : 'pill--hidden'">{{ member.active ? 'แสดง' : 'ซ่อน' }}</span>
+              <td :data-label="t('adminMembers.colOrder')" class="muted">{{ member.sortOrder }}</td>
+              <td :data-label="t('adminMembers.colStatus')">
+                <span class="pill" :class="member.active ? 'pill--active' : 'pill--hidden'">{{ member.active ? t('adminMembers.statusShown') : t('adminMembers.filterHidden') }}</span>
               </td>
               <td class="actions-cell">
                 <div class="row-actions" :aria-label="`Actions for ${member.nickname}`">
-                  <button type="button" class="icon-btn" title="แก้ไข" @click="openEdit(member)">
+                  <button type="button" class="icon-btn" :title="t('admin.edit')" @click="openEdit(member)">
                     <Icon name="heroicons:pencil-square" class="icon-btn__icon" />
                   </button>
-                  <button type="button" class="icon-btn" :title="member.active ? 'ซ่อน' : 'แสดง'" @click="toggleActive(member)">
+                  <button type="button" class="icon-btn" :title="member.active ? t('adminMembers.filterHidden') : t('adminMembers.statusShown')" @click="toggleActive(member)">
                     <Icon :name="member.active ? 'heroicons:eye-slash' : 'heroicons:eye'" class="icon-btn__icon" />
                   </button>
-                  <button type="button" class="icon-btn icon-btn--danger" title="ลบ" @click="confirmTarget = member">
+                  <button type="button" class="icon-btn icon-btn--danger" :title="t('admin.delete')" @click="confirmTarget = member">
                     <Icon name="heroicons:trash" class="icon-btn__icon" />
                   </button>
                 </div>
@@ -341,41 +342,41 @@ function roleLabel(member: Member) {
           </tbody>
         </table>
 
-        <p v-else-if="pending" class="empty">กำลังโหลดสมาชิก...</p>
-        <p v-else class="empty">ยังไม่มีสมาชิกในมุมมองนี้</p>
+        <p v-else-if="pending" class="empty">{{ t('adminMembers.loading') }}</p>
+        <p v-else class="empty">{{ t('adminMembers.emptyView') }}</p>
       </div>
     </section>
 
-    <UiModal v-model="showForm" :title="editing ? 'แก้ไขสมาชิก' : 'เพิ่มสมาชิก'" size="lg">
+    <UiModal v-model="showForm" :title="editing ? t('adminMembers.editMember') : t('adminMembers.addMember')" size="lg">
       <form class="member-form" @submit.prevent="save">
         <p v-if="formError" class="form-error">{{ formError }}</p>
 
         <div class="form-layout">
           <div class="photo-field">
-            <span>รูปโปรไฟล์</span>
+            <span>{{ t('adminMembers.profilePhoto') }}</span>
             <AdminCoverUploader v-model="form.photoR2Key" prefix="members/photos" aspect="aspect-square" />
           </div>
 
           <div class="fields-grid">
             <label class="form-field" for="m-nick">
-              <span>ชื่อเล่น</span>
-              <input id="m-nick" v-model="form.nickname" type="text" required placeholder="เช่น นิว">
+              <span>{{ t('adminMembers.nickname') }}</span>
+              <input id="m-nick" v-model="form.nickname" type="text" required :placeholder="t('adminMembers.nicknamePlaceholder')">
             </label>
 
             <label class="form-field" for="m-year">
-              <span>ชั้นปี</span>
+              <span>{{ t('adminMembers.colYear') }}</span>
               <select id="m-year" v-model="form.schoolYear">
-                <option value="">ไม่ระบุ</option>
-                <option value="1">ปี 1</option>
-                <option value="2">ปี 2</option>
-                <option value="3">ปี 3</option>
-                <option value="4">ปี 4</option>
+                <option value="">{{ t('adminMembers.unspecified') }}</option>
+                <option value="1">{{ t('adminMembers.yearN', { n: 1 }) }}</option>
+                <option value="2">{{ t('adminMembers.yearN', { n: 2 }) }}</option>
+                <option value="3">{{ t('adminMembers.yearN', { n: 3 }) }}</option>
+                <option value="4">{{ t('adminMembers.yearN', { n: 4 }) }}</option>
               </select>
             </label>
 
             <label class="form-field" for="m-pos">
-              <span>ตำแหน่ง</span>
-              <input id="m-pos" v-model="form.position" type="text" placeholder="เว้นว่างสำหรับสมาชิกทั่วไป">
+              <span>{{ t('adminMembers.position') }}</span>
+              <input id="m-pos" v-model="form.position" type="text" :placeholder="t('adminMembers.positionPlaceholder')">
             </label>
 
             <label class="form-field" for="m-ig">
@@ -384,35 +385,35 @@ function roleLabel(member: Member) {
             </label>
 
             <label class="form-field" for="m-order">
-              <span>ลำดับ</span>
+              <span>{{ t('adminMembers.colOrder') }}</span>
               <input id="m-order" v-model="form.sortOrder" type="number" inputmode="numeric">
             </label>
 
             <label class="check-field">
               <input v-model="form.active" type="checkbox">
-              <span>แสดงในหน้าสมาชิก</span>
+              <span>{{ t('adminMembers.showOnPage') }}</span>
             </label>
           </div>
         </div>
 
         <div class="form-actions">
-          <UiButton type="button" variant="secondary" @click="showForm = false">ยกเลิก</UiButton>
-          <UiButton type="submit" :loading="saving">บันทึก</UiButton>
+          <UiButton type="button" variant="secondary" @click="showForm = false">{{ t('admin.cancel') }}</UiButton>
+          <UiButton type="submit" :loading="saving">{{ t('admin.save') }}</UiButton>
         </div>
       </form>
     </UiModal>
 
     <UiModal
       :model-value="!!confirmTarget"
-      title="ลบสมาชิก"
+      :title="t('adminMembers.deleteMember')"
       @update:model-value="v => { if (!v) confirmTarget = null }"
     >
       <p class="confirm-text">
-        ต้องการลบ <strong>{{ confirmTarget?.nickname }}</strong> ใช่หรือไม่? การกระทำนี้ย้อนกลับไม่ได้
+        {{ t('adminMembers.deleteConfirmPrefix') }} <strong>{{ confirmTarget?.nickname }}</strong> {{ t('adminUsers.deleteConfirmSuffix') }}
       </p>
       <div class="form-actions form-actions--confirm">
-        <UiButton variant="secondary" @click="confirmTarget = null">ยกเลิก</UiButton>
-        <UiButton variant="danger" :loading="deleting" @click="doDelete">ลบ</UiButton>
+        <UiButton variant="secondary" @click="confirmTarget = null">{{ t('admin.cancel') }}</UiButton>
+        <UiButton variant="danger" :loading="deleting" @click="doDelete">{{ t('admin.delete') }}</UiButton>
       </div>
     </UiModal>
   </div>

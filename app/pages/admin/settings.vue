@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: ['admin', 'admin-manage'] })
-useHead({ title: 'ตั้งค่าเว็บไซต์' })
+const { t } = useI18n()
+useHead({ title: () => t('adminSettings.title') })
 
 interface Settings {
   siteDescription: string
@@ -27,10 +28,10 @@ async function save() {
   savedMsg.value = ''
   try {
     await $fetch('/api/admin/settings', { method: 'PUT', body: { ...form } })
-    savedMsg.value = 'บันทึกแล้ว'
+    savedMsg.value = t('adminSettings.saved')
     await refresh()
   } catch (e) {
-    savedMsg.value = (e as { data?: { message?: string } })?.data?.message || 'บันทึกไม่สำเร็จ'
+    savedMsg.value = (e as { data?: { message?: string } })?.data?.message || t('adminSettings.saveFailed')
   } finally {
     saving.value = false
   }
@@ -41,32 +42,32 @@ async function save() {
   <div class="mx-auto max-w-2xl">
     <div class="flex items-center justify-between gap-4">
       <div>
-        <h1 class="text-xl font-semibold text-ink">ตั้งค่าเว็บไซต์</h1>
-        <p class="mt-1 text-sm text-ink-soft">ข้อมูลทั่วไป ช่องทางติดต่อ และโซเชียล</p>
+        <h1 class="text-xl font-semibold text-ink">{{ t('adminSettings.title') }}</h1>
+        <p class="mt-1 text-sm text-ink-soft">{{ t('adminSettings.lead') }}</p>
       </div>
-      <UiButton :loading="saving" @click="save">บันทึก</UiButton>
+      <UiButton :loading="saving" @click="save">{{ t('admin.save') }}</UiButton>
     </div>
 
     <div class="mt-6 space-y-6">
       <section class="space-y-4 rounded-lg border border-line bg-white p-5">
-        <h2 class="text-sm font-semibold text-ink">ทั่วไป</h2>
-        <UiField label="คำอธิบายเว็บไซต์" input-id="s-desc" hint="ใช้สำหรับ SEO">
+        <h2 class="text-sm font-semibold text-ink">{{ t('adminSettings.general') }}</h2>
+        <UiField :label="t('adminSettings.siteDescription')" input-id="s-desc" :hint="t('adminSettings.seoHint')">
           <UiTextarea id="s-desc" v-model="form.siteDescription" :rows="2" />
         </UiField>
-        <UiField label="ข้อความท้ายเว็บ (footer)" input-id="s-footer">
+        <UiField :label="t('adminSettings.footerText')" input-id="s-footer">
           <UiInput id="s-footer" v-model="form.footerText" />
         </UiField>
       </section>
 
       <section class="space-y-4 rounded-lg border border-line bg-white p-5">
-        <h2 class="text-sm font-semibold text-ink">ช่องทางติดต่อ</h2>
-        <UiField label="อีเมล" input-id="s-email">
+        <h2 class="text-sm font-semibold text-ink">{{ t('adminSettings.contactSection') }}</h2>
+        <UiField :label="t('adminSettings.email')" input-id="s-email">
           <UiInput id="s-email" v-model="form.contactEmail" type="email" />
         </UiField>
       </section>
 
       <section class="space-y-4 rounded-lg border border-line bg-white p-5">
-        <h2 class="text-sm font-semibold text-ink">โซเชียลมีเดีย</h2>
+        <h2 class="text-sm font-semibold text-ink">{{ t('adminSettings.socialSection') }}</h2>
         <UiField label="Facebook URL" input-id="s-fb">
           <UiInput id="s-fb" v-model="form.facebookUrl" type="url" placeholder="https://facebook.com/…" />
         </UiField>
@@ -79,7 +80,7 @@ async function save() {
       </section>
 
       <div class="flex items-center gap-3">
-        <UiButton :loading="saving" @click="save">บันทึก</UiButton>
+        <UiButton :loading="saving" @click="save">{{ t('admin.save') }}</UiButton>
         <span v-if="savedMsg" class="text-sm text-ink-soft">{{ savedMsg }}</span>
       </div>
     </div>

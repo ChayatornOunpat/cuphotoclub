@@ -1,5 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: 'admin' })
+const { t } = useI18n()
 
 interface EventItem {
   id: number
@@ -21,7 +22,7 @@ const id = Number(route.params.id)
 const { data: ev, refresh, error } = await useFetch<EventItem>(`/api/admin/events/${id}`)
 if (error.value || !ev.value) throw createError({ statusCode: 404, statusMessage: 'ไม่พบกิจกรรม', fatal: true })
 
-useHead(() => ({ title: ev.value?.title || 'กิจกรรม' }))
+useHead(() => ({ title: ev.value?.title || t('adminActivities.eventFallback') }))
 
 function errMsg(e: unknown, fb: string) {
   return (e as { data?: { message?: string } })?.data?.message || fb
@@ -54,10 +55,10 @@ async function save() {
         coverR2Key: form.coverR2Key, registerUrl: form.registerUrl || null, status: form.status
       }
     })
-    savedMsg.value = 'บันทึกแล้ว'
+    savedMsg.value = t('adminSettings.saved')
     await refresh()
   } catch (e) {
-    savedMsg.value = errMsg(e, 'บันทึกไม่สำเร็จ')
+    savedMsg.value = errMsg(e, t('adminActivities.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -71,7 +72,7 @@ async function remove() {
     await $fetch(`/api/admin/events/${id}`, { method: 'DELETE' })
     await navigateTo('/admin/activities')
   } catch (e) {
-    alert(errMsg(e, 'ลบไม่สำเร็จ'))
+    alert(errMsg(e, t('adminActivities.deleteFailed')))
     deleting.value = false
   }
 }
@@ -82,70 +83,70 @@ async function remove() {
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-2 text-sm text-ink-soft">
         <NuxtLink to="/admin/activities" class="hover:text-ink"><Icon name="heroicons:arrow-left" class="size-4" /></NuxtLink>
-        <span>กิจกรรม</span>
+        <span>{{ t('adminActivities.title') }}</span>
         <Icon name="heroicons:chevron-right" class="size-3" />
         <span class="max-w-[16rem] truncate text-ink">{{ ev.title }}</span>
       </div>
       <div class="flex items-center gap-2">
         <UiButton v-if="ev.status === 'published'" variant="secondary" size="sm" :to="`/activities/${ev.slug}`" target="_blank">
-          <Icon name="heroicons:arrow-top-right-on-square" class="size-4" /> ดูบนเว็บไซต์
+          <Icon name="heroicons:arrow-top-right-on-square" class="size-4" /> {{ t('adminGalleries.viewOnSite') }}
         </UiButton>
         <UiButton variant="danger" size="sm" @click="confirmDelete = true">
-          <Icon name="heroicons:trash" class="size-4" /> ลบ
+          <Icon name="heroicons:trash" class="size-4" /> {{ t('admin.delete') }}
         </UiButton>
-        <UiButton size="sm" :loading="saving" @click="save">บันทึก</UiButton>
+        <UiButton size="sm" :loading="saving" @click="save">{{ t('admin.save') }}</UiButton>
       </div>
     </div>
 
     <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_18rem]">
       <section class="space-y-4 rounded-lg border border-line bg-white p-5">
-        <UiField label="ชื่อกิจกรรม" input-id="e-title">
+        <UiField :label="t('adminActivities.eventTitle')" input-id="e-title">
           <UiInput id="e-title" v-model="form.title" />
         </UiField>
         <UiField label="Slug (URL)" input-id="e-slug" :hint="`/activities/${form.slug}`">
           <UiInput id="e-slug" v-model="form.slug" />
         </UiField>
         <div class="grid gap-4 sm:grid-cols-2">
-          <UiField label="วันที่จัดกิจกรรม" input-id="e-date">
+          <UiField :label="t('adminActivities.startDate')" input-id="e-date">
             <UiDateInput id="e-date" v-model="form.eventDate" />
           </UiField>
-          <UiField label="สถานที่" input-id="e-loc">
-            <UiInput id="e-loc" v-model="form.location" placeholder="เช่น หอศิลป์ กทม." />
+          <UiField :label="t('adminActivities.location')" input-id="e-loc">
+            <UiInput id="e-loc" v-model="form.location" :placeholder="t('adminActivities.locationPlaceholder')" />
           </UiField>
         </div>
-        <UiField label="สรุปย่อ" input-id="e-summary" hint="แสดงในหน้ารายการ">
+        <UiField :label="t('adminActivities.summary')" input-id="e-summary" :hint="t('adminActivities.summaryHint')">
           <UiTextarea id="e-summary" v-model="form.summary" :rows="2" />
         </UiField>
-        <UiField label="รายละเอียด (Markdown)" input-id="e-body">
+        <UiField :label="t('adminActivities.body')" input-id="e-body">
           <UiTextarea id="e-body" v-model="form.body" :rows="14" class="font-mono" />
         </UiField>
       </section>
 
       <aside class="space-y-5">
         <div class="rounded-lg border border-line bg-white p-5">
-          <h3 class="text-sm font-semibold text-ink">เผยแพร่</h3>
+          <h3 class="text-sm font-semibold text-ink">{{ t('adminActivities.published') }}</h3>
           <div class="mt-3 space-y-3">
-            <UiField label="สถานะ" input-id="e-status">
+            <UiField :label="t('adminActivities.status')" input-id="e-status">
               <UiSelect id="e-status" v-model="form.status">
-                <option value="draft">ฉบับร่าง</option>
-                <option value="published">เผยแพร่</option>
+                <option value="draft">{{ t('adminActivities.draft') }}</option>
+                <option value="published">{{ t('adminActivities.published') }}</option>
               </UiSelect>
             </UiField>
-            <UiButton block :loading="saving" @click="save">บันทึก</UiButton>
+            <UiButton block :loading="saving" @click="save">{{ t('admin.save') }}</UiButton>
             <p v-if="savedMsg" class="text-center text-sm text-ink-soft">{{ savedMsg }}</p>
           </div>
         </div>
 
         <div class="rounded-lg border border-line bg-white p-5">
-          <h3 class="text-sm font-semibold text-ink">รูปปก</h3>
+          <h3 class="text-sm font-semibold text-ink">{{ t('adminActivities.cover') }}</h3>
           <div class="mt-3">
             <AdminCoverUploader v-model="form.coverR2Key" prefix="events/covers" />
           </div>
         </div>
 
         <div class="rounded-lg border border-line bg-white p-5">
-          <h3 class="text-sm font-semibold text-ink">ลิงก์ลงทะเบียน</h3>
-          <p class="mt-1 text-xs text-ink-soft">เช่น Google Form (ไม่บังคับ)</p>
+          <h3 class="text-sm font-semibold text-ink">{{ t('adminActivities.registerUrl') }}</h3>
+          <p class="mt-1 text-xs text-ink-soft">{{ t('adminActivities.registerHint') }}</p>
           <div class="mt-3">
             <UiInput v-model="form.registerUrl" type="url" placeholder="https://…" />
           </div>
@@ -153,11 +154,11 @@ async function remove() {
       </aside>
     </div>
 
-    <UiModal v-model="confirmDelete" title="ลบกิจกรรม">
-      <p class="text-sm text-ink-soft">ต้องการลบกิจกรรม <span class="font-medium text-ink">{{ ev.title }}</span> ใช่หรือไม่?</p>
+    <UiModal v-model="confirmDelete" :title="t('adminActivities.deleteTitle')">
+      <p class="text-sm text-ink-soft">{{ t('adminActivities.deleteConfirmPrefix') }} <span class="font-medium text-ink">{{ ev.title }}</span> {{ t('adminActivities.deleteConfirmSuffix') }}</p>
       <div class="mt-5 flex justify-end gap-2">
-        <UiButton variant="secondary" @click="confirmDelete = false">ยกเลิก</UiButton>
-        <UiButton variant="danger" :loading="deleting" @click="remove">ลบ</UiButton>
+        <UiButton variant="secondary" @click="confirmDelete = false">{{ t('admin.cancel') }}</UiButton>
+        <UiButton variant="danger" :loading="deleting" @click="remove">{{ t('admin.delete') }}</UiButton>
       </div>
     </UiModal>
   </div>

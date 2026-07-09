@@ -28,10 +28,10 @@ function isActive(to: string) {
       </nav>
 
       <div class="flex items-center gap-1">
-        <NuxtLink to="/search" class="rounded-md p-2 text-ink-soft hover:bg-paper-soft hover:text-ink" aria-label="ค้นหา">
+        <NuxtLink to="/search" class="rounded-md p-2 text-ink-soft hover:bg-paper-soft hover:text-ink" :aria-label="$t('search.title')">
           <Icon name="heroicons:magnifying-glass" class="size-5" />
         </NuxtLink>
-        <button class="rounded-md p-2 text-ink-soft hover:bg-paper-soft hover:text-ink md:hidden" type="button" aria-label="เมนู" @click="mobileOpen = true">
+        <button class="rounded-md p-2 text-ink-soft hover:bg-paper-soft hover:text-ink md:hidden" type="button" :aria-label="$t('nav.menu')" @click="mobileOpen = true">
           <Icon name="heroicons:bars-3" class="size-6" />
         </button>
       </div>
@@ -48,7 +48,7 @@ function isActive(to: string) {
             <DialogPanel class="flex w-72 max-w-[80%] flex-col bg-paper p-6">
               <div class="flex items-center justify-between">
                 <span class="text-lg font-semibold text-ink">{{ strings.brand }}</span>
-                <button type="button" class="rounded-md p-1 text-ink-soft hover:text-ink" aria-label="ปิด" @click="mobileOpen = false">
+                <button type="button" class="rounded-md p-1 text-ink-soft hover:text-ink" :aria-label="$t('common.close')" @click="mobileOpen = false">
                   <Icon name="heroicons:x-mark" class="size-6" />
                 </button>
               </div>

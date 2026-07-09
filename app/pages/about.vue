@@ -1,11 +1,13 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'site' })
 
+const { t } = useI18n()
+
 const { data: page } = await useFetch<{ title: string, bodyHtml: string }>('/api/pages/about')
 
 useSeoMeta({
-  title: () => page.value?.title || 'เกี่ยวกับเรา',
-  description: 'เกี่ยวกับชมรมถ่ายภาพและทีมงาน'
+  title: () => page.value?.title || t('about.title'),
+  description: () => t('about.metaDescription')
 })
 </script>
 
@@ -17,6 +19,6 @@ useSeoMeta({
       class="prose prose-zinc mt-8 max-w-none prose-a:text-accent prose-img:rounded-lg"
       v-html="page.bodyHtml"
     />
-    <p v-else class="mt-8 text-ink-soft">เนื้อหากำลังจะมาเร็ว ๆ นี้</p>
+    <p v-else class="mt-8 text-ink-soft">{{ t('about.comingSoon') }}</p>
   </div>
 </template>

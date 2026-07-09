@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: ['admin', 'admin-manage'] })
-useHead({ title: 'ผู้ดูแลระบบ' })
+const { t } = useI18n()
+useHead({ title: () => t('adminUsers.title') })
 
 interface AdminUser {
   id: number
@@ -17,7 +18,7 @@ interface AdminUser {
 
 const { user: me } = useUserSession()
 const canEditOwners = computed(() => me.value?.role === 'owner')
-const roleLabels = { owner: 'เจ้าของ', admin: 'ผู้ดูแล', editor: 'ผู้แก้ไข' } as const
+const roleLabels = computed(() => ({ owner: t('adminUsers.roleOwner'), admin: t('adminUsers.roleAdmin'), editor: t('adminUsers.roleEditor') } as const))
 
 const { data: users, refresh, pending } = await useFetch<AdminUser[]>('/api/admin/users')
 
@@ -68,7 +69,7 @@ async function save() {
     showForm.value = false
     await refresh()
   } catch (e) {
-    formError.value = errMsg(e, 'บันทึกไม่สำเร็จ')
+    formError.value = errMsg(e, t('adminUsers.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -79,7 +80,7 @@ async function toggleActive(u: AdminUser) {
     await $fetch(`/api/admin/users/${u.id}`, { method: 'PATCH', body: { active: !u.active } })
     await refresh()
   } catch (e) {
-    alert(errMsg(e, 'ทำรายการไม่สำเร็จ'))
+    alert(errMsg(e, t('adminUsers.actionFailed')))
   }
 }
 
@@ -93,7 +94,7 @@ async function doDelete() {
     confirmTarget.value = null
     await refresh()
   } catch (e) {
-    alert(errMsg(e, 'ลบไม่สำเร็จ'))
+    alert(errMsg(e, t('adminUsers.deleteFailed')))
   } finally {
     deleting.value = false
   }
@@ -120,58 +121,58 @@ function roleTone(role: AdminUser['role']) {
     <header class="page-head">
       <div class="page-head__copy">
         <NuxtLink to="/admin" class="back">Dashboard</NuxtLink>
-        <h1>ผู้ดูแลระบบ</h1>
-        <p>จัดการบัญชี สิทธิ์การเข้าถึง และวิธีเข้าสู่ระบบของทีมผู้ดูแล</p>
+        <h1>{{ t('adminUsers.title') }}</h1>
+        <p>{{ t('adminUsers.lead') }}</p>
       </div>
       <UiButton @click="openCreate">
         <Icon name="heroicons:plus" class="btn-icon" />
-        เพิ่มผู้ดูแล
+        {{ t('adminUsers.addUser') }}
       </UiButton>
     </header>
 
     <section class="iam-panel" aria-label="Admin users">
       <div class="iam-panel__summary">
-        <span>{{ users?.length ?? 0 }} accounts</span>
-        <span>{{ users?.filter(u => u.active).length ?? 0 }} active</span>
+        <span>{{ t('adminUsers.accountCount', { n: users?.length ?? 0 }) }}</span>
+        <span>{{ t('adminUsers.activeCount', { n: users?.filter(u => u.active).length ?? 0 }) }}</span>
       </div>
 
       <div class="table-scroll">
         <table v-if="users?.length" class="iam-table">
           <thead>
             <tr>
-              <th>ผู้ใช้</th>
-              <th>บทบาท</th>
-              <th>สถานะ</th>
-              <th>เข้าสู่ระบบ</th>
-              <th>ล่าสุด</th>
+              <th>{{ t('adminUsers.colUser') }}</th>
+              <th>{{ t('adminUsers.colRole') }}</th>
+              <th>{{ t('adminUsers.colStatus') }}</th>
+              <th>{{ t('adminUsers.colLogin') }}</th>
+              <th>{{ t('adminUsers.colLastSeen') }}</th>
               <th />
             </tr>
           </thead>
           <tbody>
             <tr v-for="u in users" :key="u.id">
-              <td data-label="ผู้ใช้">
+              <td :data-label="t('adminUsers.colUser')">
                 <div class="user-cell">
                   <span class="avatar">
                     <img v-if="u.avatarUrl" :src="u.avatarUrl" alt="">
                     <template v-else>{{ initialFor(u) }}</template>
                   </span>
                   <div class="user-cell__copy">
-                    <strong>{{ u.name || 'Unnamed admin' }}</strong>
+                    <strong>{{ u.name || t('adminUsers.unnamed') }}</strong>
                     <span>{{ u.email }}</span>
                   </div>
                 </div>
               </td>
-              <td data-label="บทบาท">
+              <td :data-label="t('adminUsers.colRole')">
                 <span class="pill" :class="roleTone(u.role)">
                   {{ roleLabels[u.role] }}
                 </span>
               </td>
-              <td data-label="สถานะ">
+              <td :data-label="t('adminUsers.colStatus')">
                 <span class="pill" :class="u.active ? 'pill--active' : 'pill--inactive'">
-                  {{ u.active ? 'ใช้งาน' : 'ปิดใช้งาน' }}
+                  {{ u.active ? t('adminUsers.statusActive') : t('adminUsers.statusInactive') }}
                 </span>
               </td>
-              <td data-label="เข้าสู่ระบบ">
+              <td :data-label="t('adminUsers.colLogin')">
                 <div class="auth-methods" :title="loginMethods(u)">
                   <span v-if="u.hasPassword" class="auth-method">
                     <Icon name="heroicons:key" class="auth-method__icon" />
@@ -184,16 +185,16 @@ function roleTone(role: AdminUser['role']) {
                   <span v-if="!u.hasPassword && !u.googleLinked" class="muted">—</span>
                 </div>
               </td>
-              <td data-label="ล่าสุด" class="muted">{{ formatDate(u.lastLoginAt) || '—' }}</td>
+              <td :data-label="t('adminUsers.colLastSeen')" class="muted">{{ formatDate(u.lastLoginAt) || '—' }}</td>
               <td class="actions-cell">
                 <div class="row-actions" :aria-label="`Actions for ${u.email}`">
-                  <button type="button" class="icon-btn" title="แก้ไข" @click="openEdit(u)">
+                  <button type="button" class="icon-btn" :title="t('admin.edit')" @click="openEdit(u)">
                     <Icon name="heroicons:pencil-square" class="icon-btn__icon" />
                   </button>
-                  <button v-if="u.id !== me?.id" type="button" class="icon-btn" :title="u.active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'" @click="toggleActive(u)">
+                  <button v-if="u.id !== me?.id" type="button" class="icon-btn" :title="u.active ? t('adminUsers.deactivate') : t('adminUsers.activate')" @click="toggleActive(u)">
                     <Icon :name="u.active ? 'heroicons:no-symbol' : 'heroicons:check-circle'" class="icon-btn__icon" />
                   </button>
-                  <button v-if="u.id !== me?.id" type="button" class="icon-btn icon-btn--danger" title="ลบ" @click="confirmTarget = u">
+                  <button v-if="u.id !== me?.id" type="button" class="icon-btn icon-btn--danger" :title="t('admin.delete')" @click="confirmTarget = u">
                     <Icon name="heroicons:trash" class="icon-btn__icon" />
                   </button>
                 </div>
@@ -202,53 +203,53 @@ function roleTone(role: AdminUser['role']) {
           </tbody>
         </table>
 
-        <p v-else-if="pending" class="empty">กำลังโหลดบัญชีผู้ดูแล...</p>
-        <p v-else class="empty">ยังไม่มีผู้ดูแล</p>
+        <p v-else-if="pending" class="empty">{{ t('adminUsers.loading') }}</p>
+        <p v-else class="empty">{{ t('adminUsers.empty') }}</p>
       </div>
     </section>
 
-    <UiModal v-model="showForm" :title="editing ? 'แก้ไขผู้ดูแล' : 'เพิ่มผู้ดูแล'">
+    <UiModal v-model="showForm" :title="editing ? t('adminUsers.editUser') : t('adminUsers.addUser')">
       <form class="iam-form" @submit.prevent="save">
         <p v-if="formError" class="form-error">{{ formError }}</p>
         <label class="form-field" for="f-email">
-          <span>อีเมล</span>
+          <span>{{ t('adminUsers.email') }}</span>
           <input id="f-email" v-model="form.email" type="email" :disabled="!!editing" required placeholder="you@cuphotoclub.com">
         </label>
         <label class="form-field" for="f-name">
-          <span>ชื่อ</span>
-          <input id="f-name" v-model="form.name" type="text" placeholder="ชื่อที่แสดง">
+          <span>{{ t('adminUsers.name') }}</span>
+          <input id="f-name" v-model="form.name" type="text" :placeholder="t('adminUsers.displayName')">
         </label>
         <label class="form-field" for="f-role">
-          <span>บทบาท</span>
+          <span>{{ t('adminUsers.colRole') }}</span>
           <select id="f-role" v-model="form.role">
-            <option v-if="canEditOwners" value="owner">เจ้าของ</option>
-            <option value="admin">ผู้ดูแล</option>
-            <option value="editor">ผู้แก้ไข</option>
+            <option v-if="canEditOwners" value="owner">{{ t('adminUsers.roleOwner') }}</option>
+            <option value="admin">{{ t('adminUsers.roleAdmin') }}</option>
+            <option value="editor">{{ t('adminUsers.roleEditor') }}</option>
           </select>
         </label>
         <label class="form-field" for="f-pw">
-          <span>รหัสผ่าน</span>
+          <span>{{ t('adminUsers.password') }}</span>
           <input id="f-pw" v-model="form.password" type="password" autocomplete="new-password">
-          <small>{{ editing ? 'เว้นว่างหากไม่ต้องการเปลี่ยน' : 'อย่างน้อย 8 ตัวอักษร เว้นว่างได้หากใช้ Google login' }}</small>
+          <small>{{ editing ? t('adminUsers.passwordKeepHint') : t('adminUsers.passwordNewHint') }}</small>
         </label>
         <div class="form-actions">
-          <UiButton type="button" variant="secondary" @click="showForm = false">ยกเลิก</UiButton>
-          <UiButton type="submit" :loading="saving">บันทึก</UiButton>
+          <UiButton type="button" variant="secondary" @click="showForm = false">{{ t('admin.cancel') }}</UiButton>
+          <UiButton type="submit" :loading="saving">{{ t('admin.save') }}</UiButton>
         </div>
       </form>
     </UiModal>
 
     <UiModal
       :model-value="!!confirmTarget"
-      title="ลบผู้ดูแล"
+      :title="t('adminUsers.deleteUser')"
       @update:model-value="v => { if (!v) confirmTarget = null }"
     >
       <p class="confirm-text">
-        ต้องการลบบัญชี <strong>{{ confirmTarget?.email }}</strong> ใช่หรือไม่? การกระทำนี้ย้อนกลับไม่ได้
+        {{ t('adminUsers.deleteConfirmPrefix') }} <strong>{{ confirmTarget?.email }}</strong> {{ t('adminUsers.deleteConfirmSuffix') }}
       </p>
       <div class="form-actions form-actions--confirm">
-        <UiButton variant="secondary" @click="confirmTarget = null">ยกเลิก</UiButton>
-        <UiButton variant="danger" :loading="deleting" @click="doDelete">ลบ</UiButton>
+        <UiButton variant="secondary" @click="confirmTarget = null">{{ t('admin.cancel') }}</UiButton>
+        <UiButton variant="danger" :loading="deleting" @click="doDelete">{{ t('admin.delete') }}</UiButton>
       </div>
     </UiModal>
   </div>

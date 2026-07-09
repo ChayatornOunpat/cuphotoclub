@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: 'admin' })
-useHead({ title: 'ข้อความติดต่อ' })
+const { t } = useI18n()
+useHead({ title: () => t('adminMessages.title') })
 
 interface Message {
   id: number
@@ -43,12 +44,12 @@ async function remove(m: Message) {
   <div>
     <div class="flex items-center justify-between gap-4">
       <div>
-        <h1 class="text-xl font-semibold text-ink">ข้อความติดต่อ</h1>
-        <p class="mt-1 text-sm text-ink-soft">ข้อความที่ส่งผ่านหน้าติดต่อเรา</p>
+        <h1 class="text-xl font-semibold text-ink">{{ t('adminMessages.title') }}</h1>
+        <p class="mt-1 text-sm text-ink-soft">{{ t('adminMessages.lead') }}</p>
       </div>
       <div class="flex rounded-md bg-paper-soft p-0.5 text-sm ring-1 ring-inset ring-line">
-        <button type="button" class="rounded px-3 py-1 font-medium" :class="!showArchived ? 'bg-white text-ink shadow-xs' : 'text-ink-soft'" @click="showArchived = false">กล่องข้อความ</button>
-        <button type="button" class="rounded px-3 py-1 font-medium" :class="showArchived ? 'bg-white text-ink shadow-xs' : 'text-ink-soft'" @click="showArchived = true">เก็บถาวร</button>
+        <button type="button" class="rounded px-3 py-1 font-medium" :class="!showArchived ? 'bg-white text-ink shadow-xs' : 'text-ink-soft'" @click="showArchived = false">{{ t('adminMessages.inbox') }}</button>
+        <button type="button" class="rounded px-3 py-1 font-medium" :class="showArchived ? 'bg-white text-ink shadow-xs' : 'text-ink-soft'" @click="showArchived = true">{{ t('adminMessages.archived') }}</button>
       </div>
     </div>
 
@@ -74,10 +75,10 @@ async function remove(m: Message) {
 
     <div v-else class="mt-6 rounded-lg border border-dashed border-line bg-white p-12 text-center">
       <Icon name="heroicons:inbox" class="mx-auto size-10 text-ink-soft/40" />
-      <p class="mt-3 text-sm text-ink-soft">{{ showArchived ? 'ไม่มีข้อความที่เก็บถาวร' : 'ยังไม่มีข้อความ' }}</p>
+      <p class="mt-3 text-sm text-ink-soft">{{ showArchived ? t('adminMessages.emptyArchived') : t('adminMessages.empty') }}</p>
     </div>
 
-    <UiModal :model-value="!!selected" :title="selected?.subject || 'ข้อความ'" @update:model-value="v => { if (!v) selected = null }">
+    <UiModal :model-value="!!selected" :title="selected?.subject || t('adminMessages.message')" @update:model-value="v => { if (!v) selected = null }">
       <template v-if="selected">
         <div class="text-sm">
           <p class="font-medium text-ink">{{ selected.name }}</p>
@@ -87,13 +88,13 @@ async function remove(m: Message) {
         <p class="mt-4 whitespace-pre-wrap text-sm text-ink">{{ selected.message }}</p>
         <div class="mt-6 flex flex-wrap justify-end gap-2">
           <UiButton variant="secondary" size="sm" :to="`mailto:${selected.email}`">
-            <Icon name="heroicons:arrow-uturn-left" class="size-4" /> ตอบกลับ
+            <Icon name="heroicons:arrow-uturn-left" class="size-4" /> {{ t('adminMessages.reply') }}
           </UiButton>
           <UiButton variant="secondary" size="sm" @click="setArchived(selected, !selected.archived)">
-            <Icon name="heroicons:archive-box" class="size-4" /> {{ selected.archived ? 'นำออกจากที่เก็บ' : 'เก็บถาวร' }}
+            <Icon name="heroicons:archive-box" class="size-4" /> {{ selected.archived ? t('adminMessages.unarchive') : t('adminMessages.archive') }}
           </UiButton>
           <UiButton variant="danger" size="sm" @click="remove(selected)">
-            <Icon name="heroicons:trash" class="size-4" /> ลบ
+            <Icon name="heroicons:trash" class="size-4" /> {{ t('admin.delete') }}
           </UiButton>
         </div>
       </template>
