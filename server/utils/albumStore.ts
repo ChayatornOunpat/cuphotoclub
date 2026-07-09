@@ -48,6 +48,7 @@ function rowToAlbum(row: AlbumRow): Album {
     placement: row.placement,
     coverSrc: row.coverSrc,
     rows: row.rows ?? [],
+    textDefaults: row.textDefaults ?? undefined,
     updatedAt: row.updatedAt?.toISOString()
   }
 }
@@ -69,6 +70,7 @@ async function writeAlbum(album: Album): Promise<void> {
     placement: album.placement,
     coverSrc: album.coverSrc,
     rows: album.rows,
+    textDefaults: album.textDefaults ?? null,
     updatedAt: now
   }
 
@@ -91,6 +93,7 @@ async function writeAlbum(album: Album): Promise<void> {
         placement: values.placement,
         coverSrc: values.coverSrc,
         rows: values.rows,
+        textDefaults: values.textDefaults,
         updatedAt: now
       }
     })

@@ -677,6 +677,37 @@ function addCellFromPalette(type: CellType, span: CellSpan) {
   addCell(form.rows.length - 1, type, span)
 }
 
+function addChapterSeparator() {
+  const insertAt = selectedRow.value === null
+    ? form.rows.length
+    : Math.min(selectedRow.value + 1, form.rows.length)
+  form.rows.splice(insertAt, 0, { cells: [makeCell('text', 6)] })
+  selectedRow.value = insertAt
+  selectedCell.value = 0
+  activeDock.value = 'cell'
+  dockHidden.value = false
+  scrollPreviewToRow(insertAt, 0)
+}
+
+function isChapterRow(row: AlbumRow) {
+  return isChapters.value && row.cells.length === 1 && row.cells[0]?.type === 'text'
+}
+
+function rowListLabel(row: AlbumRow, index: number) {
+  return isChapterRow(row)
+    ? t('adminForm.chapterSeparator')
+    : t('adminForm.rowN', { n: index + 1 })
+}
+
+function cellChipLabel(cell: AlbumCell) {
+  const type = cell.type === 'image'
+    ? 'img'
+    : cell.type === 'text' && isChapters.value
+      ? t('adminForm.cellTypeChapterShort')
+      : cell.type
+  return isEssay.value ? `${type} ${cell.span}` : type
+}
+
 const selectedCellData = computed(() =>
   selectedRow.value !== null && selectedCell.value !== null
     ? form.rows[selectedRow.value]?.cells[selectedCell.value] ?? null
@@ -995,6 +1026,7 @@ function onSubmit() {
 
 const SPANS: CellSpan[] = [2, 3, 4, 6]
 const isEssay = computed(() => form.style === 'essay')
+const isChapters = computed(() => form.style === 'chapters')
 
 // Style picker modal. Drop real screenshots into
 // public/admin/album-style-previews/{style}-{1,2,3}.webp and the picker will use them.
@@ -1002,7 +1034,7 @@ const STYLE_OPTIONS = [
   { value: 'essay', nameKey: 'adminForm.styleEssay', descKey: 'adminForm.styleEssayDesc', previewSrcs: ['/admin/album-style-previews/essay-1.webp', '/admin/album-style-previews/essay-2.webp', '/admin/album-style-previews/essay-3.webp'] },
   { value: 'sticky', nameKey: 'adminForm.styleSticky', descKey: 'adminForm.styleStickyDesc', previewSrcs: ['/admin/album-style-previews/sticky-1.webp', '/admin/album-style-previews/sticky-2.webp'] },
   { value: 'contact', nameKey: 'adminForm.styleContact', descKey: 'adminForm.styleContactDesc', previewSrcs: ['/admin/album-style-previews/contact-1.webp', '/admin/album-style-previews/contact-2.webp'] },
-  { value: 'darkroom', nameKey: 'adminForm.styleDarkroom', descKey: 'adminForm.styleDarkroomDesc', previewSrcs: [] },
+  { value: 'darkroom', nameKey: 'adminForm.styleDarkroom', descKey: 'adminForm.styleDarkroomDesc', previewSrcs: ['/admin/album-style-previews/darkroom-1.webp', '/admin/album-style-previews/darkroom-2.webp'] },
   { value: 'chapters', nameKey: 'adminForm.styleChapters', descKey: 'adminForm.styleChaptersDesc', previewSrcs: [] }
 ] as const
 const showStylePicker = ref(false)
@@ -1137,32 +1169,34 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       <!-- Story settings — album-wide text defaults -->
       <div v-if="isEssay" class="tray__section">
         <p class="tray__label">{{ t('adminEditor.storySettings') }}</p>
-        <div class="field">
-          <label>{{ t('adminForm.cellAlign') }}</label>
-          <div class="align-selector">
-            <button
-              v-for="opt in ALIGN_OPTIONS"
-              :key="opt.value"
-              type="button"
-              class="align-btn"
-              :class="{ active: (form.textDefaults?.align ?? 'left') === opt.value }"
-              :title="t(opt.key)"
-              @click="setDefaultAlign(opt.value)"
-            >{{ t(opt.key) }}</button>
+        <div class="story-defaults-grid">
+          <div class="field">
+            <label>{{ t('adminForm.cellAlign') }}</label>
+            <div class="align-selector">
+              <button
+                v-for="opt in ALIGN_OPTIONS"
+                :key="opt.value"
+                type="button"
+                class="align-btn"
+                :class="{ active: (form.textDefaults?.align ?? 'left') === opt.value }"
+                :title="t(opt.key)"
+                @click="setDefaultAlign(opt.value)"
+              >{{ t(opt.key) }}</button>
+            </div>
           </div>
-        </div>
-        <div class="field">
-          <label>{{ t('adminForm.cellFont') }}</label>
-          <div class="font-selector">
-            <button
-              v-for="opt in FONT_OPTIONS"
-              :key="opt.value"
-              type="button"
-              class="font-btn"
-              :class="{ active: (form.textDefaults?.font ?? 'serif') === opt.value }"
-              :title="t(opt.key)"
-              @click="setDefaultFont(opt.value)"
-            >{{ t(opt.key) }}</button>
+          <div class="field">
+            <label>{{ t('adminForm.cellFont') }}</label>
+            <div class="font-selector">
+              <button
+                v-for="opt in FONT_OPTIONS"
+                :key="opt.value"
+                type="button"
+                class="font-btn"
+                :class="{ active: (form.textDefaults?.font ?? 'serif') === opt.value }"
+                :title="t(opt.key)"
+                @click="setDefaultFont(opt.value)"
+              >{{ t(opt.key) }}</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1256,13 +1290,20 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
             <button type="button" class="palette__chip palette__chip--image" :title="t('adminForm.paletteAddImageFixed')" @click="addCellFromPalette('image', 6)">
               <span class="chip__type">{{ t('adminForm.cellTypeImage') }}</span>
             </button>
-            <button type="button" class="palette__chip palette__chip--text" :title="t('adminForm.paletteAddTextFixed')" @click="addCellFromPalette('text', 6)">
-              <span class="chip__type">{{ t('adminForm.cellTypeText') }}</span>
+            <button
+              type="button"
+              class="palette__chip palette__chip--text"
+              :class="{ 'palette__chip--chapter': isChapters }"
+              :title="isChapters ? t('adminForm.paletteAddChapter') : t('adminForm.paletteAddTextFixed')"
+              @click="isChapters ? addChapterSeparator() : addCellFromPalette('text', 6)"
+            >
+              <span class="chip__type">{{ isChapters ? t('adminForm.cellTypeChapter') : t('adminForm.cellTypeText') }}</span>
             </button>
             <button type="button" class="palette__chip palette__chip--pad" :title="t('adminForm.paletteAddSpacer')" @click="addCellFromPalette('pad', 6)">
               <span class="chip__type">{{ t('adminForm.cellTypePad') }}</span>
             </button>
           </div>
+          <p v-if="isChapters" class="media-empty media-empty--hint">{{ t('adminForm.chapterPaletteHint') }}</p>
         </template>
       </div>
 
@@ -1285,6 +1326,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
             class="row-item"
             :class="{
               'is-selected': selectedRow === ri,
+              'is-chapter-row': isChapterRow(row),
               'is-dragging': draggingRowIndex === ri,
               'drop-target': dragOverRowIndex === ri && dragOverRowIndex !== draggingRowIndex
             }"
@@ -1300,7 +1342,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               @dragend.stop="onRowDragEnd"
             >
               <span class="row-item__drag">⠿</span>
-              <span class="row-item__label">{{ t('adminForm.rowN', { n: ri + 1 }) }}</span>
+              <span class="row-item__label">{{ rowListLabel(row, ri) }}</span>
               <span v-if="isEssay" class="row-item__usage" :class="{ full: rowUsed(row) >= 6 }">{{ rowUsed(row) }}/6</span>
               <button
                 type="button"
@@ -1332,7 +1374,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
                 @drop.prevent.stop="onCellDrop(ri, ci)"
                 @dragend.stop="onCellDragEnd"
               >
-                <span class="cell-chip__label">{{ cell.type === 'image' ? 'img' : cell.type }} {{ cell.span }}</span>
+                <span class="cell-chip__label">{{ cellChipLabel(cell) }}</span>
                 <button
                   type="button"
                   class="cell-chip__del"
@@ -1518,7 +1560,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       <div class="block-dock__head">
         <div class="block-dock__identity">
           <p class="block-dock__eyebrow">
-            {{ selectedCellData?.type === 'text' ? t('adminForm.cellTypeText')
+            {{ selectedCellData?.type === 'text' ? (isChapters ? t('adminForm.cellTypeChapter') : t('adminForm.cellTypeText'))
               : selectedCellData?.type === 'pad' ? t('adminForm.cellTypePad')
               : t('adminForm.cellTypeImage') }}
           </p>
@@ -1581,7 +1623,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 
       <!-- Text cell properties -->
       <div v-else-if="selectedCellData?.type === 'text'" class="cell-controls cell-controls--text">
-        <section class="cell-control cell-control--align">
+        <section v-if="!isChapters" class="cell-control cell-control--align">
           <p class="cell-control__label">{{ t('adminForm.cellAlign') }}</p>
           <div class="align-selector">
             <button
@@ -1603,7 +1645,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           </div>
         </section>
 
-        <section class="cell-control cell-control--font">
+        <section v-if="!isChapters" class="cell-control cell-control--font">
           <p class="cell-control__label">{{ t('adminForm.cellFont') }}</p>
           <div class="font-selector">
             <button
@@ -1626,8 +1668,15 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
         </section>
 
         <section class="cell-control cell-control--text">
-          <label class="cell-control__label" for="cell-text">{{ t('adminForm.cellTextContent') }}</label>
-          <textarea id="cell-text" v-model="selectedCellData.content" class="prop-textarea" rows="3" :placeholder="t('adminForm.cellTextPlaceholder')" />
+          <label class="cell-control__label" for="cell-text">{{ isChapters ? t('adminForm.chapterTitle') : t('adminForm.cellTextContent') }}</label>
+          <textarea
+            id="cell-text"
+            v-model="selectedCellData.content"
+            class="prop-textarea"
+            rows="3"
+            :placeholder="isChapters ? t('adminForm.chapterTitlePlaceholder') : t('adminForm.cellTextPlaceholder')"
+          />
+          <p v-if="isChapters" class="cell-control__hint">{{ t('adminForm.chapterCellHint') }}</p>
         </section>
       </div>
 
@@ -2059,6 +2108,20 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   background: color-mix(in srgb, var(--accent) 5%, var(--body-bg));
   box-shadow: inset 0 0 0 1px var(--accent);
 }
+.row-item.is-chapter-row {
+  background: color-mix(in srgb, var(--accent) 4%, #fff);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--subtle));
+}
+.row-item.is-chapter-row .row-item__head {
+  border-bottom-color: color-mix(in srgb, var(--accent) 26%, var(--subtle));
+}
+.row-item.is-chapter-row .row-item__label {
+  color: var(--accent);
+}
+.row-item.is-chapter-row .row-item__cells {
+  min-height: 2.15rem;
+  background: color-mix(in srgb, var(--accent) 3%, var(--body-bg));
+}
 .row-item.is-dragging { opacity: 0.4; }
 .row-item.drop-target { border-top: 2px solid var(--accent); }
 
@@ -2472,6 +2535,12 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   text-transform: uppercase;
   color: var(--muted);
 }
+.cell-control__hint {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.58rem;
+  line-height: 1.55;
+}
 .prop-photo {
   display: flex;
   align-items: center;
@@ -2617,6 +2686,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 
 /* Fields shared */
 .dock-fields { display: grid; gap: 0.5rem; }
+.story-defaults-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 .field { display: flex; flex-direction: column; gap: 0.28rem; }
 .field label { font-size: 0.46rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .field__hint { font-size: 0.58rem; color: var(--muted); line-height: 1.55; }

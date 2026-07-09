@@ -165,6 +165,7 @@ export const contentAlbums = sqliteTable('content_albums', {
   placement: text('placement').$type<Placement>().notNull(),
   coverSrc: text('cover_src').notNull().default(''),
   rows: text('rows_json', { mode: 'json' }).$type<AlbumRow[]>().notNull().default(sql`'[]'`),
+  textDefaults: text('text_defaults_json', { mode: 'json' }).$type<{ align?: 'left' | 'center' | 'right', font?: 'serif' | 'sans' }>(),
   createdAt,
   updatedAt
 })
