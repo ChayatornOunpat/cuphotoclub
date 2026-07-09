@@ -1044,10 +1044,11 @@ function pickStyle(value: typeof STYLE_OPTIONS[number]['value']) {
   form.style = value
   showStylePicker.value = false
 }
-function hasStylePreview(srcs: readonly string[]) {
-  return srcs.some(src => !missingStylePreviews.value.has(src))
+function stylePreviewSrc(srcs: readonly string[]) {
+  return srcs.find(src => !missingStylePreviews.value.has(src)) ?? ''
 }
 function markStylePreviewMissing(src: string) {
+  if (!src) return
   const next = new Set(missingStylePreviews.value)
   next.add(src)
   missingStylePreviews.value = next
@@ -1111,24 +1112,15 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
                 <span class="sp-thumb" :class="`sp-thumb--${opt.value}`">
                   <i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i /><i />
                 </span>
-                <span
-                  v-if="hasStylePreview(opt.previewSrcs)"
-                  class="sp-preview__shots"
-                  :class="`sp-preview__shots--${opt.previewSrcs.length}`"
+                <img
+                  v-if="stylePreviewSrc(opt.previewSrcs)"
+                  class="sp-preview__image"
+                  :src="stylePreviewSrc(opt.previewSrcs)"
+                  alt=""
+                  loading="eager"
+                  decoding="async"
+                  @error="markStylePreviewMissing(stylePreviewSrc(opt.previewSrcs))"
                 >
-                  <template v-for="(src, shotIndex) in opt.previewSrcs" :key="src">
-                    <img
-                      v-if="!missingStylePreviews.has(src)"
-                      class="sp-preview__image"
-                      :class="{ 'sp-preview__image--lead': shotIndex === 0 }"
-                      :src="src"
-                      alt=""
-                      loading="eager"
-                      decoding="async"
-                      @error="markStylePreviewMissing(src)"
-                    >
-                  </template>
-                </span>
               </span>
               <span class="sp-card__name">
                 {{ t(opt.nameKey) }}
@@ -2744,38 +2736,16 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   border: 1px solid var(--subtle);
   background: #fff;
 }
-.sp-preview__shots {
+.sp-preview__image {
   position: absolute;
   inset: 0;
   z-index: 2;
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.8fr);
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  background: var(--subtle);
-}
-.sp-preview__image {
   min-width: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   background: #fff;
-}
-.sp-preview__image--lead {
-  grid-row: 1 / -1;
-}
-.sp-preview__shots--1 {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-}
-.sp-preview__shots--2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: 1fr;
-}
-.sp-preview__shots--2 .sp-preview__image--lead,
-.sp-preview__shots--1 .sp-preview__image--lead {
-  grid-row: auto;
 }
 .sp-thumb {
   position: absolute;
