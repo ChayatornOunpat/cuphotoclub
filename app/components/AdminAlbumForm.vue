@@ -1341,19 +1341,19 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           <label>{{ t('adminForm.title') }}</label>
           <textarea ref="titleInput" v-model="form.title" rows="2" :placeholder="t('adminForm.titlePlaceholder')" @focus="activeField = 'title'" />
         </div>
-        <div class="field" :class="{ active: activeField === 'category' }">
+        <div class="field field--category" :class="{ active: activeField === 'category' }">
           <label>{{ t('adminForm.category') }}</label>
           <input ref="categoryInput" v-model="form.category" type="text" :placeholder="t('adminForm.categoryPlaceholder')" @focus="activeField = 'category'">
         </div>
-        <div class="field" :class="{ active: activeField === 'date' }">
+        <div class="field field--date-start" :class="{ active: activeField === 'date' }">
           <label>{{ t('adminForm.dateDisplay') }}</label>
           <UiDateInput ref="dateInput" v-model="form.date" @focus="activeField = 'date'" />
         </div>
-        <div class="field" :class="{ active: activeField === 'dateEnd' }">
+        <div class="field field--date-end" :class="{ active: activeField === 'dateEnd' }">
           <label>{{ t('adminForm.dateEnd') }} <span class="opt">{{ t('adminForm.dateEndOptional') }}</span></label>
           <UiDateInput ref="dateEndInput" v-model="form.dateEnd" :disabled="!form.date" @focus="activeField = 'dateEnd'" />
         </div>
-        <div class="field" :class="{ active: activeField === 'location' }">
+        <div class="field field--location" :class="{ active: activeField === 'location' }">
           <label>{{ t('adminForm.location') }} <span class="opt">{{ t('adminForm.locationOptional') }}</span></label>
           <input ref="locationInput" v-model="form.location" type="text" :placeholder="t('adminForm.locationPlaceholder')" @focus="activeField = 'location'">
         </div>
@@ -2210,16 +2210,50 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 }
 
 /* Content dock */
+.context-dock.content-dock {
+  width: min(980px, calc(100vw - var(--tray-width) - 2rem));
+  padding: 0.72rem 0.85rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--dark) 12%, var(--subtle));
+  border-top: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--body-bg) 90%, #fff);
+  backdrop-filter: blur(20px) saturate(135%);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  box-shadow: 0 1rem 2.75rem rgba(26, 25, 24, 0.16);
+}
 .content-dock .dock-fields {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(100px, 0.75fr));
-  gap: 0.5rem;
-  align-items: end;
+  grid-template-columns:
+    minmax(15rem, 1.25fr)
+    minmax(8.5rem, 0.7fr)
+    minmax(8.75rem, 0.72fr)
+    minmax(8.75rem, 0.72fr);
+  gap: 0.64rem 0.72rem;
+  align-items: start;
 }
-.content-dock .field--excerpt { grid-column: 1 / -1; }
-.content-dock .field--cover { grid-column: 1 / -1; }
+.content-dock .field--title,
+.content-dock .field--category,
+.content-dock .field--date-start,
+.content-dock .field--date-end {
+  min-width: 0;
+}
+.content-dock .field--location { grid-column: 1 / 2; }
+.content-dock .field--excerpt { grid-column: 2 / -1; }
+.content-dock .field--cover {
+  grid-column: 1 / -1;
+  padding-top: 0.62rem;
+  border-top: 1px solid color-mix(in srgb, var(--subtle) 72%, transparent);
+}
 .content-dock .field.active label { color: var(--accent); }
-.content-dock .field.active textarea { max-height: 8rem; resize: none; }
+.content-dock .field.active textarea { resize: none; }
+.content-dock .field--title textarea,
+.content-dock .field--excerpt textarea {
+  min-height: 2.35rem;
+  max-height: 4.6rem;
+}
+.content-dock .field.active.field--title textarea,
+.content-dock .field.active.field--excerpt textarea {
+  max-height: 5.4rem;
+}
 
 /* Cell dock */
 .context-dock.block-dock {
@@ -2436,17 +2470,19 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 
 .cover-dock {
   display: grid;
-  grid-template-columns: minmax(9rem, 13rem) 1fr;
-  gap: 0.55rem;
-  align-items: start;
+  grid-template-columns: minmax(11rem, 13rem) minmax(0, 1fr);
+  gap: 0.72rem;
+  align-items: stretch;
 }
 .cover-dock .cover-preview {
   margin: 0;
 }
 .cover-pick {
-  align-self: start;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
   border: 1px solid var(--subtle);
-  background: none;
+  background: color-mix(in srgb, #fff 72%, var(--body-bg));
   color: var(--dark);
   padding: 0.5rem 0.85rem;
   font-family: var(--font-sans);
@@ -2456,7 +2492,11 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   cursor: pointer;
   transition: border-color 0.2s, color 0.2s;
 }
-.cover-pick:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.cover-pick:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, #fff);
+}
 .cover-pick:disabled { opacity: 0.5; cursor: default; }
 
 /* Fields shared */
@@ -2632,6 +2672,18 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
     left: 50%;
     width: min(860px, calc(100vw - 1.5rem));
   }
+  .context-dock.content-dock {
+    width: min(860px, calc(100vw - 1.5rem));
+  }
+  .content-dock .dock-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .content-dock .field--title,
+  .content-dock .field--location,
+  .content-dock .field--excerpt,
+  .content-dock .field--cover {
+    grid-column: 1 / -1;
+  }
   .cover-dock {
     grid-template-columns: 1fr;
   }
@@ -2666,6 +2718,12 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   .prop-photo {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 560px) {
+  .content-dock .dock-fields {
+    grid-template-columns: 1fr;
   }
 }
 
