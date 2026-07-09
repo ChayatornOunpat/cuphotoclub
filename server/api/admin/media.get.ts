@@ -13,8 +13,12 @@ export default defineEventHandler(async (event) => {
     cursor = result.hasMore ? result.cursor : undefined
   } while (cursor)
 
+  // Trashed images are kept in R2 but must not be selectable anywhere — hide
+  // them from the album image picker just like the R2 inventory does.
+  const trashed = await trashedKeySet()
+
   const images = blobs
-    .filter(item => item.contentType?.startsWith('image/'))
+    .filter(item => item.contentType?.startsWith('image/') && !trashed.has(item.pathname))
     .map((item) => {
       // Queue-order stamp written at upload time; uploadedAt (completion time)
       // is the fallback for images uploaded before the stamp existed.
