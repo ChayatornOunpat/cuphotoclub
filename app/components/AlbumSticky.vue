@@ -5,6 +5,7 @@ interface Album {
   title: string
   category: string
   date: string
+  dateEnd?: string
   location?: string
   excerpt: string
   coverSrc: string
@@ -15,6 +16,7 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 const cover = computed(() => props.album.coverSrc)
 const categoryAlbumsPath = computed(() => `${localePath('/albums')}?category=${encodeURIComponent(props.album.category)}`)
+const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.album.dateEnd))
 
 // Flat list of image cells with their row/cell coordinates for admin selection
 const imageCells = computed(() => {
@@ -49,7 +51,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
         <p class="meta__excerpt" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
         <div class="meta__facts">
           <div class="meta__fact"><span class="k">{{ t('albums.category') }}</span><span class="v">{{ album.category }}</span></div>
-          <div class="meta__fact"><span class="k">{{ t('albums.date') }}</span><span class="v">{{ album.date }}</span></div>
+          <div class="meta__fact"><span class="k">{{ t('albums.date') }}</span><span class="v">{{ dateDisplay }}</span></div>
           <div v-if="album.location" class="meta__fact"><span class="k">{{ t('albums.location') }}</span><span class="v">{{ album.location }}</span></div>
           <div class="meta__fact"><span class="k">{{ t('albums.frames') }}</span><span class="v">{{ imageCells.length }}</span></div>
         </div>

@@ -69,14 +69,6 @@ const secondarySections = computed(() => [
     count: null as number | null,
     meta: t('admin.accountMeta'),
     to: localePath('/admin/account')
-  },
-  {
-    key: 'viewSite',
-    title: t('admin.viewSite'),
-    count: null as number | null,
-    meta: t('admin.viewSiteMeta'),
-    to: localePath('/'),
-    target: '_blank'
   }
 ])
 

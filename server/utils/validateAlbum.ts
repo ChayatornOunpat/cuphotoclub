@@ -30,6 +30,8 @@ export function validateAlbum(b: Record<string, unknown>): string | null {
   if (!String(b.title ?? '').trim()) return 'Title is required'
   if (!String(b.category ?? '').trim()) return 'Category is required'
   if (!validISODate(b.date)) return 'Date must use YYYY-MM-DD'
+  if (b.dateEnd !== undefined && b.dateEnd !== '' && !validISODate(b.dateEnd)) return 'End date must use YYYY-MM-DD'
+  if (typeof b.dateEnd === 'string' && b.dateEnd && typeof b.date === 'string' && b.dateEnd < b.date) return 'End date must be after start date'
   if (b.published !== undefined && b.published !== '' && !validISODate(b.published)) return 'Published date must use YYYY-MM-DD'
   if (b.visibility !== undefined && !VISIBILITY.includes(String(b.visibility))) return 'Invalid visibility'
   if (!String(b.excerpt ?? '').trim()) return 'Excerpt is required'

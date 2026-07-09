@@ -13,6 +13,7 @@ interface Album {
   title: string
   category: string
   date: string
+  dateEnd?: string
   location?: string
   excerpt: string
   coverSrc: string
@@ -24,6 +25,7 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 const coverAspect = ref<number | null>(null)
 let coverMeasureId = 0
+const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.album.dateEnd))
 
 const coverOrientation = computed(() => {
   const aspect = coverAspect.value
@@ -109,7 +111,7 @@ watch(() => props.album.coverSrc, measureCover, { immediate: true })
         <p class="cover__kicker">{{ t('albums.albumKicker', { category: album.category }) }}</p>
         <h1 class="cover__title" :lang="textLang(album.title)">{{ album.title }}</h1>
         <div class="cover__meta">
-          <span>{{ album.date }}</span><span class="dot" />
+          <span>{{ dateDisplay }}</span><span class="dot" />
           <span>{{ t('albums.metaFrames', { count: totalImages }) }}</span>
           <template v-if="album.location"><span class="dot" /><span>{{ album.location }}</span></template>
         </div>

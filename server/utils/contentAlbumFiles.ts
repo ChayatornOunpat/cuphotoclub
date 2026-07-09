@@ -115,6 +115,7 @@ function parseAlbumMarkdown(filename: string, source: string): Album | null {
     title: String(data.title),
     category: String(data.category),
     date: String(data.date),
+    dateEnd: data.dateEnd ? String(data.dateEnd) : undefined,
     published: String(data.published),
     visibility: (data.visibility as ContentStatus | undefined) ?? 'public',
     location: data.location ? String(data.location) : undefined,

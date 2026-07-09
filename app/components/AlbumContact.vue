@@ -5,6 +5,7 @@ interface Album {
   title: string
   category: string
   date: string
+  dateEnd?: string
   excerpt: string
   coverSrc: string
   rows: AlbumRow[]
@@ -13,6 +14,7 @@ const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedR
 const { t } = useI18n()
 const localePath = useLocalePath()
 const cover = computed(() => props.album.coverSrc)
+const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.album.dateEnd))
 const coverAspect = ref<number | null>(null)
 let coverMeasureId = 0
 
@@ -101,7 +103,7 @@ watch(cover, measureCover, { immediate: true })
       <span v-if="disableNavigation" class="head__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="head__back">{{ t('albums.coverBack') }}</NuxtLink>
       <div class="head__body">
-        <p class="head__kicker"><span class="head__kicker-category">{{ t('albums.albumKicker', { category: album.category }) }}</span> · <span class="head__kicker-date">{{ album.date }}</span></p>
+        <p class="head__kicker"><span class="head__kicker-category">{{ t('albums.albumKicker', { category: album.category }) }}</span> · <span class="head__kicker-date">{{ dateDisplay }}</span></p>
         <h1 class="head__title" :lang="textLang(album.title)">{{ album.title }}</h1>
         <p class="head__sub" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
       </div>
@@ -229,7 +231,9 @@ watch(cover, measureCover, { immediate: true })
 .head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; overflow-wrap: break-word; }
 .head__sub { margin-top: 1.5rem; max-width: 520px; font-size: 0.82rem; color: rgba(245, 244, 240, 0.5); line-height: 1.8; white-space: pre-line; }
 
-.sheet { padding: 4rem 3rem 6rem; max-width: 1380px; margin: 0 auto; }
+/* narrower side gutters (1.5rem vs 3rem) widen the content area to ~1332px so
+   four 3:2 frames (4×315px + gaps ≈ 1291px) fit per row at the 210px height. */
+.sheet { padding: 4rem 1.5rem 6rem; max-width: 1380px; margin: 0 auto; }
 .sheet__bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
 .eyebrow { font-size: 0.54rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 1rem; }
 .eyebrow .num { color: var(--accent); font-weight: 500; }

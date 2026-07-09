@@ -14,6 +14,7 @@ export interface PhotoGridImage {
   albumTitle: string
   albumCover: string
   albumDate: string
+  albumDateEnd?: string
   photoCount: number
 }
 
@@ -35,6 +36,7 @@ export default defineEventHandler(async (event) => {
       albumTitle: album.title,
       albumCover,
       albumDate: album.date,
+      albumDateEnd: album.dateEnd,
       photoCount
     }
 

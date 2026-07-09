@@ -110,6 +110,7 @@ const modalData = ref({
   albumTitle: '',
   albumCover: '',
   albumDate: '',
+  albumDateEnd: '',
   photoCount: 0,
   clickedSrc: ''
 })
@@ -122,6 +123,7 @@ function openModal(src: string) {
     albumTitle: meta.albumTitle,
     albumCover: meta.albumCover,
     albumDate: meta.albumDate,
+    albumDateEnd: meta.albumDateEnd ?? '',
     photoCount: meta.photoCount,
     clickedSrc: src
   }
@@ -261,6 +263,7 @@ async function fetchBatch(): Promise<string[]> {
           albumTitle: img.albumTitle,
           albumCover: img.albumCover,
           albumDate: img.albumDate,
+          albumDateEnd: img.albumDateEnd,
           photoCount: img.photoCount
         })
       }
@@ -642,6 +645,7 @@ onBeforeUnmount(() => {
       :album-title="modalData.albumTitle"
       :album-cover="modalData.albumCover"
       :album-date="modalData.albumDate"
+      :album-date-end="modalData.albumDateEnd"
       :photo-count="modalData.photoCount"
       :clicked-src="modalData.clickedSrc"
       @close="closeModal"

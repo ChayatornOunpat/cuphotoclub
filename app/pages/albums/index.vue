@@ -72,6 +72,27 @@ const paged = computed(() => filtered.value.slice((page.value - 1) * pageSize, p
 const featured = computed(() => paged.value[0] ?? null)
 const rest = computed(() => paged.value.slice(1))
 
+// Masonry columns: distribute items round-robin (1→col1, 2→col2, 3→col3, 4→col1…)
+// so they read left-to-right across the top row, then down, while each cover
+// keeps its natural (variable) height. Column count is responsive.
+const columnCount = ref(3)
+function updateColumnCount() {
+  const w = window.innerWidth
+  columnCount.value = w <= 720 ? 1 : w <= 1000 ? 2 : 3
+}
+onMounted(() => {
+  updateColumnCount()
+  window.addEventListener('resize', updateColumnCount)
+})
+onBeforeUnmount(() => {
+  if (import.meta.client) window.removeEventListener('resize', updateColumnCount)
+})
+const albumColumns = computed(() => {
+  const cols: (typeof rest.value)[] = Array.from({ length: columnCount.value }, () => [])
+  rest.value.forEach((a, i) => { cols[i % columnCount.value]!.push(a) })
+  return cols
+})
+
 function goToPage(n: number) {
   page.value = Math.min(Math.max(1, n), totalPages.value)
   if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -90,6 +111,11 @@ function imageCount(a: NonNullable<typeof albums.value>[number]): number {
   // Photo count is precomputed server-side (full `rows` no longer sent).
   return a.photoCount ?? 0
 }
+
+function albumDateDisplay(a: NonNullable<typeof albums.value>[number]): string {
+  return formatAlbumDateRange(a.date, a.dateEnd)
+}
+
 const totalFrames = computed(() => galleryAlbums.value.reduce((n, a) => n + imageCount(a), 0))
 const headerBg = computed(() => (galleryAlbums.value[0] ? coverOf(galleryAlbums.value[0]) : ''))
 
@@ -193,7 +219,7 @@ useSeoMeta({
             <h3 class="feature__title" :lang="textLang(featured.title)">{{ featured.title }}</h3>
             <p class="feature__excerpt" :lang="textLang(featured.excerpt)">{{ featured.excerpt }}</p>
             <div class="feature__meta">
-              <span>{{ featured.date }}</span><span class="dot" /><span>{{ t('albums.metaFrames', { count: imageCount(featured) }) }}</span>
+              <span>{{ albumDateDisplay(featured) }}</span><span class="dot" /><span>{{ t('albums.metaFrames', { count: imageCount(featured) }) }}</span>
             </div>
             <span class="feature__view">{{ t('albums.viewAlbum') }}</span>
           </div>
@@ -201,17 +227,19 @@ useSeoMeta({
 
         <!-- MASONRY -->
         <div class="albums">
-          <NuxtLink v-for="a in rest" :key="a.path" :to="localizedPath(a.path)" class="album">
-            <div class="album__stack">
-              <div class="album__cover">
-                <AppImg :src="coverOf(a)" :alt="a.title" sizes="sm:100vw md:50vw lg:33vw" />
-                <div class="album__view">{{ t('albums.viewAlbum') }}</div>
+          <div v-for="(col, ci) in albumColumns" :key="ci" class="albums__col">
+            <NuxtLink v-for="a in col" :key="a.path" :to="localizedPath(a.path)" class="album">
+              <div class="album__stack">
+                <div class="album__cover">
+                  <AppImg :src="coverOf(a)" :alt="a.title" sizes="sm:100vw md:50vw lg:33vw" />
+                  <div class="album__view">{{ t('albums.viewAlbum') }}</div>
+                </div>
               </div>
-            </div>
-            <p class="album__cat" :lang="textLang(a.category)">{{ a.category }}</p>
-            <h3 class="album__title" :lang="textLang(a.title)">{{ a.title }}</h3>
-            <p class="album__date">{{ a.date }}</p>
-          </NuxtLink>
+              <p class="album__cat" :lang="textLang(a.category)">{{ a.category }}</p>
+              <h3 class="album__title" :lang="textLang(a.title)">{{ a.title }}</h3>
+              <p class="album__date">{{ albumDateDisplay(a) }}</p>
+            </NuxtLink>
+          </div>
         </div>
         <p v-if="filtered.length === 0" class="empty">{{ t('albums.noAlbums') }}</p>
 
@@ -337,8 +365,9 @@ useSeoMeta({
 .feature__view { font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); width: fit-content; border-bottom: 1px solid rgba(232, 24, 110, 0.35); padding-bottom: 3px; transition: border-color 0.2s; }
 .feature:hover .feature__view { border-color: var(--accent); }
 
-.albums { column-count: 3; column-gap: 1.5rem; }
-.album { break-inside: avoid; margin-bottom: 2.75rem; cursor: pointer; display: block; text-decoration: none; color: var(--dark); }
+.albums { display: flex; gap: 1.5rem; align-items: flex-start; }
+.albums__col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2.75rem; }
+.album { cursor: pointer; display: block; text-decoration: none; color: var(--dark); }
 .album__stack { position: relative; margin-bottom: 1.1rem; }
 .album__stack::before, .album__stack::after { content: ''; position: absolute; inset: 0; background: var(--paper); border: 1px solid var(--subtle); z-index: 0; transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
 .album__stack::before { transform: translate(6px, 6px); }
@@ -363,7 +392,6 @@ useSeoMeta({
 .pager__status { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 
 @media (max-width: 1000px) {
-  .albums { column-count: 2; }
   .feature { grid-template-columns: 1fr; }
   .feature__img { min-height: 320px; }
 }
@@ -372,7 +400,6 @@ useSeoMeta({
   .page-head__body, .page-head__foot { padding-left: 1.5rem; padding-right: 1.5rem; }
   .page-head__foot { grid-template-columns: 1fr; }
   .page-head__stats { justify-content: flex-start; }
-  .albums { column-count: 1; }
   .filter { justify-content: flex-start; }
   .index-bar { flex-direction: column; align-items: flex-start; }
 }

@@ -5,6 +5,7 @@ interface Album {
   title: string
   category: string
   date: string
+  dateEnd?: string
   location?: string
   excerpt: string
   coverSrc: string
@@ -13,6 +14,7 @@ interface Album {
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
+const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.album.dateEnd))
 
 // Flatten rows/cells in canvas order, keeping row/cell coordinates for the
 // admin preview selection and the cell span for print sizing.
@@ -67,7 +69,7 @@ function plateSizes(span: number) {
       <h1 class="dk-head__title" :lang="textLang(album.title)">{{ album.title }}</h1>
       <p v-if="album.excerpt" class="dk-head__excerpt" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
       <div class="dk-head__meta">
-        <span>{{ album.date }}</span><span class="dot" />
+        <span>{{ dateDisplay }}</span><span class="dot" />
         <span>{{ t('albums.metaFrames', { count: totalImages }) }}</span>
         <template v-if="album.location"><span class="dot" /><span>{{ album.location }}</span></template>
       </div>

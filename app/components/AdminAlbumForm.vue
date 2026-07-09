@@ -31,6 +31,7 @@ function isISODate(value?: string | null) {
 function normalizeInitialAlbum(input: AlbumInput): AlbumInput {
   const album = structuredClone(toRaw(input))
   if (!isISODate(album.date)) album.date = isISODate(album.published) ? album.published : ''
+  if (!isISODate(album.dateEnd)) album.dateEnd = ''
   if (!isISODate(album.published)) album.published = album.date || todayISO()
   album.visibility = album.visibility ?? 'public'
   album.placement = 'gallery'
@@ -49,6 +50,7 @@ function blank(): AlbumInput {
     title: '',
     category: '',
     date: '',
+    dateEnd: '',
     published: todayISO(),
     visibility: 'draft',
     location: '',
@@ -92,10 +94,11 @@ const dragOverRowIndex = ref<number | null>(null)
 const dragOverCellIndex = ref<{ row: number, cell: number } | null>(null)
 
 // Content editing refs
-const activeField = ref<'title' | 'category' | 'date' | 'location' | 'excerpt'>('title')
+const activeField = ref<'title' | 'category' | 'date' | 'dateEnd' | 'location' | 'excerpt'>('title')
 const titleInput = ref<HTMLTextAreaElement | null>(null)
 const categoryInput = ref<HTMLInputElement | null>(null)
 const dateInput = ref<FocusSelectable | null>(null)
+const dateEndInput = ref<FocusSelectable | null>(null)
 const publishedInput = ref<FocusSelectable | null>(null)
 const locationInput = ref<HTMLInputElement | null>(null)
 const excerptInput = ref<HTMLTextAreaElement | null>(null)
@@ -114,6 +117,10 @@ watch(publishedMatchesEvent, (enabled) => {
 })
 watch(() => form.date, (date) => {
   if (publishedMatchesEvent.value) form.published = date || ''
+  if (form.dateEnd && date && form.dateEnd < date) form.dateEnd = ''
+})
+watch(() => form.dateEnd, (dateEnd) => {
+  if (dateEnd && form.date && dateEnd < form.date) form.dateEnd = ''
 })
 watch(() => form.published, (published) => {
   if (publishedMatchesEvent.value && published !== form.date) publishedMatchesEvent.value = false
@@ -550,6 +557,7 @@ const previewAlbum = computed(() => ({
   title: form.title || t('adminForm.titlePlaceholder'),
   category: form.category || t('adminForm.categoryPlaceholder'),
   date: form.date || t('adminForm.datePlaceholder'),
+  dateEnd: form.dateEnd,
   location: form.location,
   excerpt: form.excerpt || t('adminForm.excerptPlaceholder'),
   coverSrc: form.coverSrc || form.rows.flatMap(r => r.cells).find(c => c.type === 'image' && c.src)?.src || PLACEHOLDER_IMG,
@@ -953,6 +961,7 @@ function trimmedAlbumPayload(): AlbumInput {
   payload.title = payload.title.trim()
   payload.category = payload.category.trim()
   payload.date = payload.date.trim()
+  payload.dateEnd = payload.dateEnd?.trim() || undefined
   payload.published = payload.published.trim()
   payload.location = payload.location.trim()
   payload.excerpt = payload.excerpt.trim()
@@ -975,6 +984,7 @@ function onSubmit() {
   if (!form.category.trim()) missing.push(t('adminEditor.fieldCategory'))
   if (!form.date.trim()) missing.push(t('adminEditor.fieldDate'))
   if (!form.published) missing.push(t('adminEditor.fieldPublished'))
+  if (form.dateEnd && form.date && form.dateEnd < form.date) missing.push(t('adminEditor.fieldDateEnd'))
   if (missing.length) {
     validationError.value = t('adminEditor.validationMissing', { fields: missing.join(', ') })
     return
@@ -1338,6 +1348,10 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
         <div class="field" :class="{ active: activeField === 'date' }">
           <label>{{ t('adminForm.dateDisplay') }}</label>
           <UiDateInput ref="dateInput" v-model="form.date" @focus="activeField = 'date'" />
+        </div>
+        <div class="field" :class="{ active: activeField === 'dateEnd' }">
+          <label>{{ t('adminForm.dateEnd') }} <span class="opt">{{ t('adminForm.dateEndOptional') }}</span></label>
+          <UiDateInput ref="dateEndInput" v-model="form.dateEnd" :disabled="!form.date" @focus="activeField = 'dateEnd'" />
         </div>
         <div class="field" :class="{ active: activeField === 'location' }">
           <label>{{ t('adminForm.location') }} <span class="opt">{{ t('adminForm.locationOptional') }}</span></label>

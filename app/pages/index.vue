@@ -208,6 +208,9 @@ useSeoMeta({
       >
         <div class="construction-notice__backdrop" @click="dismissConstructionNotice" />
         <section class="construction-notice__panel">
+          <div class="construction-notice__mark" aria-hidden="true">
+            <Icon name="heroicons:wrench-screwdriver" />
+          </div>
           <p class="construction-notice__kicker">CU PHOTOCLUB / NOTICE</p>
           <h2 id="construction-title">{{ t('home.constructionTitle') }}</h2>
           <p>
@@ -281,6 +284,22 @@ useSeoMeta({
   border-top: 2px solid var(--accent);
   padding: clamp(1.5rem, 5vw, 2.4rem);
   box-shadow: 0 1.5rem 4rem rgba(12, 12, 10, 0.34);
+}
+
+.construction-notice__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  margin-bottom: 1.2rem;
+  border: 1px solid var(--subtle);
+  color: var(--accent);
+}
+
+.construction-notice__mark :deep(svg) {
+  width: 1.2rem;
+  height: 1.2rem;
+  stroke-width: 1.45;
 }
 
 .construction-notice__kicker {

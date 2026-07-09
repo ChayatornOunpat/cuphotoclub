@@ -38,6 +38,7 @@ export interface Album {
   title: string
   category: string
   date: string // ISO date (YYYY-MM-DD) shown on the album
+  dateEnd?: string // optional ISO date (YYYY-MM-DD) for multi-day albums
   published: string // ISO date (sorting)
   visibility: ContentStatus // draft = admin only, link-only = direct URL, public = listed
   location?: string

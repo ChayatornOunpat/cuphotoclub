@@ -156,6 +156,7 @@ export const contentAlbums = sqliteTable('content_albums', {
   title: text('title').notNull(),
   category: text('category').notNull(),
   date: text('date').notNull(),
+  dateEnd: text('date_end'),
   published: text('published').notNull(),
   visibility: text('visibility').$type<ContentStatus>().notNull().default('public'),
   location: text('location'),

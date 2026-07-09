@@ -61,6 +61,10 @@ function imageCount(album: NonNullable<typeof albums.value>[number]) {
   return album.rows.reduce((n, r) => n + r.cells.filter(c => c.type === 'image').length, 0)
 }
 
+function albumDateDisplay(album: NonNullable<typeof albums.value>[number]) {
+  return formatAlbumDateRange(album.date, album.dateEnd)
+}
+
 async function del(id: string, title: string) {
   if (!confirm(t('admin.deleteConfirm', { title }))) return
   deleting.value = id
@@ -123,7 +127,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           <td><span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span></td>
           <td><span class="pill">{{ a.style }}</span></td>
           <td>{{ imageCount(a) }}</td>
-          <td class="t-muted">{{ a.date }}</td>
+          <td class="t-muted">{{ albumDateDisplay(a) }}</td>
           <td class="t-actions">
             <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
             <NuxtLink :to="localePath(`/admin/albums/${a.slug}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
@@ -139,7 +143,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
       <article v-for="a in visibleAlbums" :key="a.id" class="card">
         <img v-if="coverFor(a)" :src="coverFor(a) as string" :alt="a.title">
         <div class="card__body">
-          <p class="card__meta">{{ a.category }} · {{ a.date }}</p>
+          <p class="card__meta">{{ a.category }} · {{ albumDateDisplay(a) }}</p>
           <h2 :class="{ 'card__title--draft': !a.title }">{{ a.title || t('admin.untitledDraft') }}</h2>
           <p>{{ a.excerpt }}</p>
           <div class="card__facts">

@@ -11,6 +11,7 @@ const props = defineProps<{
   albumTitle: string
   albumCover: string
   albumDate: string
+  albumDateEnd?: string
   photoCount: number
   /** The specific photo the user clicked (shown as hero) */
   clickedSrc: string
@@ -27,12 +28,7 @@ const albumPath = computed(() => localePath(`/albums/${props.albumId}`))
 
 const formattedDate = computed(() => {
   if (!props.albumDate) return ''
-  try {
-    const d = new Date(props.albumDate)
-    return d.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' })
-  } catch {
-    return props.albumDate
-  }
+  return formatAlbumDateRange(props.albumDate, props.albumDateEnd)
 })
 
 const dialogRef = ref<HTMLElement | null>(null)
