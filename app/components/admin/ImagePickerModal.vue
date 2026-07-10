@@ -166,7 +166,8 @@ function selectionOrder(key: string) {
                     :aria-pressed="thumbnailSize === option.value"
                     @click="thumbnailSize = option.value"
                   >
-                    {{ t(option.labelKey) }}
+                    <span class="picker__size-mark" :class="`picker__size-mark--${option.value}`" aria-hidden="true" />
+                    <span>{{ t(option.labelKey) }}</span>
                   </button>
                 </div>
               </div>
@@ -256,10 +257,10 @@ function selectionOrder(key: string) {
   top: 0;
   z-index: 2;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.7rem 0.9rem;
+  gap: 1.25rem;
+  padding: 0.78rem 0.95rem;
   border-bottom: 1px solid var(--subtle);
   background: var(--body-bg);
 }
@@ -267,7 +268,7 @@ function selectionOrder(key: string) {
 .picker__controls {
   display: flex;
   align-items: flex-end;
-  gap: 0.8rem;
+  gap: 1.15rem;
   flex-wrap: wrap;
 }
 .picker__sort {
@@ -284,7 +285,7 @@ function selectionOrder(key: string) {
   color: var(--muted);
 }
 .picker__sort select {
-  min-height: 2.1rem;
+  min-height: 2.2rem;
   min-width: 10.5rem;
   border: 1px solid var(--subtle);
   background: #fff;
@@ -304,33 +305,71 @@ function selectionOrder(key: string) {
   gap: 0.3rem;
 }
 .picker__size-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  min-height: 2.1rem;
+  display: flex;
+  min-height: 2.2rem;
   border: 1px solid var(--subtle);
   background: #fff;
 }
 .picker__size-options button {
-  min-width: 3.2rem;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.36rem;
+  min-width: 4.6rem;
   border: 0;
   border-left: 1px solid var(--subtle);
   background: transparent;
-  color: var(--muted);
+  color: color-mix(in srgb, var(--muted) 88%, var(--dark));
   font-family: var(--font-sans);
-  font-size: 0.58rem;
-  letter-spacing: 0.12em;
+  font-size: 0.55rem;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   cursor: pointer;
+  transition: color 0.15s, background 0.15s;
 }
 .picker__size-options button:first-child {
   border-left: 0;
 }
 .picker__size-options button:hover {
   color: var(--dark);
+  background: color-mix(in srgb, var(--paper) 48%, #fff);
 }
 .picker__size-options button.is-active {
-  background: var(--dark);
-  color: #fff;
+  background: color-mix(in srgb, var(--accent) 7%, #fff);
+  color: var(--dark);
+}
+.picker__size-options button.is-active::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  right: -1px;
+  height: 2px;
+  background: var(--accent);
+}
+.picker__size-mark {
+  display: block;
+  flex: 0 0 auto;
+  border: 1px solid currentColor;
+  opacity: 0.72;
+}
+.picker__size-mark--small {
+  width: 0.52rem;
+  height: 0.42rem;
+}
+.picker__size-mark--medium {
+  width: 0.68rem;
+  height: 0.5rem;
+}
+.picker__size-mark--large {
+  width: 0.84rem;
+  height: 0.58rem;
+}
+.picker__size-options button.is-active .picker__size-mark {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, #fff);
+  opacity: 1;
 }
 
 .picker__grid {
@@ -439,6 +478,10 @@ function selectionOrder(key: string) {
   }
   .picker__size-options {
     width: 100%;
+  }
+  .picker__size-options button {
+    flex: 1;
+    min-width: 0;
   }
   .picker__item {
     height: min(var(--picker-thumb-height), 150px);

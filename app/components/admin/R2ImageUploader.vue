@@ -52,20 +52,19 @@ interface UploadManifestItem {
   toUpload: File
   hash: string
   key: string
+  seq: number
   exists: boolean
   sessionId?: string
   itemId?: string
   status?: string
 }
 
-// Queue-order stamp sent with each upload. R2's uploadedAt records *completion*
-// time, which scrambles under parallel uploads — this seq is taken when a worker
-// pulls the file off the queue, so it preserves the order files were queued in.
-// Epoch-ms based so it sorts on the same axis as uploadedAt for legacy images.
-let lastSeq = 0
-function nextSeq() {
-  lastSeq = Math.max(Date.now(), lastSeq + 1)
-  return lastSeq
+// Queue-order stamp sent with each upload. R2's uploadedAt records completion
+// time, which scrambles under parallel uploads. Stamp from the original file
+// index before compression/upload workers start, so 300+ file batches remain
+// stable across session chunks and retries.
+function uploadOrderSeq(base: number, index: number) {
+  return base + index
 }
 
 function fileSignature(file: File) {
@@ -250,14 +249,15 @@ function chooseFiles() {
   if (!uploading.value && canAddMore.value) fileInput.value?.click()
 }
 
-async function createUploadSessionBatch(files: File[]) {
-  const prepared = await mapWithConcurrency(files, UPLOAD_CONCURRENCY, async (file) => {
+async function createUploadSessionBatch(files: File[], sessionStart: number, sequenceBase: number) {
+  const prepared = await mapWithConcurrency(files, UPLOAD_CONCURRENCY, async (file, index) => {
     const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
     return {
       file,
       toUpload,
       hash: await contentHash(toUpload),
       key: '',
+      seq: uploadOrderSeq(sequenceBase, sessionStart + index),
       exists: false
     }
   })
@@ -297,8 +297,7 @@ async function createUploadSessionBatch(files: File[]) {
 async function uploadPreparedFile(
   item: UploadManifestItem,
   uploadedKeys: string[],
-  uploadedKeySet: Set<string>,
-  seq = nextSeq()
+  uploadedKeySet: Set<string>
 ) {
   const signature = fileSignature(item.file)
   let stoppedByResourceLimit = false
@@ -318,7 +317,7 @@ async function uploadPreparedFile(
     }
 
     if (item.sessionId && item.itemId) {
-      const { key } = await uploadPreparedFileDirect(item, seq)
+      const { key } = await uploadPreparedFileDirect(item)
       if (!model.value.includes(key) && !uploadedKeySet.has(key)) {
         uploadedKeySet.add(key)
         uploadedKeys.push(key)
@@ -347,7 +346,7 @@ async function uploadPreparedFile(
   return stoppedByResourceLimit
 }
 
-async function uploadPreparedFileDirect(item: UploadManifestItem, seq: number) {
+async function uploadPreparedFileDirect(item: UploadManifestItem) {
   if (!item.sessionId || !item.itemId) throw new Error('Upload manifest item is missing session identity.')
 
   const base = `/api/admin/upload/sessions/${encodeURIComponent(item.sessionId)}/items/${encodeURIComponent(item.itemId)}`
@@ -358,7 +357,7 @@ async function uploadPreparedFileDirect(item: UploadManifestItem, seq: number) {
     upload?: { url: string, headers: Record<string, string>, expiresAt: string }
   }>(`${base}/presign`, {
     method: 'POST',
-    body: { seq }
+    body: { seq: item.seq }
   })
 
   if (presigned.duplicate || presigned.status === 'exists' || presigned.status === 'uploaded') {
@@ -393,7 +392,7 @@ function markUploadStopped(files: File[]) {
   }
 }
 
-async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet: Set<string>) {
+async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet: Set<string>, sequenceBase: number) {
   for (let sessionStart = 0; sessionStart < files.length; sessionStart += UPLOAD_SESSION_SIZE) {
     if (shouldStopCurrentUpload) {
       markUploadStopped(files.slice(sessionStart))
@@ -409,7 +408,7 @@ async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet:
     const sessionFiles = files.slice(sessionStart, sessionStart + UPLOAD_SESSION_SIZE)
     let preparedSession: Awaited<ReturnType<typeof createUploadSessionBatch>>
     try {
-      preparedSession = await createUploadSessionBatch(sessionFiles)
+      preparedSession = await createUploadSessionBatch(sessionFiles, sessionStart, sequenceBase)
     } catch (err) {
       const message = uploadErrorMessage(err)
       for (const file of sessionFiles) {
@@ -471,6 +470,8 @@ async function upload(files: File[], retry = false) {
   let batch = images
   const allUploadedKeys: string[] = []
   const uploadedKeySet = new Set<string>()
+  const sequenceBase = Date.now()
+  let sequenceOffset = 0
 
   while (batch.length) {
     // model isn't updated until after the loop, so count this run's uploads too.
@@ -482,7 +483,8 @@ async function upload(files: File[], retry = false) {
 
     batch = batch.slice(toProcess.length)
 
-    await uploadMany(toProcess, allUploadedKeys, uploadedKeySet)
+    await uploadMany(toProcess, allUploadedKeys, uploadedKeySet, sequenceBase + sequenceOffset)
+    sequenceOffset += toProcess.length
 
     if (shouldStopCurrentUpload) break
     if (!props.multiple) break

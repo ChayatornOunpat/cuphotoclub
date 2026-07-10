@@ -95,7 +95,25 @@ footer {
 }
 
 @media (max-width: 720px) {
-  .footer__grid { grid-template-columns: 1fr 1fr; }
-  .footer__bottom { flex-direction: column; gap: 0.5rem; }
+  footer { padding: 3rem 1.5rem 2rem; }
+  .footer__grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem 1.5rem;
+    margin-bottom: 2.25rem;
+  }
+  /* Brand + tagline spans the full width above the link columns */
+  .footer__grid > :first-child { grid-column: 1 / -1; }
+  .footer__col h4 { margin-bottom: 0.85rem; }
+  .footer__bottom {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 1.5rem;
+  }
+}
+
+@media (max-width: 420px) {
+  footer { padding: 2.5rem 1.25rem 1.75rem; }
+  .footer__tagline { font-size: 0.72rem; }
+  .footer__col a { font-size: 0.8rem; }
 }
 </style>
