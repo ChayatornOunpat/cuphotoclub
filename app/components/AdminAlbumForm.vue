@@ -72,6 +72,7 @@ const photoManagerOpen = ref(false)
 const coverPickerOpen = ref(false)
 const cellPickerOpen = ref(false)
 const bulkPickerOpen = ref(false)
+const clearPlacedOpen = ref(false)
 const smartFrameAutofill = ref(true)
 
 // Editing state
@@ -267,6 +268,15 @@ const mediaItems = computed(() => {
 })
 
 const hasMedia = computed(() => mediaItems.value.length > 0)
+const placedImageCount = computed(() => {
+  let count = form.coverSrc ? 1 : 0
+  for (const row of form.rows) {
+    for (const cell of row.cells) {
+      if (cell.type === 'image' && cell.src) count++
+    }
+  }
+  return count
+})
 
 function mergeMediaKeys(keys: string[]) {
   uploadedMediaKeys.value = [...new Set([...uploadedMediaKeys.value, ...keys])]
@@ -528,6 +538,18 @@ async function appendAutoFrames(keys: string[]) {
 
 function onBulkPick(keys: string[]) {
   appendAutoFrames(keys)
+}
+
+function clearPlacedImages() {
+  form.coverSrc = ''
+  form.rows = form.rows
+    .map(row => ({
+      cells: row.cells.filter(cell => cell.type !== 'image')
+    }))
+    .filter(row => row.cells.length > 0)
+  clearCellSelection()
+  dockHidden.value = true
+  clearPlacedOpen.value = false
 }
 
 onMounted(loadMediaKeys)
@@ -1211,6 +1233,15 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           <Icon name="heroicons:squares-plus" class="bulk-fill-btn__icon" />
           <span>{{ t('adminForm.autofillFrames') }}</span>
         </button>
+        <button
+          type="button"
+          class="clear-placed-btn"
+          :disabled="placedImageCount === 0"
+          @click="clearPlacedOpen = true"
+        >
+          <Icon name="heroicons:x-mark" class="clear-placed-btn__icon" />
+          <span>{{ t('adminForm.clearPlacedImages') }}</span>
+        </button>
         <label v-if="isEssay" class="smart-fill-toggle">
           <input v-model="smartFrameAutofill" type="checkbox">
           <span>
@@ -1526,6 +1557,19 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       <div class="row-delete-confirm__actions">
         <UiButton variant="secondary" @click="pendingRowDelete = null">{{ t('admin.cancel') }}</UiButton>
         <UiButton variant="danger" @click="confirmRemoveRow">{{ t('admin.delete') }}</UiButton>
+      </div>
+    </UiModal>
+
+    <UiModal
+      v-model="clearPlacedOpen"
+      :title="t('adminForm.clearPlacedImagesTitle')"
+    >
+      <p class="row-delete-confirm__body">
+        {{ t('adminForm.clearPlacedImagesBody', { count: placedImageCount }) }}
+      </p>
+      <div class="row-delete-confirm__actions">
+        <UiButton variant="secondary" @click="clearPlacedOpen = false">{{ t('admin.cancel') }}</UiButton>
+        <UiButton variant="danger" :disabled="placedImageCount === 0" @click="clearPlacedImages">{{ t('adminForm.clearPlacedImagesConfirm') }}</UiButton>
       </div>
     </UiModal>
 
@@ -1930,6 +1974,35 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   background: color-mix(in srgb, var(--dark) 4%, transparent);
 }
 .bulk-fill-btn__icon { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
+
+.clear-placed-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+  padding: 0.48rem 0.75rem;
+  border: 1px solid color-mix(in srgb, #b0243c 42%, var(--subtle));
+  background: transparent;
+  color: #8f2133;
+  font-family: var(--font-sans);
+  font-size: 0.44rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, opacity 0.15s;
+}
+.clear-placed-btn:hover:not(:disabled) {
+  border-color: #b0243c;
+  background: color-mix(in srgb, #b0243c 6%, transparent);
+  color: #b0243c;
+}
+.clear-placed-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+.clear-placed-btn__icon { width: 0.78rem; height: 0.78rem; flex-shrink: 0; }
 
 .smart-fill-toggle {
   display: grid;
