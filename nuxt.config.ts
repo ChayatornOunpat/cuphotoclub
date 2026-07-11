@@ -53,7 +53,26 @@ export default defineNuxtConfig({
       }
     },
     '/images/**': { headers: { 'Cache-Control': 'public, max-age=31536000, immutable' } },
-    '/api/settings': { cache: { maxAge: 60 } }
+    '/api/settings': { cache: { maxAge: 60 } },
+
+    // Public pages have no auth-dependent SSR (no page/component reads the
+    // session), so serve them from an edge cache and revalidate in the
+    // background. Without this, every visit runs a fresh SSR Function and a
+    // traffic burst trips Cloudflare's per-request resource limit (Error 1102).
+    // Admin routes and dynamic APIs above are intentionally left uncached.
+    '/': { swr: 120 },
+    '/about': { swr: 300 },
+    '/contact': { swr: 300 },
+    '/members': { swr: 300 },
+    '/members/**': { swr: 300 },
+    '/albums': { swr: 120 },
+    '/albums/**': { swr: 120 },
+    '/activities': { swr: 120 },
+    '/activities/**': { swr: 120 },
+    '/blog': { swr: 120 },
+    '/blog/**': { swr: 120 },
+    '/posts': { swr: 120 },
+    '/posts/**': { swr: 120 }
   },
 
   // Private (server-only) config.
