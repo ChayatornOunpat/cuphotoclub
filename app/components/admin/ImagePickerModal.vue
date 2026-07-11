@@ -41,9 +41,16 @@ const thumbnailSize = ref<ThumbnailSize>('medium')
 const lastSelectedKey = ref<string | null>(null)
 
 // orderAt is the upload queue-order stamp; uploadedAt (completion time) covers
-// images uploaded before the stamp existed.
+// images uploaded before the stamp existed. An image with neither is almost
+// always a just-uploaded object whose R2 metadata hasn't propagated yet — treat
+// it as the newest so it doesn't leap to the front of oldest-first ordering.
 function imageTime(image: LibraryImage) {
-  return image.orderAt ?? (image.uploadedAt ? new Date(image.uploadedAt).getTime() : 0)
+  if (image.orderAt && image.orderAt > 0) return image.orderAt
+  if (image.uploadedAt) {
+    const uploaded = new Date(image.uploadedAt).getTime()
+    if (uploaded > 0) return uploaded
+  }
+  return Number.MAX_SAFE_INTEGER
 }
 
 const sortedImages = computed(() => {
