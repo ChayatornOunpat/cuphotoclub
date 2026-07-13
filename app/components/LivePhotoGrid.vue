@@ -50,6 +50,10 @@ interface Block {
 interface GridConfig { cols: number, rows: number, rowHeight: number }
 const GAP = 3
 
+interface PreloadedGridImage {
+  ratio: number
+}
+
 function currentGridConfig(): GridConfig {
   const w = window.innerWidth
   if (w <= 460) return { cols: 4, rows: 11, rowHeight: 64 }
@@ -301,6 +305,37 @@ function nextImage(): string | null {
   return src
 }
 
+async function preloadGridImage(src: string): Promise<PreloadedGridImage> {
+  const img = new Image()
+  img.decoding = 'async'
+  img.loading = 'eager'
+
+  const loaded = new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error(`Unable to preload photo grid image: ${src}`))
+  })
+
+  img.src = src
+  if (!img.complete) await loaded
+
+  // `onload` means the bytes arrived, but the next paint can still miss while
+  // the browser decodes. Wait for decode before Vue flips the visible face.
+  if (typeof img.decode === 'function') {
+    await img.decode().catch(() => undefined)
+  }
+
+  if (!img.naturalWidth || !img.naturalHeight) {
+    throw new Error(`Unable to read photo grid image dimensions: ${src}`)
+  }
+
+  return { ratio: img.naturalWidth / img.naturalHeight }
+}
+
+function releaseImage(src: string) {
+  shown.delete(src)
+  if (!queue.value.includes(src)) queue.value.push(src)
+}
+
 function crossfadeInPlace(block: Block, src: string) {
   const idx = blocks.value.findIndex(b => b.id === block.id)
   if (idx === -1) return
@@ -422,27 +457,28 @@ function trySplit(block: Block, src: string): boolean {
   return true
 }
 
-function applySwap(reservedId: number, src: string, targetShape: SizeClass) {
+function applySwap(reservedId: number, src: string, targetShape: SizeClass): boolean {
   // The block may have been absorbed as a merge neighbor by a *different*
   // concurrent swap since it was reserved — bail out gracefully rather than
   // operating on cells that now belong to another block.
   const block = blocks.value.find(b => b.id === reservedId)
-  if (!block) return
+  if (!block) return false
 
   if (block.shape === targetShape) {
     crossfadeInPlace(block, src)
-    return
+    return true
   }
 
   const targetArea = DIMS[targetShape].w * DIMS[targetShape].h
   const blockArea = DIMS[block.shape].w * DIMS[block.shape].h
 
-  if (targetShape !== 'sm' && tryReshape(block, targetShape, src)) return
-  if (targetArea < blockArea && trySplit(block, src)) return
+  if (targetShape !== 'sm' && tryReshape(block, targetShape, src)) return true
+  if (targetArea < blockArea && trySplit(block, src)) return true
 
   // No compatible footprint to reshape into — just crossfade in the existing
   // slot rather than leaving the cell blank.
   crossfadeInPlace(block, src)
+  return true
 }
 
 // `reserved` holds block ids already claimed by other swaps still in flight
@@ -456,12 +492,17 @@ function performSwap(reserved: Set<number>) {
 
   const src = nextImage()
   if (!src) return
-  const preload = new Image()
-  preload.onload = () => {
-    const ratio = preload.naturalWidth / preload.naturalHeight || 1
-    applySwap(block.id, src, shapeForRatio(ratio))
-  }
-  preload.src = src
+  void preloadGridImage(src)
+    .then(({ ratio }) => {
+      if (!shouldRun()) {
+        releaseImage(src)
+        return
+      }
+      if (!applySwap(block.id, src, shapeForRatio(ratio))) releaseImage(src)
+    })
+    .catch(() => {
+      releaseImage(src)
+    })
 }
 
 function tick() {
@@ -626,14 +667,16 @@ onBeforeUnmount(() => {
             v-if="block.layers[0]"
             :src="block.layers[0]"
             alt=""
-            loading="lazy"
+            loading="eager"
+            decoding="async"
             class="cube__face cube__face--front"
           >
           <img
             v-if="block.layers[1]"
             :src="block.layers[1]"
             alt=""
-            loading="lazy"
+            loading="eager"
+            decoding="async"
             class="cube__face cube__face--back"
           >
         </div>
@@ -677,6 +720,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   perspective: 800px;
   cursor: pointer;
+  background: var(--body-bg, #0c0c0a);
 }
 .photogrid__cell:hover,
 .photogrid__cell:focus-visible {
@@ -757,6 +801,7 @@ onBeforeUnmount(() => {
      this transition never competes with rotateY. Composing scale after the
      face's own rotateY keeps backface-visibility working. */
   transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--body-bg, #0c0c0a);
 }
 .cube__face--front {
   transform: rotateY(0deg);
