@@ -46,6 +46,7 @@ const autoCompress = ref(true)
 let resourcePausePromise: Promise<void> | null = null
 let resourcePauseTimer: ReturnType<typeof setInterval> | null = null
 let shouldStopCurrentUpload = false
+const fileOrderCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
 interface UploadManifestItem {
   file: File
@@ -69,6 +70,18 @@ function uploadOrderSeq(base: number, index: number) {
 
 function fileSignature(file: File) {
   return `${file.name}:${file.size}:${file.lastModified}`
+}
+
+function fileOrderName(file: File) {
+  return (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
+}
+
+function normalizeUploadOrder(files: File[]) {
+  return [...files].sort((a, b) =>
+    fileOrderCollator.compare(fileOrderName(a), fileOrderName(b))
+      || a.lastModified - b.lastModified
+      || a.size - b.size
+  )
 }
 
 function prepareId(file: File) {
@@ -535,7 +548,7 @@ function onDragOver() {
 function onDrop(e: DragEvent) {
   dragOver.value = false
   if (uploading.value || !canAddMore.value || !e.dataTransfer?.files?.length) return
-  upload(Array.from(e.dataTransfer.files))
+  upload(normalizeUploadOrder(Array.from(e.dataTransfer.files)))
 }
 </script>
 
