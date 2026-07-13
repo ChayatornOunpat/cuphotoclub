@@ -1,4 +1,4 @@
-function decodePathSegment(value: string): string {
+export function decodePathSegment(value: string): string {
   let current = value
   for (let i = 0; i < 2; i++) {
     try {

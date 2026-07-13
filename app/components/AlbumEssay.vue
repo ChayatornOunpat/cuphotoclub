@@ -23,17 +23,8 @@ interface Album {
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number, draggableCells?: boolean }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
-const coverAspect = ref<number | null>(null)
-let coverMeasureId = 0
 const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.album.dateEnd))
-
-const coverOrientation = computed(() => {
-  const aspect = coverAspect.value
-  if (!aspect) return 'landscape'
-  if (aspect < 0.82) return 'portrait'
-  if (aspect < 1.18) return 'square'
-  return 'landscape'
-})
+const { coverOrientation } = useCoverOrientation(() => props.album.coverSrc)
 
 // Sequential image number keyed by "ri-ci"
 const imageNumbers = computed(() => {
@@ -74,25 +65,6 @@ const excerptStyle = computed(() => {
   return { textAlign: align, fontFamily: font === 'sans' ? 'var(--font-sans)' : 'var(--font-serif)' }
 })
 
-function measureCover(src: string) {
-  const id = ++coverMeasureId
-  coverAspect.value = null
-  if (!import.meta.client || !src) return
-
-  const img = new Image()
-  img.onload = () => {
-    if (id !== coverMeasureId) return
-    const width = img.naturalWidth || img.width
-    const height = img.naturalHeight || img.height
-    coverAspect.value = width > 0 && height > 0 ? width / height : null
-  }
-  img.onerror = () => {
-    if (id === coverMeasureId) coverAspect.value = null
-  }
-  img.src = src
-}
-
-watch(() => props.album.coverSrc, measureCover, { immediate: true })
 </script>
 
 <template>
@@ -147,7 +119,7 @@ watch(() => props.album.coverSrc, measureCover, { immediate: true })
             <div class="frame">
               <AppImg :src="cell.src || ''" :alt="cell.caption || album.title" :sizes="imgSizes(cell.span)" />
             </div>
-            <figcaption :lang="textLang(cell.caption)">
+            <figcaption v-if="cell.caption" :lang="textLang(cell.caption)">
               <span class="n">{{ pad(imageNumbers.get(`${ri}-${ci}`) ?? 0) }}</span>
               {{ cell.caption }}
             </figcaption>

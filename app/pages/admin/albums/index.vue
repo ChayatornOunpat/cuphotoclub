@@ -29,8 +29,16 @@ function previewPath(album: NonNullable<typeof albums.value>[number]) {
   // Live ('public') and 'link-only' albums are reachable on their real public
   // page (the API only 404s drafts), so open that directly — no preview/admin
   // chrome. Only drafts fall back to the admin preview route.
-  if (album.visibility === 'draft') return `${adminAlbumRoutePath(album.slug)}/preview`
-  return albumRoutePath(album.slug)
+  if (album.visibility === 'draft') return `${localizedAlbumBase('/admin/albums')}/${decodePathSegment(album.slug)}/preview`
+  return `${localizedAlbumBase('/albums')}/${decodePathSegment(album.slug)}`
+}
+
+function editPath(album: NonNullable<typeof albums.value>[number]) {
+  return `${localizedAlbumBase('/admin/albums')}/${decodePathSegment(album.slug)}`
+}
+
+function localizedAlbumBase(path: string) {
+  return localePath(path).replace(/\/$/, '')
 }
 
 function modifiedValue(album: NonNullable<typeof albums.value>[number]) {
@@ -153,8 +161,8 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           <td>{{ imageCount(a) }}</td>
           <td class="t-muted">{{ albumDateDisplay(a) }}</td>
           <td class="t-actions">
-            <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
-            <NuxtLink :to="localePath(adminAlbumRoutePath(a.slug))" class="link">{{ t('admin.edit') }}</NuxtLink>
+            <NuxtLink :to="previewPath(a)" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
+            <NuxtLink :to="editPath(a)" class="link">{{ t('admin.edit') }}</NuxtLink>
             <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title || t('admin.untitledDraft'))">
               {{ deleting === a.id ? '...' : t('admin.delete') }}
             </button>
@@ -176,8 +184,8 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
             <span>{{ a.style }}</span>
           </div>
           <div class="card__actions">
-            <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
-            <NuxtLink :to="localePath(adminAlbumRoutePath(a.slug))" class="link">{{ t('admin.edit') }}</NuxtLink>
+            <NuxtLink :to="previewPath(a)" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
+            <NuxtLink :to="editPath(a)" class="link">{{ t('admin.edit') }}</NuxtLink>
             <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title || t('admin.untitledDraft'))">
               {{ deleting === a.id ? '...' : t('admin.delete') }}
             </button>

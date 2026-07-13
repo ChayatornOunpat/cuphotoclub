@@ -15,6 +15,7 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 const cover = computed(() => props.album.coverSrc)
 const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.album.dateEnd))
+const { coverOrientation } = useCoverOrientation(() => cover.value)
 
 // ── Chapters: each text cell starts a new chapter titled by its content; the
 // images that follow belong to it. Albums without text cells render as one
@@ -72,36 +73,6 @@ const showChapterNav = computed(() => titledChapters.value.length >= 2)
 
 const pad = (n: number) => String(n).padStart(totalImages.value > 99 ? 3 : 2, '0')
 
-// ── Cover orientation (same treatment as the contact sheet header) ──
-const coverAspect = ref<number | null>(null)
-let coverMeasureId = 0
-
-const coverOrientation = computed(() => {
-  const aspect = coverAspect.value
-  if (!aspect) return 'landscape'
-  if (aspect < 0.82) return 'portrait'
-  if (aspect < 1.18) return 'square'
-  return 'landscape'
-})
-
-function measureCover(src: string) {
-  const id = ++coverMeasureId
-  coverAspect.value = null
-  if (!import.meta.client || !src) return
-  const img = new Image()
-  img.onload = () => {
-    if (id !== coverMeasureId) return
-    const width = img.naturalWidth || img.width
-    const height = img.naturalHeight || img.height
-    coverAspect.value = width > 0 && height > 0 ? width / height : null
-  }
-  img.onerror = () => {
-    if (id === coverMeasureId) coverAspect.value = null
-  }
-  img.src = src
-}
-watch(cover, measureCover, { immediate: true })
-
 // ── Live frame counter + active chapter ──
 const rootEl = ref<HTMLElement | null>(null)
 const currentFrame = ref(1)
@@ -135,7 +106,9 @@ function jumpTo(i: number) {
 // ── Lightbox ──
 const open = ref(false)
 const idx = ref(0)
+const lightboxRef = ref<HTMLElement | null>(null)
 const current = computed(() => allImages.value[idx.value])
+useFocusTrap(lightboxRef, open)
 
 function show(i: number) {
   if (props.disableNavigation) return
@@ -278,7 +251,7 @@ onUnmounted(() => {
     </section>
 
     <!-- LIGHTBOX -->
-    <div v-if="open" class="lb" role="dialog" aria-modal="true" @click.self="close">
+    <div v-if="open" ref="lightboxRef" class="lb" role="dialog" aria-modal="true" @click.self="close">
       <div class="lb__top">
         <div class="lb__identity">
           <span class="lb__counter"><b>{{ pad(idx + 1) }}</b> / {{ pad(totalImages) }}</span>

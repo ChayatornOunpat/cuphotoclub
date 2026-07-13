@@ -15,16 +15,7 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 const cover = computed(() => props.album.coverSrc)
 const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.album.dateEnd))
-const coverAspect = ref<number | null>(null)
-let coverMeasureId = 0
-
-const coverOrientation = computed(() => {
-  const aspect = coverAspect.value
-  if (!aspect) return 'landscape'
-  if (aspect < 0.82) return 'portrait'
-  if (aspect < 1.18) return 'square'
-  return 'landscape'
-})
+const { coverOrientation } = useCoverOrientation(() => cover.value)
 
 // Flat list of image cells with their row/cell coordinates for admin selection
 const imageCells = computed(() => {
@@ -43,7 +34,9 @@ const pad = (n: number) => String(n).padStart(2, '0')
 // Lightbox
 const open = ref(false)
 const idx = ref(0)
+const lightboxRef = ref<HTMLElement | null>(null)
 const current = computed(() => imageCells.value[idx.value])
+useFocusTrap(lightboxRef, open)
 
 function show(i: number) {
   if (props.disableNavigation) return
@@ -53,24 +46,6 @@ function show(i: number) {
 function close() { open.value = false }
 function prev() { show(idx.value - 1) }
 function next() { show(idx.value + 1) }
-
-function measureCover(src: string) {
-  const id = ++coverMeasureId
-  coverAspect.value = null
-  if (!import.meta.client || !src) return
-
-  const img = new Image()
-  img.onload = () => {
-    if (id !== coverMeasureId) return
-    const width = img.naturalWidth || img.width
-    const height = img.naturalHeight || img.height
-    coverAspect.value = width > 0 && height > 0 ? width / height : null
-  }
-  img.onerror = () => {
-    if (id === coverMeasureId) coverAspect.value = null
-  }
-  img.src = src
-}
 
 function onKey(e: KeyboardEvent) {
   if (!open.value) return
@@ -87,7 +62,6 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
   if (import.meta.client) document.body.style.overflow = ''
 })
-watch(cover, measureCover, { immediate: true })
 </script>
 
 <template>
@@ -133,7 +107,7 @@ watch(cover, measureCover, { immediate: true })
     </section>
 
     <!-- LIGHTBOX -->
-    <div v-if="open" class="lb" role="dialog" aria-modal="true" @click.self="close">
+    <div v-if="open" ref="lightboxRef" class="lb" role="dialog" aria-modal="true" @click.self="close">
       <div class="lb__top">
         <div class="lb__identity">
           <span class="lb__counter"><b>{{ pad(idx + 1) }}</b> / {{ pad(imageCells.length) }}</span>
