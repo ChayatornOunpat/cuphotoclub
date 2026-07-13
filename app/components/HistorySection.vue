@@ -15,7 +15,7 @@ defineProps<{
   <section id="history" class="history">
     <div class="wrap history__grid">
       <div class="history__photo">
-        <AppImg :src="history.image" alt="Archive" width="900" height="675" sizes="sm:100vw lg:50vw" eager />
+        <AppImg :src="history.image" alt="Archive" width="900" height="675" sizes="sm:100vw lg:50vw" optimize />
       </div>
       <div>
         <div class="eyebrow history__eyebrow">

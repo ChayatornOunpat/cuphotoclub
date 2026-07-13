@@ -14,11 +14,29 @@ const props = defineProps<{
   width?: string | number
   height?: string | number
   eager?: boolean
+  // Opt-in to Cloudflare Image Transformations. Only set this on *bounded*
+  // surfaces (hero pool, album covers, story/post cards, listings) — never on
+  // the ~8k-image album walls or the random flip-grid, or a month of traffic
+  // will blow through the 5,000 unique-transformations/month free tier.
+  optimize?: boolean
 }>()
 
 // R2 blob images are already served by the app's /images route. Render those
 // directly so covers do not depend on Nuxt Image's remote-domain allowlist.
 const isRoutedImage = computed(() => props.src?.startsWith('/images/'))
+
+// In production, routed images go through Cloudflare Image Transformations
+// (/cdn-cgi/image/ via the `cloudflare` Nuxt Image provider) so they get a
+// real srcset + auto WebP/AVIF instead of the full-size R2 original. If a
+// transform request fails (e.g. transformations not enabled on the zone),
+// fall back to serving the original.
+const transformFailed = ref(false)
+const useTransforms = computed(() =>
+  props.optimize === true
+  && isRoutedImage.value
+  && useRuntimeConfig().public.imageTransforms === true
+  && !transformFailed.value
+)
 
 const loaded = ref(false)
 const imgEl = ref<HTMLImageElement | null>(null)
@@ -35,8 +53,25 @@ onMounted(() => {
 </script>
 
 <template>
+  <NuxtImg
+    v-if="useTransforms"
+    provider="cloudflare"
+    format="auto"
+    :src="props.src"
+    :alt="props.alt ?? ''"
+    :sizes="props.sizes"
+    :width="props.width"
+    :height="props.height"
+    :loading="isEager ? 'eager' : 'lazy'"
+    :fetchpriority="isEager ? 'high' : 'auto'"
+    :preload="isEager ? true : undefined"
+    :class="{ 'app-img--done': done }"
+    class="app-img"
+    @load="markLoaded"
+    @error="transformFailed = true"
+  />
   <img
-    v-if="isRoutedImage"
+    v-else-if="isRoutedImage"
     ref="imgEl"
     :src="props.src"
     :alt="props.alt ?? ''"

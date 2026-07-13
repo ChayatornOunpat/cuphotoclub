@@ -24,7 +24,7 @@ defineProps<{
         <a :href="about.cta.to" class="btn-hybrid">{{ about.cta.label }} →</a>
       </div>
       <div class="about__photo">
-        <AppImg :src="about.image" alt="About" width="900" height="675" sizes="sm:100vw lg:50vw" eager />
+        <AppImg :src="about.image" alt="About" width="900" height="675" sizes="sm:100vw lg:50vw" optimize />
       </div>
     </div>
   </section>

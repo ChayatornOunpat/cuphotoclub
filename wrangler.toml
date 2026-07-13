@@ -15,6 +15,13 @@ binding = "KV"
 id = "ef64435cbd844ce1ae71fb7fd5c5fa0f"
 remote = true
 
+# Nitro swr route-rule cache (hub.cache). Without this binding the swr rules
+# only cache in per-isolate memory, so most visitors still hit a full SSR.
+[[kv_namespaces]]
+binding = "CACHE"
+id = "a3e533bb5602447b9a2eba0c4153a8a5"
+remote = true
+
 [[r2_buckets]]
 binding = "BLOB"
 bucket_name = "cuphotoclub-blob"

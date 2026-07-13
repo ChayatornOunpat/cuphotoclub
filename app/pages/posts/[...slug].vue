@@ -94,7 +94,7 @@ useSeoMeta({
       </header>
       <div v-if="post.image" class="std-hero">
         <AppImg :src="post.image" :alt="post.title" width="1200" height="800"
-          sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" eager />
+          sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" eager optimize />
       </div>
     </template>
 

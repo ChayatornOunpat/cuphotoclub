@@ -196,7 +196,7 @@ useSeoMeta({
     <!-- PAGE HEADER -->
     <header class="page-head" data-chrome-header>
       <div class="page-head__bg" data-parallax data-hero-dim>
-        <AppImg v-if="headerBg" :src="headerBg" alt="" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="page-head__img" eager />
+        <AppImg v-if="headerBg" :src="headerBg" alt="" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="page-head__img" eager optimize />
       </div>
       <div class="page-head__body">
         <p class="page-head__kicker">{{ t('albums.pageKicker') }}</p>
@@ -307,7 +307,7 @@ useSeoMeta({
         <NuxtLink v-if="featured" :to="localizedPath(featured.path)" class="feature">
           <div class="feature__img">
             <span class="feature__flag">{{ t('albums.latest') }}</span>
-            <AppImg :src="coverOf(featured)" :alt="featured.title" sizes="sm:100vw lg:55vw" />
+            <AppImg :src="coverOf(featured)" :alt="featured.title" sizes="sm:100vw lg:55vw" optimize />
           </div>
           <div class="feature__body">
             <p class="feature__cat" :lang="textLang(featured.category)">{{ featured.category }}</p>
@@ -326,7 +326,7 @@ useSeoMeta({
             <NuxtLink v-for="a in col" :key="a.path" :to="localizedPath(a.path)" class="album">
               <div class="album__stack">
                 <div class="album__cover">
-                  <AppImg :src="coverOf(a)" :alt="a.title" sizes="sm:100vw md:50vw lg:33vw" />
+                  <AppImg :src="coverOf(a)" :alt="a.title" sizes="sm:100vw md:50vw lg:33vw" optimize />
                   <div class="album__view">{{ t('albums.viewAlbum') }}</div>
                 </div>
               </div>

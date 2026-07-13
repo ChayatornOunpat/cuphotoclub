@@ -25,7 +25,7 @@ const localePath = useLocalePath()
         <!-- Lead: newest item, album or post -->
         <NuxtLink v-if="lead" :to="lead.path" class="scard-lead">
           <div class="scard-lead__img">
-            <AppImg :src="lead.image" :alt="lead.title" width="1200" height="900" sizes="sm:100vw lg:55vw" />
+            <AppImg :src="lead.image" :alt="lead.title" width="1200" height="900" sizes="sm:100vw lg:55vw" optimize />
           </div>
           <div class="scard-lead__body">
             <p class="scard-lead__tag">{{ lead.tag }}</p>
@@ -38,7 +38,7 @@ const localePath = useLocalePath()
         <!-- Smaller cards: the rest of the feed -->
         <NuxtLink v-for="item in items" :key="item.path" :to="item.path" class="scard">
           <div class="scard__img">
-            <AppImg :src="item.image" :alt="item.title" width="800" height="550" sizes="sm:100vw lg:22vw" />
+            <AppImg :src="item.image" :alt="item.title" width="800" height="550" sizes="sm:100vw lg:22vw" optimize />
           </div>
           <p class="scard__tag">{{ item.tag }}</p>
           <h3 class="scard__title">{{ item.title }}</h3>

@@ -75,7 +75,7 @@ function plateSizes(span: number) {
       </div>
 
       <div v-if="album.coverSrc" class="dk-head__print">
-        <AppImg :src="album.coverSrc" :alt="album.title" sizes="xs:100vw sm:70vw lg:720px" eager />
+        <AppImg :src="album.coverSrc" :alt="album.title" sizes="xs:100vw sm:70vw lg:720px" eager optimize />
       </div>
       <div class="dk-head__scroll" aria-hidden="true" />
     </header>

@@ -30,7 +30,10 @@ export default defineNuxtConfig({
   hub: {
     db: { dialect: 'sqlite', applyMigrationsDuringDev: true },
     blob: true,
-    kv: true
+    kv: true,
+    // Persists Nitro's swr route-rule cache in the CACHE KV namespace (see
+    // wrangler.toml). Without it, swr only caches per-isolate in memory.
+    cache: true
   },
 
   nitro: {
@@ -98,7 +101,12 @@ export default defineNuxtConfig({
         : process.env.NODE_ENV === 'production'
           || process.env.NUXT_PUBLIC_REAL_DATA_ONLY === 'true'
           || process.env.NUXT_REAL_DATA_ONLY === 'true',
-      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === 'production' ? 'https://cuphotoclub.com' : 'http://localhost:3000')
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === 'production' ? 'https://cuphotoclub.com' : 'http://localhost:3000'),
+      // /cdn-cgi/image/ only exists behind the Cloudflare zone, never in dev.
+      // Set NUXT_PUBLIC_IMAGE_TRANSFORMS=false to opt out in production.
+      imageTransforms: process.env.NUXT_PUBLIC_IMAGE_TRANSFORMS === 'false'
+        ? false
+        : process.env.NODE_ENV === 'production'
     }
   },
 
@@ -129,8 +137,13 @@ export default defineNuxtConfig({
 
   // picsum: design placeholders. localhost / prod: R2 blob images are served
   // via a server route (/images/**), not from public/, so IPX must HTTP-fetch them.
+  // The `cloudflare` provider (used by AppImg for /images/** in production)
+  // rewrites through /cdn-cgi/image/ — Cloudflare Image Transformations must be
+  // enabled on the zone (dashboard → Images → Transformations).
   image: {
     domains: ['picsum.photos', 'localhost', 'cuphotoclub.com', 'www.cuphotoclub.com', 'cuphotoclub.pages.dev'],
+    cloudflare: { baseURL: '/' },
+    quality: 80
   },
 
   icon: {

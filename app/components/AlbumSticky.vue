@@ -73,7 +73,7 @@ onUnmounted(() => {
           <NuxtLink v-else :to="categoryAlbumsPath" :lang="textLang(album.category)">{{ album.category }}</NuxtLink><span>/</span>
           <span class="here" :lang="textLang(album.title)">{{ album.title }}</span>
         </div>
-        <div class="meta__thumb"><AppImg :src="cover" :alt="album.title" sizes="sm:100vw lg:360px" /></div>
+        <div class="meta__thumb"><AppImg :src="cover" :alt="album.title" sizes="sm:100vw lg:360px" optimize /></div>
         <p class="meta__cat" :lang="textLang(album.category)">{{ album.category }}</p>
         <h1 class="meta__title" :lang="textLang(album.title)">{{ album.title }}</h1>
         <p class="meta__excerpt" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>

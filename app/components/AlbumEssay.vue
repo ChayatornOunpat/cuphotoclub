@@ -72,10 +72,10 @@ const excerptStyle = computed(() => {
     <!-- COVER -->
     <header class="cover" :class="`cover--${coverOrientation}`" data-chrome-header>
       <div class="cover__bg" data-parallax data-hero-dim>
-        <AppImg :src="album.coverSrc" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="cover__img" eager />
+        <AppImg :src="album.coverSrc" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="cover__img" eager optimize />
       </div>
       <div v-if="coverOrientation !== 'landscape'" class="cover__subject" aria-hidden="true">
-        <AppImg :src="album.coverSrc" alt="" sizes="xs:100vw sm:70vw md:45vw lg:520px" class="cover__subject-img" eager />
+        <AppImg :src="album.coverSrc" alt="" sizes="xs:100vw sm:70vw md:45vw lg:520px" class="cover__subject-img" eager optimize />
       </div>
       <span v-if="disableNavigation" class="cover__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="cover__back">{{ t('albums.coverBack') }}</NuxtLink>

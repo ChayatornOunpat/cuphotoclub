@@ -667,7 +667,7 @@ onBeforeUnmount(() => {
             v-if="block.layers[0]"
             :src="block.layers[0]"
             alt=""
-            loading="eager"
+            loading="lazy"
             decoding="async"
             class="cube__face cube__face--front"
           >
@@ -675,7 +675,7 @@ onBeforeUnmount(() => {
             v-if="block.layers[1]"
             :src="block.layers[1]"
             alt=""
-            loading="eager"
+            loading="lazy"
             decoding="async"
             class="cube__face cube__face--back"
           >

@@ -147,10 +147,10 @@ onUnmounted(() => {
     <!-- COMPACT HEADER -->
     <header class="head" :class="`head--${coverOrientation}`" data-chrome-header>
       <div class="head__bg" data-parallax data-hero-dim>
-        <AppImg :src="cover" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="head__img" eager />
+        <AppImg :src="cover" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="head__img" eager optimize />
       </div>
       <div v-if="coverOrientation !== 'landscape'" class="head__subject" aria-hidden="true">
-        <AppImg :src="cover" alt="" sizes="xs:100vw sm:70vw md:38vw lg:420px" class="head__subject-img" eager />
+        <AppImg :src="cover" alt="" sizes="xs:100vw sm:70vw md:38vw lg:420px" class="head__subject-img" eager optimize />
       </div>
       <span v-if="disableNavigation" class="head__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="head__back">{{ t('albums.coverBack') }}</NuxtLink>

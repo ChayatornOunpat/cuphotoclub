@@ -10,9 +10,16 @@ const localePath = useLocalePath()
 const localizedPath = useLocalizedContentPath()
 const localizedSite = useLocalizedSite(site)
 
-const { data: home } = await useAsyncData('home', () =>
-  $fetch('/api/home').catch(() => ({ albums: [], posts: [], events: [] }))
-)
+// Both awaited fetches run in parallel — awaiting them one after another
+// would serialize two round trips into the SSR time.
+const [{ data: home }, { data: heroImagesData }] = await Promise.all([
+  useAsyncData('home', () =>
+    $fetch('/api/home').catch(() => ({ albums: [], posts: [], events: [] }))
+  ),
+  useAsyncData('hero-images', () =>
+    $fetch<{ images: string[] }>('/api/hero-images').catch(() => ({ images: [] }))
+  )
+])
 
 function imageSrc(key: string | null | undefined) {
   const value = key?.trim()
@@ -29,9 +36,6 @@ function albumPath(a: { slug: string }) {
 
 // ── Hero background: randomise from the admin-managed image pool.
 //    useState pins the seed on the server so client hydration matches.
-const { data: heroImagesData } = await useAsyncData('hero-images', () =>
-  $fetch<{ images: string[] }>('/api/hero-images').catch(() => ({ images: [] }))
-)
 const heroImageSeed = useState('hero-image-seed', () => Math.floor(Math.random() * 2147483647))
 const heroWithImage = computed(() => {
   const base = localizedSite.value?.hero
@@ -121,9 +125,17 @@ function dismissConstructionNotice() {
   if (import.meta.client) sessionStorage.setItem(constructionNoticeKey, '1')
 }
 
+function prewarmPhotoGridWhenIdle() {
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(() => void prewarmPhotoGrid(), { timeout: 3000 })
+    return
+  }
+  window.setTimeout(() => void prewarmPhotoGrid(), 1200)
+}
+
 onMounted(() => {
   onScroll()
-  void prewarmPhotoGrid()
+  prewarmPhotoGridWhenIdle()
   constructionNoticeOpen.value = sessionStorage.getItem(constructionNoticeKey) !== '1'
   window.addEventListener('scroll', onScroll, { passive: true })
 })
@@ -181,7 +193,7 @@ useSeoMeta({
             class="intro-photos__photo"
             :style="{ '--r': `${(i - 1) * 6}deg` }"
           >
-            <AppImg :src="a.cover" :alt="a.title" sizes="120px" />
+            <AppImg :src="a.cover" :alt="a.title" sizes="120px" optimize />
           </div>
         </div>
         <div class="intro-photos__text">
