@@ -103,6 +103,10 @@ function titleFor(block: Block): string {
 // ── Album mapping: track which album each image belongs to ──
 const albumMap = new Map<string, Omit<PhotoGridImage, 'src'>>()
 
+// Real aspect ratio (w/h) per src, measured by preloadGridImage — the preview
+// modal uses it to lay itself out for portrait vs landscape photos.
+const ratioBySrc = new Map<string, number>()
+
 let rows = 0
 let cols = 0
 let occupancy: number[][] = []
@@ -125,7 +129,8 @@ const modalData = ref({
   albumDate: '',
   albumDateEnd: '',
   photoCount: 0,
-  clickedSrc: ''
+  clickedSrc: '',
+  clickedRatio: 0
 })
 
 function openModal(src: string) {
@@ -138,7 +143,8 @@ function openModal(src: string) {
     albumDate: meta.albumDate,
     albumDateEnd: meta.albumDateEnd ?? '',
     photoCount: meta.photoCount,
-    clickedSrc: src
+    clickedSrc: src,
+    clickedRatio: ratioBySrc.get(src) ?? 0
   }
   modalOpen.value = true
 }
@@ -359,7 +365,9 @@ async function preloadGridImage(src: string): Promise<PreloadedGridImage> {
   }
 
   markFaceLoaded(src)
-  return { ratio: img.naturalWidth / img.naturalHeight }
+  const ratio = img.naturalWidth / img.naturalHeight
+  ratioBySrc.set(src, ratio)
+  return { ratio }
 }
 
 function releaseImage(src: string) {
@@ -734,6 +742,7 @@ onBeforeUnmount(() => {
       :album-date-end="modalData.albumDateEnd"
       :photo-count="modalData.photoCount"
       :clicked-src="modalData.clickedSrc"
+      :clicked-ratio="modalData.clickedRatio"
       @close="closeModal"
     />
   </div>

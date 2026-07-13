@@ -15,6 +15,8 @@ const props = defineProps<{
   photoCount: number
   /** The specific photo the user clicked (shown as hero) */
   clickedSrc: string
+  /** Real aspect ratio (w/h) of the clicked photo, when the grid knows it */
+  clickedRatio?: number
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +32,17 @@ const formattedDate = computed(() => {
   if (!props.albumDate) return ''
   return formatAlbumDateRange(props.albumDate, props.albumDateEnd)
 })
+
+// ── Orientation-aware layout ──
+// Landscape photos keep the stacked card with the hero at (roughly) its real
+// ratio. Portrait photos switch to a side-by-side card on wide screens so the
+// modal doesn't grow into a scrolling tower, and a 4:5 crop on mobile.
+const heroRatio = computed(() => {
+  const r = props.clickedRatio
+  if (!r || !Number.isFinite(r) || r <= 0) return 1.5
+  return Math.min(Math.max(r, 0.7), 1.9)
+})
+const isPortrait = computed(() => heroRatio.value < 0.95)
 
 const dialogRef = ref<HTMLElement | null>(null)
 let lastFocused: HTMLElement | null = null
@@ -80,10 +93,16 @@ watch(() => props.open, (open) => {
   if (import.meta.server) return
   if (open) {
     lastFocused = document.activeElement as HTMLElement | null
+    // Compensate for the vanishing scrollbar — otherwise the whole page
+    // (photo wall included) reflows sideways right as the enter transition
+    // starts, which reads as click lag on Windows.
+    const scrollbar = window.innerWidth - document.documentElement.clientWidth
     document.body.style.overflow = 'hidden'
+    if (scrollbar > 0) document.body.style.paddingRight = `${scrollbar}px`
     nextTick(() => dialogRef.value?.focus())
   } else {
     document.body.style.overflow = ''
+    document.body.style.paddingRight = ''
     lastFocused?.focus?.()
     lastFocused = null
   }
@@ -95,6 +114,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeydown)
   document.body.style.overflow = ''
+  document.body.style.paddingRight = ''
 })
 </script>
 
@@ -112,6 +132,7 @@ onBeforeUnmount(() => {
         <div
           ref="dialogRef"
           class="album-modal__content"
+          :class="{ 'album-modal__content--portrait': isPortrait }"
           tabindex="-1"
         >
           <button
@@ -124,12 +145,16 @@ onBeforeUnmount(() => {
             <Icon name="heroicons:x-mark" class="album-modal__close-icon" />
           </button>
 
-          <div class="album-modal__hero">
+          <div class="album-modal__hero" :style="isPortrait ? undefined : { aspectRatio: String(heroRatio) }">
+            <!-- eager: the clicked photo is already decoded on the wall, so the
+                 default blur-in reveal would only add compositing work while the
+                 modal's own enter transition is running. -->
             <AppImg
               :src="clickedSrc"
               :alt="albumTitle"
               sizes="(max-width: 600px) 100vw, 520px"
               class="album-modal__image"
+              eager
             />
           </div>
 
@@ -165,9 +190,10 @@ onBeforeUnmount(() => {
 .album-modal__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(12, 12, 10, 0.82);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  /* No backdrop-filter here: blurring the whole animated photo wall while the
+     modal's enter transition runs re-blurs every frame and makes the open
+     visibly stutter. A slightly deeper plain scrim reads the same. */
+  background: rgba(12, 12, 10, 0.88);
 }
 
 .album-modal__content {
@@ -223,9 +249,36 @@ onBeforeUnmount(() => {
 .album-modal__hero {
   position: relative;
   width: 100%;
+  /* Landscape default; the real (clamped) photo ratio comes in as an inline
+     style so wide frames aren't force-cropped to 3:2. */
   aspect-ratio: 3 / 2;
   overflow: hidden;
   background: #1a1a18;
+}
+
+/* Portrait photos: side-by-side card on wide screens (photo left, body right)
+   so the tall frame gets real height without turning the modal into a
+   scrolling tower. */
+@media (min-width: 601px) {
+  .album-modal__content--portrait {
+    width: min(100%, 780px);
+    display: grid;
+    grid-template-columns: minmax(0, 46%) 1fr;
+  }
+  .album-modal__content--portrait .album-modal__hero {
+    height: 100%;
+    min-height: 420px;
+    aspect-ratio: auto;
+  }
+  .album-modal__content--portrait .album-modal__body {
+    align-self: center;
+  }
+}
+/* Portrait on mobile: keep the bottom sheet, cap the hero to a 4:5 crop. */
+@media (max-width: 600px) {
+  .album-modal__content--portrait .album-modal__hero {
+    aspect-ratio: 4 / 5;
+  }
 }
 /* Soft top-and-bottom scrim: keeps the close button legible over bright
    frames and lets the featured photo blend into the body below. */
