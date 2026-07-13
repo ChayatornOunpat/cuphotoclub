@@ -55,15 +55,17 @@ export const defaultSite = {
           { label: 'History', to: '/#history' },
           { label: 'About', to: '/#about' },
           { label: 'Join', to: '/#about' },
-          { label: 'Contact', to: '#' }
+          { label: 'Contact', to: '/contact' },
+          { label: 'Developed By', to: '/developed-by' }
         ]
       },
       {
         title: 'Follow',
         links: [
-          { label: 'Instagram', to: '#' },
-          { label: 'Facebook', to: '#' },
-          { label: 'YouTube', to: '#' }
+          { label: 'Instagram', to: 'https://www.instagram.com/cuphotoclub/' },
+          { label: 'Facebook', to: 'https://www.facebook.com/cuphoto' },
+          { label: 'X', to: 'https://x.com/CUPhotoClubs' },
+          { label: 'Linktree', to: 'https://linktr.ee/CUPhotoClub' }
         ]
       }
     ],

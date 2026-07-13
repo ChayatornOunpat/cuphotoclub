@@ -61,15 +61,17 @@ export function useLocalizedSite(site: Ref<any>) {
               { label: t('site.footer.columns.0.links.2.label'), to: '/#history' },
               { label: t('site.footer.columns.0.links.3.label'), to: '/#about' },
               { label: t('site.footer.columns.0.links.4.label'), to: '/#about' },
-              { label: t('site.footer.columns.0.links.5.label'), to: '#' }
+              { label: t('site.footer.columns.0.links.5.label'), to: '/contact' },
+              { label: t('site.footer.columns.0.links.6.label'), to: '/developed-by' }
             ]
           },
           {
             title: t('site.footer.columns.1.title'),
             links: [
-              { label: t('site.footer.columns.1.links.0.label'), to: '#' },
-              { label: t('site.footer.columns.1.links.1.label'), to: '#' },
-              { label: t('site.footer.columns.1.links.2.label'), to: '#' }
+              { label: t('site.footer.columns.1.links.0.label'), to: 'https://www.instagram.com/cuphotoclub/' },
+              { label: t('site.footer.columns.1.links.1.label'), to: 'https://www.facebook.com/cuphoto' },
+              { label: t('site.footer.columns.1.links.2.label'), to: 'https://x.com/CUPhotoClubs' },
+              { label: t('site.footer.columns.1.links.3.label'), to: 'https://linktr.ee/CUPhotoClub' }
             ]
           }
         ],

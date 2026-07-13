@@ -66,6 +66,7 @@ export default defineNuxtConfig({
     '/': { swr: 120 },
     '/about': { swr: 300 },
     '/contact': { swr: 300 },
+    '/developed-by': { swr: 300 },
     '/members': { swr: 300 },
     '/members/**': { swr: 300 },
     '/albums': { swr: 120 },

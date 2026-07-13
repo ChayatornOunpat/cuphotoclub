@@ -51,6 +51,16 @@
     "constructionBody": "บางหน้าและข้อมูลอาจยังไม่สมบูรณ์ ขอบคุณที่แวะมาชมงานของชมรมระหว่างที่เราจัดวางเว็บไซต์ใหม่",
     "constructionButton": "เข้าชมเว็บไซต์ต่อ"
   },
+  "developedBy": {
+    "metaTitle": "ผู้พัฒนาเว็บไซต์ - CU Photo Club",
+    "metaDescription": "เครดิตผู้พัฒนาเว็บไซต์ CU Photo Club",
+    "kicker": "ผู้พัฒนาเว็บไซต์",
+    "title": "พัฒนาโดย",
+    "role": "ประธานชมรม CU Photo Club ปี 2026",
+    "lead": "พัฒนาและจัดทำเว็บไซต์สำหรับ CU Photo Club",
+    "madeWithLove": "ทำด้วยความรักให้กับชมรม",
+    "githubLabel": "ดู GitHub"
+  },
   "site": {
     "hero": {
       "kicker": "จุฬาลงกรณ์มหาวิทยาลัย · ",
@@ -99,7 +109,8 @@
             { "label": "ประวัติ", "to": "/#history" },
             { "label": "เกี่ยวกับ", "to": "/#about" },
             { "label": "เข้าร่วม", "to": "/#about" },
-            { "label": "ติดต่อ", "to": "#" }
+            { "label": "ติดต่อ", "to": "/contact" },
+            { "label": "ผู้พัฒนาเว็บไซต์", "to": "/developed-by" }
           ]
         },
         {
@@ -107,7 +118,8 @@
           "links": [
             { "label": "Instagram", "to": "https://www.instagram.com/cuphotoclub/" },
             { "label": "Facebook", "to": "https://www.facebook.com/cuphoto" },
-            { "label": "YouTube", "to": "#" }
+            { "label": "X", "to": "https://x.com/CUPhotoClubs" },
+            { "label": "Linktree", "to": "https://linktr.ee/CUPhotoClub" }
           ]
         }
       ],

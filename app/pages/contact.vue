@@ -9,6 +9,13 @@ const sending = ref(false)
 const sent = ref(false)
 const error = ref('')
 
+const officialSocials = {
+  facebook: 'https://www.facebook.com/cuphoto',
+  instagram: 'https://www.instagram.com/cuphotoclub/',
+  x: 'https://x.com/CUPhotoClubs',
+  linktree: 'https://linktr.ee/CUPhotoClub'
+}
+
 async function submit() {
   sending.value = true
   error.value = ''
@@ -27,8 +34,10 @@ async function submit() {
 
 const socials = computed(() =>
   [
-    { url: settings.value?.facebookUrl, icon: 'simple-icons:facebook', label: 'Facebook' },
-    { url: settings.value?.instagramUrl, icon: 'simple-icons:instagram', label: 'Instagram' },
+    { url: settings.value?.facebookUrl || officialSocials.facebook, icon: 'simple-icons:facebook', label: 'Facebook' },
+    { url: settings.value?.instagramUrl || officialSocials.instagram, icon: 'simple-icons:instagram', label: 'Instagram' },
+    { url: officialSocials.x, icon: 'simple-icons:x', label: 'X' },
+    { url: officialSocials.linktree, icon: 'simple-icons:linktree', label: 'Linktree' },
     { url: settings.value?.lineUrl, icon: 'simple-icons:line', label: 'LINE' }
   ].filter(s => s.url)
 )

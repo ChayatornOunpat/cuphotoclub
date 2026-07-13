@@ -51,6 +51,16 @@
     "constructionBody": "Some pages and content may still be incomplete. Thanks for stopping by to see the club's work while we rebuild the site.",
     "constructionButton": "Continue to the site"
   },
+  "developedBy": {
+    "metaTitle": "Developed By - CU Photo Club",
+    "metaDescription": "Developer credit for the CU Photo Club website.",
+    "kicker": "Developed By",
+    "title": "Developed by",
+    "role": "2026 President, CU Photo Club",
+    "lead": "Website development and implementation for CU Photo Club.",
+    "madeWithLove": "Made with love for the club.",
+    "githubLabel": "View GitHub"
+  },
   "site": {
     "hero": {
       "kicker": "Chulalongkorn University · ",
@@ -99,7 +109,8 @@
             { "label": "History", "to": "/#history" },
             { "label": "About", "to": "/#about" },
             { "label": "Join", "to": "/#about" },
-            { "label": "Contact", "to": "#" }
+            { "label": "Contact", "to": "/contact" },
+            { "label": "Developed By", "to": "/developed-by" }
           ]
         },
         {
@@ -107,7 +118,8 @@
           "links": [
             { "label": "Instagram", "to": "https://www.instagram.com/cuphotoclub/" },
             { "label": "Facebook", "to": "https://www.facebook.com/cuphoto" },
-            { "label": "YouTube", "to": "#" }
+            { "label": "X", "to": "https://x.com/CUPhotoClubs" },
+            { "label": "Linktree", "to": "https://linktr.ee/CUPhotoClub" }
           ]
         }
       ],
