@@ -59,7 +59,13 @@
     "role": "2026 President, CU Photo Club",
     "lead": "Website development and implementation for CU Photo Club.",
     "madeWithLove": "Made with love for the club.",
-    "githubLabel": "View GitHub"
+    "githubLabel": "View GitHub",
+    "contactButton": "Contact Info",
+    "frontButton": "Front of Card",
+    "contactTitle": "Contact Info",
+    "contactEyebrow": "Back of card",
+    "contactHeading": "Reach me directly.",
+    "contactNote": "For CU Photo Club website and collaboration questions."
   },
   "site": {
     "hero": {

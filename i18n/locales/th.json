@@ -59,7 +59,13 @@
     "role": "ประธานชมรม CU Photo Club ปี 2026",
     "lead": "พัฒนาและจัดทำเว็บไซต์สำหรับ CU Photo Club",
     "madeWithLove": "ทำด้วยความรักให้กับชมรม",
-    "githubLabel": "ดู GitHub"
+    "githubLabel": "ดู GitHub",
+    "contactButton": "ข้อมูลติดต่อ",
+    "frontButton": "หน้าบัตร",
+    "contactTitle": "ข้อมูลติดต่อ",
+    "contactEyebrow": "ด้านหลังบัตร",
+    "contactHeading": "ติดต่อได้โดยตรง",
+    "contactNote": "สำหรับเรื่องเว็บไซต์ CU Photo Club และการร่วมงาน"
   },
   "site": {
     "hero": {
