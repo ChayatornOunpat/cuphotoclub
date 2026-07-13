@@ -53,7 +53,7 @@ watch(() => route.query.q, () => { q.value = String(route.query.q || '') })
         <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-soft">{{ t('search.galleries') }}</h2>
         <ul class="mt-3 divide-y divide-line">
           <li v-for="a in data.albums" :key="a.slug">
-            <NuxtLink :to="`/albums/${a.slug}`" class="flex items-center justify-between gap-4 py-3 hover:text-accent">
+            <NuxtLink :to="albumRoutePath(a.slug)" class="flex items-center justify-between gap-4 py-3 hover:text-accent">
               <span class="font-medium text-ink">{{ a.title }}</span>
               <span class="text-sm text-ink-soft">{{ a.eventDate ? formatDate(a.eventDate) : '' }}</span>
             </NuxtLink>

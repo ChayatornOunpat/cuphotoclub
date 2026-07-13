@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dawn at Lumphini — E: Slideshow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,200;0,300;0,400;0,500;0,600;1,200;1,300;1,400;1,500;1,600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --hero-bg: #0C0C0A; --body-bg: #F5F4F0; --dark: #1A1918;
+      --muted: #7C7A72; --subtle: #E2DED8; --paper: #EEEAE2; --accent: #E8186E;
+    }
+    html { scroll-snap-type: y mandatory; }
+    body {
+      background: var(--hero-bg); color: #F5F4F0;
+      font-family: 'Inter', sans-serif; font-weight: 300;
+      -webkit-font-smoothing: antialiased; overflow-x: hidden;
+    }
+    #progress { position: fixed; top: 0; left: 0; z-index: 200; width: 0%; height: 2px; background: var(--accent); transition: width 0.1s linear; }
+
+    nav {
+      position: fixed; inset-block-start: 2px; inset-inline: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 3rem; mix-blend-mode: normal;
+      background: linear-gradient(to bottom, rgba(12,12,10,0.6), transparent);
+    }
+    .logo { font-size: 0.82rem; font-weight: 500; letter-spacing: 0.18em; text-decoration: none; line-height: 1; color: #F5F4F0; }
+    .logo .cu { color: var(--accent); }
+    .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+    .nav-links a { font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(245,244,240,0.55); text-decoration: none; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--accent); }
+    .nav-links a.join { color: var(--accent) !important; }
+
+    /* ─── SIDE RAIL ──────────────────────── */
+    .rail {
+      position: fixed; right: 2.25rem; top: 50%; transform: translateY(-50%); z-index: 100;
+      display: flex; flex-direction: column; gap: 1rem; align-items: center;
+    }
+    .rail a { display: block; width: 5px; height: 5px; border-radius: 50%; background: rgba(245,244,240,0.28); transition: all 0.3s; }
+    .rail a.on { background: var(--accent); transform: scale(1.6); }
+    .rail__count { font-size: 0.52rem; letter-spacing: 0.2em; color: rgba(245,244,240,0.45); writing-mode: vertical-rl; margin-top: 0.75rem; }
+    .rail__count b { color: var(--accent); font-weight: 500; }
+
+    /* ─── SLIDES ─────────────────────────── */
+    .slide { height: 100svh; scroll-snap-align: start; scroll-snap-stop: always; position: relative; display: flex; align-items: flex-end; overflow: hidden; }
+    .slide__bg { position: absolute; inset: 0; background-position: center; background-size: cover; }
+    .slide__bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(12,12,10,0.35), transparent 40%, rgba(12,12,10,0.75)); }
+
+    /* caption fade-in per slide */
+    .slide__body, .title-body, .end-body { opacity: 0; transform: translateY(22px); transition: opacity 0.8s ease 0.2s, transform 0.8s cubic-bezier(0.25,0.46,0.45,0.94) 0.2s; }
+    .slide.on .slide__body, .slide.on .title-body, .slide.on .end-body { opacity: 1; transform: none; }
+    .slide__body { position: relative; z-index: 2; padding: 0 3rem 3.5rem; width: 100%; max-width: 1380px; margin: 0 auto; display: flex; justify-content: space-between; align-items: flex-end; gap: 2rem; }
+    .slide__num { font-family: 'Spectral', serif; font-size: clamp(3rem, 6vw, 5.5rem); font-weight: 200; line-height: 1; color: rgba(245,244,240,0.25); }
+    .slide__num b { color: var(--accent); font-weight: 200; }
+    .slide__cap { text-align: right; max-width: 420px; }
+    .slide__cap-kicker { font-size: 0.52rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem; }
+    .slide__cap-text { font-family: 'Spectral', serif; font-size: clamp(1.2rem, 2.2vw, 1.8rem); font-weight: 200; font-style: italic; line-height: 1.35; color: rgba(245,244,240,0.92); }
+
+    /* ─── TITLE SLIDE ────────────────────── */
+    .slide--title { align-items: center; }
+    .slide--title .slide__bg { opacity: 0.5; }
+    .title-body { position: relative; z-index: 2; text-align: center; padding: 0 2rem; width: 100%; }
+    .title-back { font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(245,244,240,0.7); text-decoration: none; }
+    .title-back:hover { color: var(--accent); }
+    .title-kicker { margin-top: 3rem; font-size: 0.56rem; letter-spacing: 0.34em; text-transform: uppercase; color: rgba(245,244,240,0.6); }
+    .title-kicker span { color: var(--accent); }
+    .title-main { font-family: 'Spectral', serif; font-size: clamp(3.2rem, 9vw, 8.5rem); font-weight: 200; line-height: 0.94; letter-spacing: -0.03em; margin-top: 1.25rem; }
+    .title-main em { font-style: italic; }
+    .title-meta { margin-top: 2rem; display: flex; gap: 1.5rem; align-items: center; justify-content: center; font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245,244,240,0.5); }
+    .title-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
+    .title-scroll { position: absolute; bottom: 2.5rem; left: 50%; transform: translateX(-50%); z-index: 2; font-size: 0.5rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245,244,240,0.45); animation: bob 2.4s ease-in-out infinite; }
+    @keyframes bob { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 8px); } }
+
+    /* ─── END SLIDE ──────────────────────── */
+    .slide--end { background: var(--body-bg); color: var(--dark); align-items: center; }
+    .end-body { position: relative; z-index: 2; text-align: center; padding: 0 2rem; width: 100%; }
+    .end-kicker { font-size: 0.54rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--muted); }
+    .end-title { font-family: 'Spectral', serif; font-size: clamp(2.2rem, 5vw, 4rem); font-weight: 200; margin-top: 1.25rem; letter-spacing: -0.02em; }
+    .end-title em { font-style: italic; }
+    .end-next { display: inline-block; margin-top: 2.5rem; text-decoration: none; }
+    .end-next-label { font-size: 0.5rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.6rem; }
+    .end-next-title { font-family: 'Spectral', serif; font-size: clamp(1.6rem, 3vw, 2.6rem); font-weight: 300; color: var(--dark); transition: color 0.2s; }
+    .end-next:hover .end-next-title { color: var(--accent); }
+    .end-back { display: inline-block; margin-top: 3rem; font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+    .end-back:hover { color: var(--accent); }
+    .end-footer { position: absolute; bottom: 2rem; left: 0; right: 0; text-align: center; font-size: 0.58rem; color: var(--muted); letter-spacing: 0.1em; }
+    .end-footer .cu { color: var(--accent); font-weight: 500; }
+
+    @media (max-width: 720px) {
+      nav { padding: 1.25rem 1.5rem; } .nav-links { display: none; }
+      .rail { right: 1rem; }
+      .slide__body { padding: 0 1.5rem 2.5rem; flex-direction: column; align-items: flex-start; gap: 1rem; }
+      .slide__cap { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <div id="progress"></div>
+  <nav>
+    <a href="#" class="logo"><span class="cu">CU</span>PHOTOCLUB</a>
+    <ul class="nav-links">
+      <li><a href="#">Home</a></li>
+      <li><a href="#">Albums</a></li>
+      <li><a href="#">Blog</a></li>
+      <li><a href="#">History</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#" class="join">Join</a></li>
+    </ul>
+  </nav>
+
+  <div class="rail" id="rail"></div>
+
+  <!-- TITLE -->
+  <section class="slide slide--title" data-rail>
+    <div class="slide__bg" style="background-image:url('https://picsum.photos/seed/dawnlumphini_1/1920/1280')"></div>
+    <div class="title-body">
+      <a href="#" class="title-back">← The Archive</a>
+      <p class="title-kicker">Album · <span>Street</span></p>
+      <h1 class="title-main">Dawn at <em>Lumphini</em></h1>
+      <div class="title-meta"><span>April 2025</span><span class="dot"></span><span>6 Frames</span><span class="dot"></span><span>Bangkok</span></div>
+    </div>
+    <div class="title-scroll">Scroll</div>
+  </section>
+
+  <!-- FRAMES injected -->
+  <div id="slides"></div>
+
+  <!-- END -->
+  <section class="slide slide--end" data-rail>
+    <div class="end-body">
+      <p class="end-kicker">End of set · 6 frames</p>
+      <h2 class="end-title">Dawn at <em>Lumphini</em></h2>
+      <a href="#" class="end-next">
+        <div class="end-next-label">Next Album →</div>
+        <div class="end-next-title">Faces of Siam</div>
+      </a>
+      <br>
+      <a href="#" class="end-back">← All Albums</a>
+    </div>
+    <div class="end-footer">© 2025 <span class="cu">CU</span> Photo Club · Chulalongkorn University · Bangkok</div>
+  </section>
+
+  <script>
+    const frames = [
+      { seed: 'dawnlumphini_1', cap: 'First light over the lake' },
+      { seed: 'dawnlumphini_2', cap: 'The eastern path, empty' },
+      { seed: 'dawnlumphini_3', cap: 'A runner passes' },
+      { seed: 'dawnlumphini_4', cap: "Reeds at the water's edge" },
+      { seed: 'dawnlumphini_5', cap: 'Mist burning off' },
+      { seed: 'dawnlumphini_6', cap: 'Full morning, the city wakes' },
+    ];
+    const slidesHost = document.getElementById('slides');
+    slidesHost.innerHTML = frames.map((f, i) => `
+      <section class="slide" data-rail>
+        <div class="slide__bg" style="background-image:url('https://picsum.photos/seed/${f.seed}/1920/1280')"></div>
+        <div class="slide__body">
+          <div class="slide__num"><b>${String(i+1).padStart(2,'0')}</b> / 06</div>
+          <div class="slide__cap">
+            <p class="slide__cap-kicker">Frame ${String(i+1).padStart(2,'0')}</p>
+            <p class="slide__cap-text">${f.cap}</p>
+          </div>
+        </div>
+      </section>`).join('');
+
+    // rail dots
+    const slides = [...document.querySelectorAll('[data-rail]')];
+    const rail = document.getElementById('rail');
+    slides.forEach((s, i) => {
+      s.id = 'sl' + i;
+      const a = document.createElement('a');
+      a.href = '#sl' + i;
+      rail.appendChild(a);
+    });
+    const count = document.createElement('div');
+    count.className = 'rail__count';
+    count.innerHTML = '<b id="railCur">01</b>/' + String(slides.length).padStart(2, '0');
+    rail.appendChild(count);
+
+    const dots = [...rail.querySelectorAll('a')];
+    const railCur = document.getElementById('railCur');
+    let curIdx = 0;
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        // Ken Burns + caption fade replay per visit
+        en.target.classList.toggle('on', en.isIntersecting);
+        if (!en.isIntersecting) return;
+        curIdx = slides.indexOf(en.target);
+        dots.forEach((d, j) => d.classList.toggle('on', j === curIdx));
+        railCur.textContent = String(curIdx + 1).padStart(2, '0');
+      });
+    }, { threshold: 0.6 });
+    slides.forEach(s => io.observe(s));
+
+    // arrow-key navigation between slides
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown') {
+        e.preventDefault(); slides[Math.min(curIdx + 1, slides.length - 1)].scrollIntoView({ behavior: 'smooth' });
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault(); slides[Math.max(curIdx - 1, 0)].scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+
+    const progress = document.getElementById('progress');
+    window.addEventListener('scroll', () => {
+      const total = document.body.scrollHeight - window.innerHeight;
+      progress.style.width = (window.scrollY / total * 100) + '%';
+    }, { passive: true });
+  </script>
+</body>
+</html>

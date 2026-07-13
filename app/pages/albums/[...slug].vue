@@ -70,7 +70,7 @@ useHead(() => ({
         '@type': 'ImageGallery',
         name: album.value?.title?.replace(/\n+/g, ' '),
         description: album.value?.excerpt || undefined,
-        url: `${origin}/albums/${album.value?.slug}`,
+        url: `${origin}${albumRoutePath(album.value?.slug ?? '')}`,
         image: galleryImages.value.length ? galleryImages.value : (coverUrl.value ? [coverUrl.value] : undefined),
         isPartOf: { '@type': 'Organization', name: 'CU Photo Club', url: origin }
       })

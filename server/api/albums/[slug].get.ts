@@ -2,7 +2,7 @@ import { and, asc, eq } from 'drizzle-orm'
 
 // Public: a published album and its photos.
 export default defineEventHandler(async (event) => {
-  const slug = getRouterParam(event, 'slug') || ''
+  const slug = decodeRouteSegment(getRouterParam(event, 'slug') || '')
 
   const [album] = await db
     .select({

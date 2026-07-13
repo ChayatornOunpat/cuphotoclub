@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dawn at Lumphini — H: Exhibition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,200;0,300;0,400;0,500;0,600;1,200;1,300;1,400;1,500;1,600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --hero-bg: #0C0C0A; --body-bg: #F5F4F0; --dark: #1A1918;
+      --muted: #7C7A72; --subtle: #E2DED8; --paper: #EEEAE2; --accent: #E8186E;
+      --wall: #141312; --wall-lit: #1E1C1A;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--wall); color: #F5F4F0;
+      font-family: 'Inter', sans-serif; font-weight: 300;
+      -webkit-font-smoothing: antialiased; overflow-x: hidden;
+    }
+    #progress { position: fixed; top: 0; left: 0; z-index: 200; width: 0%; height: 2px; background: var(--accent); transition: width 0.1s linear; }
+
+    nav {
+      position: fixed; inset-block-start: 2px; inset-inline: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 3rem;
+      background: linear-gradient(to bottom, rgba(12,12,10,0.75), transparent);
+    }
+    .logo { font-size: 0.82rem; font-weight: 500; letter-spacing: 0.18em; text-decoration: none; line-height: 1; color: #F5F4F0; }
+    .logo .cu { color: var(--accent); }
+    .nav-links { display: flex; gap: 2.5rem; list-style: none; }
+    .nav-links a { font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(245,244,240,0.55); text-decoration: none; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--accent); }
+    .nav-links a.join { color: var(--accent) !important; }
+
+    /* ─── ENTRANCE WALL ──────────────────── */
+    .entry { min-height: 88svh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; position: relative; padding: 8rem 2rem 4rem; }
+    .entry::before {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(ellipse 60% 45% at 50% 38%, rgba(245,240,225,0.09), transparent 70%);
+    }
+    .entry__back { position: absolute; top: 6rem; left: 3rem; font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(245,244,240,0.6); text-decoration: none; }
+    .entry__back:hover { color: var(--accent); }
+    .entry__kicker { font-size: 0.56rem; letter-spacing: 0.4em; text-transform: uppercase; color: rgba(245,244,240,0.5); }
+    .entry__kicker span { color: var(--accent); }
+    .entry__title { font-family: 'Spectral', serif; font-size: clamp(3.2rem, 8.5vw, 8rem); font-weight: 200; line-height: 0.94; letter-spacing: -0.03em; margin-top: 1.75rem; max-width: 14ch; }
+    .entry__title em { font-style: italic; }
+    .entry__rule { width: 56px; height: 1px; background: var(--accent); margin: 2.5rem auto 0; }
+    .entry__blurb { margin-top: 2.25rem; max-width: 480px; font-size: 0.8rem; color: rgba(245,244,240,0.55); line-height: 1.9; }
+    .entry__meta { margin-top: 2.25rem; display: flex; gap: 1.5rem; align-items: center; font-size: 0.56rem; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(245,244,240,0.4); }
+    .entry__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
+
+    /* ─── GALLERY WALLS ──────────────────── */
+    .wall { padding: 7rem 3rem; position: relative; }
+    .wall--lit { background: var(--wall-lit); }
+    .piece { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: 1fr 300px; gap: 4.5rem; align-items: center; }
+    .piece--flip { grid-template-columns: 300px 1fr; }
+    .piece--flip .plabel { order: -1; text-align: right; }
+    .piece--flip .plabel .plabel__rule { margin-left: auto; }
+
+    /* framed, matted print under a spotlight */
+    .pframe { position: relative; justify-self: center; width: 100%; max-width: 780px; }
+    .pframe::before {
+      content: ''; position: absolute; inset: -18% -22%; pointer-events: none; z-index: 0;
+      background: radial-gradient(ellipse 62% 58% at 50% 42%, rgba(245,240,225,0.10), transparent 72%);
+    }
+    .pframe__frame {
+      position: relative; z-index: 1;
+      background: #F8F6F1; padding: clamp(1.4rem, 3.5vw, 3rem);
+      box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 30px 70px rgba(0,0,0,0.55), 0 8px 22px rgba(0,0,0,0.45);
+      border: 1px solid rgba(0,0,0,0.35);
+      cursor: zoom-in; transition: transform 0.5s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    .pframe__frame:hover { transform: translateY(-4px); }
+    .pframe__img { display: block; width: 100%; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.14); background: var(--hero-bg); }
+    .pframe__img img { width: 100%; display: block; aspect-ratio: var(--ar, 4/3); object-fit: cover; }
+
+    /* museum wall label */
+    .plabel { font-size: 0.7rem; line-height: 1.8; color: rgba(245,244,240,0.65); }
+    .plabel__num { font-family: 'Spectral', serif; font-size: 2.6rem; font-weight: 200; color: rgba(245,244,240,0.22); line-height: 1; }
+    .plabel__num b { color: var(--accent); font-weight: 200; }
+    .plabel__title { font-family: 'Spectral', serif; font-size: 1.35rem; font-weight: 300; font-style: italic; color: #F5F4F0; margin-top: 1.1rem; line-height: 1.3; }
+    .plabel__spec { margin-top: 0.9rem; font-size: 0.56rem; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(245,244,240,0.38); line-height: 2.1; }
+    .plabel__note { margin-top: 1.1rem; font-size: 0.72rem; color: rgba(245,244,240,0.5); line-height: 1.85; max-width: 34ch; }
+    .plabel__rule { width: 34px; height: 1px; background: var(--accent); margin-top: 1.4rem; }
+
+    /* label lines fade in one after the other, after the frame */
+    .plabel > * { opacity: 0; transform: translateY(14px); transition: opacity 0.7s ease, transform 0.7s ease; }
+    .piece.in .plabel > * { opacity: 1; transform: none; }
+    .piece.in .plabel > *:nth-child(1) { transition-delay: 0.25s; }
+    .piece.in .plabel > *:nth-child(2) { transition-delay: 0.38s; }
+    .piece.in .plabel > *:nth-child(3) { transition-delay: 0.51s; }
+    .piece.in .plabel > *:nth-child(4) { transition-delay: 0.64s; }
+    .piece.in .plabel > *:nth-child(5) { transition-delay: 0.77s; }
+
+    /* fixed room marker */
+    .marker { position: fixed; left: 3rem; bottom: 2.2rem; z-index: 90; font-size: 0.54rem; letter-spacing: 0.26em; text-transform: uppercase; color: rgba(245,244,240,0.5); opacity: 0; transition: opacity 0.4s; pointer-events: none; }
+    .marker b { color: var(--accent); font-weight: 500; }
+    .marker.show { opacity: 1; }
+
+    /* full-screen print viewer */
+    .view { position: fixed; inset: 0; z-index: 300; background: rgba(8,7,6,0.97); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem; padding: 3rem 2rem; cursor: zoom-out; }
+    .view.open { display: flex; }
+    .view img { max-width: 92vw; max-height: 74vh; object-fit: contain; box-shadow: 0 40px 100px rgba(0,0,0,0.65); }
+    .view__cap { font-family: 'Spectral', serif; font-size: 1.15rem; font-style: italic; font-weight: 300; color: rgba(245,244,240,0.85); text-align: center; }
+    .view__cap b { color: var(--accent); font-weight: 300; font-style: normal; margin-right: 0.9rem; }
+    .view__hint { font-size: 0.5rem; letter-spacing: 0.26em; text-transform: uppercase; color: rgba(245,244,240,0.35); }
+
+    /* ─── EXIT / NAV ─────────────────────── */
+    .exit { background: var(--body-bg); color: var(--dark); text-align: center; padding: 6rem 3rem 5rem; }
+    .exit__kicker { font-size: 0.54rem; letter-spacing: 0.32em; text-transform: uppercase; color: var(--muted); }
+    .exit__title { font-family: 'Spectral', serif; font-size: clamp(2rem, 4.5vw, 3.6rem); font-weight: 200; margin-top: 1.25rem; letter-spacing: -0.02em; }
+    .exit__title em { font-style: italic; }
+    .exit__next { display: inline-block; margin-top: 2.5rem; text-decoration: none; }
+    .exit__next-label { font-size: 0.5rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.6rem; }
+    .exit__next-title { font-family: 'Spectral', serif; font-size: clamp(1.5rem, 2.8vw, 2.4rem); font-weight: 300; color: var(--dark); transition: color 0.2s; }
+    .exit__next:hover .exit__next-title { color: var(--accent); }
+    .exit__back { display: block; margin-top: 2.75rem; font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+    .exit__back:hover { color: var(--accent); }
+
+    footer { background: var(--dark); color: rgba(245,244,240,0.7); padding: 3rem; text-align: center; }
+    .footer__brand { font-size: 0.82rem; font-weight: 500; letter-spacing: 0.18em; text-decoration: none; color: #F5F4F0; }
+    .footer__brand .cu { color: var(--accent); }
+    .footer__tagline { font-size: 0.62rem; color: rgba(245,244,240,0.35); margin-top: 1rem; letter-spacing: 0.1em; }
+
+    /* reveal on scroll */
+    .reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .reveal.in { opacity: 1; transform: none; }
+
+    @media (max-width: 880px) {
+      nav { padding: 1.25rem 1.5rem; } .nav-links { display: none; }
+      .entry__back { left: 1.5rem; }
+      .wall { padding: 4.5rem 1.5rem; }
+      .marker { left: 1.5rem; bottom: 1.5rem; }
+      .piece, .piece--flip { grid-template-columns: 1fr; gap: 2.25rem; }
+      .piece--flip .plabel { order: 0; text-align: left; }
+      .piece--flip .plabel .plabel__rule { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="progress"></div>
+  <nav>
+    <a href="#" class="logo"><span class="cu">CU</span>PHOTOCLUB</a>
+    <ul class="nav-links">
+      <li><a href="#">Home</a></li>
+      <li><a href="#">Albums</a></li>
+      <li><a href="#">Blog</a></li>
+      <li><a href="#">History</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#" class="join">Join</a></li>
+    </ul>
+  </nav>
+
+  <!-- ENTRANCE -->
+  <header class="entry">
+    <a href="#" class="entry__back">← The Archive</a>
+    <p class="entry__kicker">An exhibition · <span>Street</span></p>
+    <h1 class="entry__title">Dawn at <em>Lumphini</em></h1>
+    <div class="entry__rule"></div>
+    <p class="entry__blurb">Six prints from a single morning. Members gathered before sunrise to watch the park become itself in the first gold light.</p>
+    <div class="entry__meta"><span>April 2025</span><span class="dot"></span><span>6 Prints</span><span class="dot"></span><span>Bangkok</span></div>
+  </header>
+
+  <!-- WALLS injected -->
+  <div id="walls"></div>
+
+  <!-- ROOM MARKER -->
+  <div class="marker" id="marker">Print <b id="markerCur">01</b> / 06</div>
+
+  <!-- PRINT VIEWER -->
+  <div class="view" id="view">
+    <img id="viewImg" src="" alt="">
+    <p class="view__cap"><b id="viewNum">01</b><span id="viewCap"></span></p>
+    <p class="view__hint">Click anywhere or press Esc to return to the gallery</p>
+  </div>
+
+  <!-- EXIT -->
+  <section class="exit">
+    <p class="exit__kicker">You have reached the end of the exhibition</p>
+    <h2 class="exit__title">Dawn at <em>Lumphini</em></h2>
+    <a href="#" class="exit__next">
+      <div class="exit__next-label">Continue to →</div>
+      <div class="exit__next-title">Faces of Siam</div>
+    </a>
+    <a href="#" class="exit__back">← All Albums</a>
+  </section>
+
+  <footer>
+    <a href="#" class="footer__brand"><span class="cu">CU</span>PHOTOCLUB</a>
+    <p class="footer__tagline">© 2025 CU Photo Club · Chulalongkorn University · Bangkok</p>
+  </footer>
+
+  <script>
+    const frames = [
+      { seed: 'dawnlumphini_1', cap: 'First light over the lake',    ar: '3/2',  note: 'The first frame of the morning, made minutes after arrival while the lake was still holding the night.' },
+      { seed: 'dawnlumphini_2', cap: 'The eastern path, empty',      ar: '16/10', note: 'For a short while the promenade belonged to no one — a corridor of wet stone and early light.' },
+      { seed: 'dawnlumphini_3', cap: 'A runner passes',              ar: '4/5',  note: 'The first of the joggers. After this frame, the park was never empty again.' },
+      { seed: 'dawnlumphini_4', cap: "Reeds at the water's edge",    ar: '3/2',  note: 'A quieter study — the wind kept the reeds moving through every exposure.' },
+      { seed: 'dawnlumphini_5', cap: 'Mist burning off',             ar: '16/10', note: 'Ten minutes of mist, gone almost as soon as it was noticed.' },
+      { seed: 'dawnlumphini_6', cap: 'Full morning, the city wakes', ar: '3/2',  note: 'The closing print: full sun, full sound, the city arriving all at once.' },
+    ];
+    const specs = ['Gelatin silver print · 40 × 60 cm', 'Archival pigment print · 50 × 80 cm', 'Gelatin silver print · 50 × 40 cm', 'Archival pigment print · 40 × 60 cm', 'Archival pigment print · 50 × 80 cm', 'Gelatin silver print · 40 × 60 cm'];
+    const walls = document.getElementById('walls');
+    walls.innerHTML = frames.map((f, i) => `
+      <section class="wall ${i % 2 ? 'wall--lit' : ''}">
+        <div class="piece ${i % 2 ? 'piece--flip' : ''} reveal" data-i="${i}">
+          <div class="pframe">
+            <div class="pframe__frame">
+              <div class="pframe__img" style="--ar:${f.ar}"><img src="https://picsum.photos/seed/${f.seed}/1300/975" alt="${f.cap}" loading="lazy"></div>
+            </div>
+          </div>
+          <div class="plabel">
+            <div class="plabel__num"><b>${String(i+1).padStart(2,'0')}</b> / 06</div>
+            <div class="plabel__title">${f.cap}</div>
+            <div class="plabel__spec">${specs[i]}<br>Lumphini Park, Bangkok · April 2025</div>
+            <p class="plabel__note">${f.note}</p>
+            <div class="plabel__rule"></div>
+          </div>
+        </div>
+      </section>`).join('');
+
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+    }, { threshold: 0.18 });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+    // fixed room marker — tracks which print is in the middle of the viewport
+    const marker = document.getElementById('marker'), markerCur = document.getElementById('markerCur');
+    const pieces = [...document.querySelectorAll('.piece')];
+    const ioMark = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        markerCur.textContent = String(pieces.indexOf(en.target) + 1).padStart(2, '0');
+        marker.classList.add('show');
+      });
+    }, { rootMargin: '-38% 0px -38% 0px', threshold: 0 });
+    pieces.forEach(p => ioMark.observe(p));
+    // hide the marker at the entrance and exit rooms
+    const ioEnds = new IntersectionObserver(entries => {
+      entries.forEach(en => { if (en.isIntersecting) marker.classList.remove('show'); });
+    }, { rootMargin: '-38% 0px -38% 0px', threshold: 0 });
+    ioEnds.observe(document.querySelector('.entry'));
+    ioEnds.observe(document.querySelector('.exit'));
+
+    // full-screen print viewer
+    const view = document.getElementById('view'), viewImg = document.getElementById('viewImg');
+    const viewNum = document.getElementById('viewNum'), viewCap = document.getElementById('viewCap');
+    walls.addEventListener('click', e => {
+      const fr = e.target.closest('.pframe__frame'); if (!fr) return;
+      const i = +fr.closest('.piece').dataset.i;
+      viewImg.src = `https://picsum.photos/seed/${frames[i].seed}/1600/1200`;
+      viewNum.textContent = String(i + 1).padStart(2, '0');
+      viewCap.textContent = frames[i].cap;
+      view.classList.add('open'); document.body.style.overflow = 'hidden';
+    });
+    function closeView() { view.classList.remove('open'); document.body.style.overflow = ''; }
+    view.addEventListener('click', closeView);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && view.classList.contains('open')) closeView(); });
+
+    const progress = document.getElementById('progress');
+    window.addEventListener('scroll', () => {
+      const total = document.body.scrollHeight - window.innerHeight;
+      progress.style.width = (window.scrollY / total * 100) + '%';
+    }, { passive: true });
+  </script>
+</body>
+</html>

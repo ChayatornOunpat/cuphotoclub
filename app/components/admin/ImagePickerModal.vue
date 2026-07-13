@@ -127,13 +127,30 @@ function toggleItem(key: string, event?: MouseEvent) {
 }
 
 function confirm() {
-  emit('select', [...selected.value])
+  // Emit in the visible (sorted) order, not Set insertion order. Selecting the
+  // library in several range-clicks would otherwise hand back the click order,
+  // and the album autofill lays images out in whatever order it receives —
+  // producing a rotated/scrambled album even though upload order was correct.
+  const selectedKeys = sortedImages.value
+    .map(image => image.key)
+    .filter(key => selected.value.has(key))
+  emit('select', selectedKeys)
   open.value = false
 }
 
+// Badge shows the order images will be handed off in — the visible order, to
+// match what confirm() emits (not the click order).
+const selectionOrderMap = computed(() => {
+  const map = new Map<string, number>()
+  let n = 0
+  for (const image of sortedImages.value) {
+    if (selected.value.has(image.key)) map.set(image.key, ++n)
+  }
+  return map
+})
+
 function selectionOrder(key: string) {
-  const index = [...selected.value].indexOf(key)
-  return index >= 0 ? index + 1 : null
+  return selectionOrderMap.value.get(key) ?? null
 }
 </script>
 

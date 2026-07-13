@@ -7,7 +7,7 @@ const router = useRouter()
 const localizedPath = useLocalizedContentPath()
 const { data: albums } = await useAsyncData('albums-archive', async () => {
   const adminAlbums = await $fetch('/api/albums').catch(() => [])
-  if (adminAlbums.length) return adminAlbums.map(album => ({ ...album, path: `/albums/${album.slug}` }))
+  if (adminAlbums.length) return adminAlbums.map(album => ({ ...album, path: albumRoutePath(album.slug) }))
   return []
 })
 
@@ -32,7 +32,13 @@ function queryCategory(value: unknown) {
   return typeof value === 'string' && value.trim() ? value : 'all'
 }
 
+function queryText(value: unknown) {
+  return typeof value === 'string' ? value : ''
+}
+
 const activeCat = ref(queryCategory(route.query.category))
+const searchQuery = ref(queryText(route.query.q))
+const normalizedSearch = computed(() => searchQuery.value.trim().toLowerCase())
 const categoryMenuOpen = ref(false)
 const inlineCategoryLimit = 4
 const sortedCategories = computed(() =>
@@ -48,11 +54,17 @@ const inlineCategories = computed(() => {
   if (activeSecondaryCategory.value) cats.push(activeSecondaryCategory.value)
   return cats
 })
-const filtered = computed(() =>
-  activeCat.value === 'all'
+const filtered = computed(() => {
+  const byCategory = activeCat.value === 'all'
     ? galleryAlbums.value
     : galleryAlbums.value.filter(a => a.category === activeCat.value)
-)
+  const q = normalizedSearch.value
+  if (!q) return byCategory
+  return byCategory.filter(a =>
+    [a.title, a.category, a.location, a.excerpt, a.date, a.dateEnd]
+      .some(value => String(value ?? '').toLowerCase().includes(q))
+  )
+})
 
 const pageSize = 30
 const page = ref(1)
@@ -63,6 +75,21 @@ watch(activeCat, () => {
 })
 watch(() => route.query.category, value => {
   activeCat.value = queryCategory(value)
+})
+watch(normalizedSearch, () => {
+  page.value = 1
+})
+// Keep ?q= in the URL so searches are shareable/bookmarkable. Compare trimmed
+// values so the route watcher doesn't clobber trailing spaces mid-typing.
+watch(searchQuery, value => {
+  const query = { ...route.query }
+  delete query.q
+  const q = value.trim()
+  router.replace({ query: q ? { ...query, q } : query })
+})
+watch(() => route.query.q, value => {
+  const next = queryText(value)
+  if (next !== searchQuery.value.trim()) searchQuery.value = next
 })
 watch(totalPages, () => {
   if (page.value > totalPages.value) page.value = totalPages.value
@@ -165,44 +192,62 @@ useSeoMeta({
             <div class="eyebrow"><span class="num">01</span> {{ t('albums.theArchive') }}</div>
             <h2 class="index-bar__title">{{ t('albums.sequencedBy') }}</h2>
           </div>
-          <div class="filter">
-            <button :class="{ active: activeCat === 'all' }" @click="selectCategory('all')">
-              {{ t('common.all') }} <sup>{{ galleryAlbums.length }}</sup>
-            </button>
-            <button
-              v-for="cat in inlineCategories"
-              :key="cat.name"
-              :class="{ active: activeCat === cat.name }"
-              :lang="textLang(cat.name)"
-              @click="selectCategory(cat.name)"
-            >
-              {{ cat.name }} <sup>{{ cat.count }}</sup>
-            </button>
-            <div v-if="secondaryCategories.length" class="filter__menu">
-              <button
-                type="button"
-                class="filter__more"
-                :class="{ active: activeSecondaryCategory }"
-                :aria-expanded="categoryMenuOpen"
-                aria-haspopup="menu"
-                @click="categoryMenuOpen = !categoryMenuOpen"
+          <div class="index-bar__controls">
+            <div class="search">
+              <input
+                v-model="searchQuery"
+                type="search"
+                class="search__input"
+                :placeholder="t('albums.searchPlaceholder')"
+                :aria-label="t('albums.searchLabel')"
               >
-                {{ t('albums.categoryMenu') }} <sup>{{ secondaryCategories.length }}</sup>
+              <button
+                v-if="searchQuery"
+                type="button"
+                class="search__clear"
+                :aria-label="t('albums.clearSearch')"
+                @click="searchQuery = ''"
+              >✕</button>
+            </div>
+            <div class="filter">
+              <button :class="{ active: activeCat === 'all' }" @click="selectCategory('all')">
+                {{ t('common.all') }} <sup>{{ galleryAlbums.length }}</sup>
               </button>
-              <div v-if="categoryMenuOpen" class="filter__panel" role="menu">
+              <button
+                v-for="cat in inlineCategories"
+                :key="cat.name"
+                :class="{ active: activeCat === cat.name }"
+                :lang="textLang(cat.name)"
+                @click="selectCategory(cat.name)"
+              >
+                {{ cat.name }} <sup>{{ cat.count }}</sup>
+              </button>
+              <div v-if="secondaryCategories.length" class="filter__menu">
                 <button
-                  v-for="cat in secondaryCategories"
-                  :key="`menu-${cat.name}`"
                   type="button"
-                  role="menuitemradio"
-                  :aria-checked="activeCat === cat.name"
-                  :class="{ active: activeCat === cat.name }"
-                  :lang="textLang(cat.name)"
-                  @click="selectCategory(cat.name)"
+                  class="filter__more"
+                  :class="{ active: activeSecondaryCategory }"
+                  :aria-expanded="categoryMenuOpen"
+                  aria-haspopup="menu"
+                  @click="categoryMenuOpen = !categoryMenuOpen"
                 >
-                  <span>{{ cat.name }}</span>
-                  <sup>{{ cat.count }}</sup>
+                  {{ t('albums.categoryMenu') }} <sup>{{ secondaryCategories.length }}</sup>
                 </button>
+                <div v-if="categoryMenuOpen" class="filter__panel" role="menu">
+                  <button
+                    v-for="cat in secondaryCategories"
+                    :key="`menu-${cat.name}`"
+                    type="button"
+                    role="menuitemradio"
+                    :aria-checked="activeCat === cat.name"
+                    :class="{ active: activeCat === cat.name }"
+                    :lang="textLang(cat.name)"
+                    @click="selectCategory(cat.name)"
+                  >
+                    <span>{{ cat.name }}</span>
+                    <sup>{{ cat.count }}</sup>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -241,7 +286,7 @@ useSeoMeta({
             </NuxtLink>
           </div>
         </div>
-        <p v-if="filtered.length === 0" class="empty">{{ t('albums.noAlbums') }}</p>
+        <p v-if="filtered.length === 0" class="empty">{{ normalizedSearch ? t('albums.noSearchResults') : t('albums.noAlbums') }}</p>
 
         <nav v-if="totalPages > 1" class="pager" aria-label="Pagination">
           <button type="button" class="pager__nav" :disabled="page === 1" @click="goToPage(page - 1)">
@@ -298,6 +343,40 @@ useSeoMeta({
 .eyebrow .num { color: var(--accent); font-weight: 500; }
 .index-bar__title { font-family: var(--font-serif); font-size: clamp(1.6rem, 2.4vw, 2.3rem); font-weight: 300; letter-spacing: -0.02em; line-height: 1.1; }
 .index-bar__title em { font-style: italic; color: var(--accent); }
+
+.index-bar__controls { display: flex; flex-direction: column; align-items: flex-end; gap: 1.4rem; }
+
+.search { position: relative; width: min(20rem, 100%); }
+.search__input {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--subtle);
+  border-radius: 0;
+  padding: 0.45rem 1.6rem 0.45rem 0;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--dark);
+  transition: border-color 0.2s;
+}
+.search__input:focus { outline: none; border-color: var(--accent); }
+.search__input::placeholder { text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.56rem; color: var(--muted); }
+.search__input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.search__clear {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+  font-size: 0.6rem;
+  color: var(--muted);
+  transition: color 0.2s;
+}
+.search__clear:hover { color: var(--accent); }
 
 .filter { display: flex; flex-wrap: wrap; gap: 0.4rem 1.6rem; max-width: 760px; justify-content: flex-end; align-items: flex-start; }
 .filter button { background: none; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 0.6rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); padding: 0.35rem 0; position: relative; transition: color 0.2s; }
@@ -402,5 +481,6 @@ useSeoMeta({
   .page-head__stats { justify-content: flex-start; }
   .filter { justify-content: flex-start; }
   .index-bar { flex-direction: column; align-items: flex-start; }
+  .index-bar__controls { align-items: flex-start; width: 100%; }
 }
 </style>

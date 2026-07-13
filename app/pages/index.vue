@@ -24,7 +24,7 @@ function imageSrc(key: string | null | undefined) {
 }
 
 function albumPath(a: { slug: string }) {
-  return `/albums/${a.slug}`
+  return albumRoutePath(a.slug)
 }
 
 // ── Hero background: randomise from the admin-managed image pool.

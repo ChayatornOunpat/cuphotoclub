@@ -29,8 +29,8 @@ function previewPath(album: NonNullable<typeof albums.value>[number]) {
   // Live ('public') and 'link-only' albums are reachable on their real public
   // page (the API only 404s drafts), so open that directly — no preview/admin
   // chrome. Only drafts fall back to the admin preview route.
-  if (album.visibility === 'draft') return `/admin/albums/${album.slug}/preview`
-  return `/albums/${album.slug}`
+  if (album.visibility === 'draft') return `${adminAlbumRoutePath(album.slug)}/preview`
+  return albumRoutePath(album.slug)
 }
 
 function modifiedValue(album: NonNullable<typeof albums.value>[number]) {
@@ -154,7 +154,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           <td class="t-muted">{{ albumDateDisplay(a) }}</td>
           <td class="t-actions">
             <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
-            <NuxtLink :to="localePath(`/admin/albums/${a.slug}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
+            <NuxtLink :to="localePath(adminAlbumRoutePath(a.slug))" class="link">{{ t('admin.edit') }}</NuxtLink>
             <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title || t('admin.untitledDraft'))">
               {{ deleting === a.id ? '...' : t('admin.delete') }}
             </button>
@@ -177,7 +177,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           </div>
           <div class="card__actions">
             <NuxtLink :to="localePath(previewPath(a))" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
-            <NuxtLink :to="localePath(`/admin/albums/${a.slug}`)" class="link">{{ t('admin.edit') }}</NuxtLink>
+            <NuxtLink :to="localePath(adminAlbumRoutePath(a.slug))" class="link">{{ t('admin.edit') }}</NuxtLink>
             <button class="link link--del" :disabled="deleting === a.id" @click="del(a.id, a.title || t('admin.untitledDraft'))">
               {{ deleting === a.id ? '...' : t('admin.delete') }}
             </button>

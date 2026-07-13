@@ -24,7 +24,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const localePath = useLocalePath()
 
-const albumPath = computed(() => localePath(`/albums/${props.albumId}`))
+const albumPath = computed(() => localePath(albumRoutePath(props.albumId)))
 
 const formattedDate = computed(() => {
   if (!props.albumDate) return ''

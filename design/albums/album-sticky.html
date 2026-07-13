@@ -62,14 +62,34 @@
     .meta__btn.solid:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
     .meta__count { margin-top: 2rem; font-size: 0.54rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 1rem; }
     .meta__count::before { content: ''; width: 30px; height: 1px; background: var(--accent); }
+    .meta__count b { color: var(--accent); font-weight: 500; }
 
     .frames { display: flex; flex-direction: column; gap: 2rem; }
     figure { margin: 0; }
     .frame { overflow: hidden; background: var(--hero-bg); position: relative; }
-    .frame img { width: 100%; display: block; object-fit: cover; transition: transform 1s cubic-bezier(0.25,0.46,0.45,0.94); }
-    .frame:hover img { transform: scale(1.03); }
+    .frame img { width: 100%; display: block; object-fit: cover; }
     .frame__num { position: absolute; top: 1rem; left: 1rem; font-size: 0.5rem; letter-spacing: 0.18em; color: #F5F4F0; background: rgba(12,12,10,0.5); backdrop-filter: blur(4px); padding: 0.4rem 0.6rem; }
     figcaption { margin-top: 0.85rem; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+    /* reveal on scroll */
+    .reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.85s ease, transform 0.85s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .reveal.in { opacity: 1; transform: none; }
+
+    /* ─── LIGHTBOX ───────────────────────── */
+    .frame { cursor: zoom-in; }
+    .lb { position: fixed; inset: 0; z-index: 300; background: rgba(10,10,8,0.97); display: none; flex-direction: column; }
+    .lb.open { display: flex; }
+    .lb__top { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; color: rgba(245,244,240,0.7); }
+    .lb__counter { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; }
+    .lb__counter b { color: var(--accent); font-weight: 500; }
+    .lb__close { background: none; border: none; color: rgba(245,244,240,0.7); font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: color 0.2s; }
+    .lb__close:hover { color: var(--accent); }
+    .lb__stage { flex: 1; display: flex; align-items: center; justify-content: center; gap: 1.5rem; padding: 0 2rem; }
+    .lb__img { max-width: min(1100px, 86vw); max-height: 78vh; object-fit: contain; box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+    .lb__nav { background: none; border: 1px solid rgba(245,244,240,0.2); color: #F5F4F0; width: 48px; height: 48px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; flex-shrink: 0; transition: all 0.2s; }
+    .lb__nav:hover { background: var(--accent); border-color: var(--accent); }
+    .lb__cap { text-align: center; padding: 1.25rem 2rem 2rem; color: rgba(245,244,240,0.55); font-size: 0.68rem; letter-spacing: 0.12em; }
+    .lb__cap span { color: var(--accent); margin-right: 0.75rem; }
 
     footer { background: var(--dark); color: rgba(245,244,240,0.7); padding: 3rem; text-align: center; }
     .footer__brand { font-size: 0.82rem; font-weight: 500; letter-spacing: 0.18em; text-decoration: none; color: #F5F4F0; }
@@ -116,10 +136,10 @@
         <div class="meta__fact"><span class="k">Frames</span><span class="v">6</span></div>
       </div>
       <div class="meta__actions">
-        <a href="#" class="meta__btn solid">Slideshow</a>
+        <a href="#" class="meta__btn solid" id="playBtn">Slideshow</a>
         <a href="#" class="meta__btn">Share</a>
       </div>
-      <div class="meta__count">Scroll the set →</div>
+      <div class="meta__count"><span>Frame <b id="metaCur">01</b> / 06</span></div>
     </aside>
 
     <!-- SCROLLING FRAMES -->
@@ -133,12 +153,78 @@
     </div>
   </div>
 
+  <!-- LIGHTBOX -->
+  <div class="lb" id="lb">
+    <div class="lb__top">
+      <span class="lb__counter"><b id="lbCur">01</b> / 06 · Dawn at Lumphini</span>
+      <button class="lb__close" id="lbClose">Close ✕</button>
+    </div>
+    <div class="lb__stage">
+      <button class="lb__nav" id="lbPrev">‹</button>
+      <img class="lb__img" id="lbImg" src="" alt="">
+      <button class="lb__nav" id="lbNext">›</button>
+    </div>
+    <div class="lb__cap"><span id="lbCapNum">01</span><span id="lbCap"></span></div>
+  </div>
+
   <footer>
     <a href="#" class="footer__brand"><span class="cu">CU</span>PHOTOCLUB</a>
     <p class="footer__tagline">© 2025 CU Photo Club · Chulalongkorn University · Bangkok</p>
   </footer>
 
   <script>
+    const seeds = ['dawnlumphini_1','dawnlumphini_2','dawnlumphini_3','dawnlumphini_4','dawnlumphini_5','dawnlumphini_6'];
+    const caps = ['First light over the lake','The eastern path, empty','A runner passes',"Reeds at the water's edge",'Mist burning off','Full morning, the city wakes'];
+    const figs = [...document.querySelectorAll('.frames figure')];
+
+    // reveal on scroll
+    figs.forEach(f => f.classList.add('reveal'));
+    const ioReveal = new IntersectionObserver(entries => {
+      entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); ioReveal.unobserve(en.target); } });
+    }, { threshold: 0.15 });
+    figs.forEach(f => ioReveal.observe(f));
+
+    // live frame counter in the sticky meta
+    const metaCur = document.getElementById('metaCur');
+    const ioCur = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        metaCur.textContent = String(figs.indexOf(en.target) + 1).padStart(2, '0');
+      });
+    }, { rootMargin: '-35% 0px -55% 0px', threshold: 0 });
+    figs.forEach(f => ioCur.observe(f));
+
+    // lightbox + slideshow
+    const lb = document.getElementById('lb'), lbImg = document.getElementById('lbImg');
+    const lbCur = document.getElementById('lbCur'), lbCap = document.getElementById('lbCap'), lbCapNum = document.getElementById('lbCapNum');
+    let idx = 0, timer = null;
+    function stopPlay() { if (timer) { clearInterval(timer); timer = null; } }
+    function show(i) {
+      idx = (i + seeds.length) % seeds.length;
+      lbImg.src = `https://picsum.photos/seed/${seeds[idx]}/1400/1050`;
+      lbCur.textContent = String(idx+1).padStart(2,'0');
+      lbCapNum.textContent = String(idx+1).padStart(2,'0');
+      lbCap.textContent = caps[idx];
+      [idx+1, idx-1].forEach(n => { const m = (n + seeds.length) % seeds.length; new Image().src = `https://picsum.photos/seed/${seeds[m]}/1400/1050`; });
+    }
+    function open(i) { show(i); lb.classList.add('open'); document.body.style.overflow = 'hidden'; }
+    function close() { stopPlay(); lb.classList.remove('open'); document.body.style.overflow = ''; }
+    figs.forEach((f, i) => f.querySelector('.frame').addEventListener('click', () => { stopPlay(); open(i); }));
+    document.getElementById('playBtn').addEventListener('click', e => {
+      e.preventDefault(); open(0);
+      stopPlay(); timer = setInterval(() => show(idx + 1), 3000);
+    });
+    document.getElementById('lbClose').onclick = close;
+    document.getElementById('lbPrev').onclick = () => { stopPlay(); show(idx - 1); };
+    document.getElementById('lbNext').onclick = () => { stopPlay(); show(idx + 1); };
+    lb.addEventListener('click', e => { if (e.target === lb) close(); });
+    document.addEventListener('keydown', e => {
+      if (!lb.classList.contains('open')) return;
+      if (e.key === 'Escape') close();
+      if (e.key === 'ArrowLeft') { stopPlay(); show(idx - 1); }
+      if (e.key === 'ArrowRight') { stopPlay(); show(idx + 1); }
+    });
+
     const progress = document.getElementById('progress');
     window.addEventListener('scroll', () => {
       const total = document.body.scrollHeight - window.innerHeight;

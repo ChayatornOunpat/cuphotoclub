@@ -71,10 +71,29 @@
     .essay { padding: 3rem 3rem 6rem; max-width: 1380px; margin: 0 auto; }
     figure { margin: 0; }
     .frame { overflow: hidden; background: var(--hero-bg); }
-    .frame img { width: 100%; display: block; object-fit: cover; transition: transform 1s cubic-bezier(0.25,0.46,0.45,0.94); }
-    .frame:hover img { transform: scale(1.03); }
+    .frame img { width: 100%; display: block; object-fit: cover; }
     figcaption { display: flex; gap: 1rem; align-items: baseline; margin-top: 1rem; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
     figcaption .n { color: var(--accent); font-weight: 500; }
+
+    /* reveal on scroll */
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .reveal.in { opacity: 1; transform: none; }
+
+    /* ─── LIGHTBOX ───────────────────────── */
+    .frame { cursor: zoom-in; }
+    .lb { position: fixed; inset: 0; z-index: 300; background: rgba(10,10,8,0.97); display: none; flex-direction: column; }
+    .lb.open { display: flex; }
+    .lb__top { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; color: rgba(245,244,240,0.7); }
+    .lb__counter { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; }
+    .lb__counter b { color: var(--accent); font-weight: 500; }
+    .lb__close { background: none; border: none; color: rgba(245,244,240,0.7); font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: color 0.2s; }
+    .lb__close:hover { color: var(--accent); }
+    .lb__stage { flex: 1; display: flex; align-items: center; justify-content: center; gap: 1.5rem; padding: 0 2rem; }
+    .lb__img { max-width: min(1100px, 86vw); max-height: 78vh; object-fit: contain; box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+    .lb__nav { background: none; border: 1px solid rgba(245,244,240,0.2); color: #F5F4F0; width: 48px; height: 48px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; flex-shrink: 0; transition: all 0.2s; }
+    .lb__nav:hover { background: var(--accent); border-color: var(--accent); }
+    .lb__cap { text-align: center; padding: 1.25rem 2rem 2rem; color: rgba(245,244,240,0.55); font-size: 0.68rem; letter-spacing: 0.12em; }
+    .lb__cap span { color: var(--accent); margin-right: 0.75rem; }
 
     .row { margin-bottom: 4.5rem; }
     .row--single { max-width: 760px; }
@@ -160,16 +179,31 @@
       </figure>
     </div>
 
-    <figure class="row row--single right">
-      <div class="frame"><img src="https://picsum.photos/seed/dawnlumphini_5/1100/820" alt="Frame 5"></div>
-      <figcaption><span class="n">05</span> Mist burning off</figcaption>
-    </figure>
-
-    <figure class="row row--bleed">
-      <div class="frame"><img src="https://picsum.photos/seed/dawnlumphini_6/1600/900" alt="Frame 6"></div>
-      <figcaption><span class="n">06</span> Full morning, the city wakes</figcaption>
-    </figure>
+    <div class="row row--offset">
+      <figure>
+        <div class="frame"><img src="https://picsum.photos/seed/dawnlumphini_5/1200/850" alt="Frame 5"></div>
+        <figcaption><span class="n">05</span> Mist burning off</figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><img src="https://picsum.photos/seed/dawnlumphini_6/900/880" alt="Frame 6"></div>
+        <figcaption><span class="n">06</span> Full morning, the city wakes</figcaption>
+      </figure>
+    </div>
   </section>
+
+  <!-- LIGHTBOX -->
+  <div class="lb" id="lb">
+    <div class="lb__top">
+      <span class="lb__counter"><b id="lbCur">01</b> / 06 · Dawn at Lumphini</span>
+      <button class="lb__close" id="lbClose">Close ✕</button>
+    </div>
+    <div class="lb__stage">
+      <button class="lb__nav" id="lbPrev">‹</button>
+      <img class="lb__img" id="lbImg" src="" alt="">
+      <button class="lb__nav" id="lbNext">›</button>
+    </div>
+    <div class="lb__cap"><span id="lbCapNum">01</span><span id="lbCap"></span></div>
+  </div>
 
   <!-- ALBUM NAV -->
   <section class="albnav">
@@ -188,6 +222,43 @@
   </footer>
 
   <script>
+    // reveal on scroll
+    document.querySelectorAll('.row, .intro__lead').forEach(el => el.classList.add('reveal'));
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+    // lightbox
+    const seeds = ['dawnlumphini_1','dawnlumphini_2','dawnlumphini_3','dawnlumphini_4','dawnlumphini_5','dawnlumphini_6'];
+    const caps = ['First light over the lake','The eastern path, empty','A runner passes',"Reeds at the water's edge",'Mist burning off','Full morning, the city wakes'];
+    const lb = document.getElementById('lb'), lbImg = document.getElementById('lbImg');
+    const lbCur = document.getElementById('lbCur'), lbCap = document.getElementById('lbCap'), lbCapNum = document.getElementById('lbCapNum');
+    let idx = 0;
+    function show(i) {
+      idx = (i + seeds.length) % seeds.length;
+      lbImg.src = `https://picsum.photos/seed/${seeds[idx]}/1400/1050`;
+      lbCur.textContent = String(idx+1).padStart(2,'0');
+      lbCapNum.textContent = String(idx+1).padStart(2,'0');
+      lbCap.textContent = caps[idx];
+      // preload neighbours
+      [idx+1, idx-1].forEach(n => { const m = (n + seeds.length) % seeds.length; new Image().src = `https://picsum.photos/seed/${seeds[m]}/1400/1050`; });
+    }
+    function close() { lb.classList.remove('open'); document.body.style.overflow = ''; }
+    document.querySelectorAll('.essay .frame').forEach((f, i) => f.addEventListener('click', () => {
+      show(i); lb.classList.add('open'); document.body.style.overflow = 'hidden';
+    }));
+    document.getElementById('lbClose').onclick = close;
+    document.getElementById('lbPrev').onclick = () => show(idx - 1);
+    document.getElementById('lbNext').onclick = () => show(idx + 1);
+    lb.addEventListener('click', e => { if (e.target === lb) close(); });
+    document.addEventListener('keydown', e => {
+      if (!lb.classList.contains('open')) return;
+      if (e.key === 'Escape') close();
+      if (e.key === 'ArrowLeft') show(idx - 1);
+      if (e.key === 'ArrowRight') show(idx + 1);
+    });
+
     const nav = document.getElementById('nav'), cover = document.getElementById('cover');
     const parallax = document.getElementById('parallax'), progress = document.getElementById('progress');
     window.addEventListener('scroll', () => {

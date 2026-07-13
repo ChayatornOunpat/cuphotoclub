@@ -59,8 +59,12 @@
 
     .grid { column-count: 3; column-gap: 1rem; }
     .cell { break-inside: avoid; margin-bottom: 1rem; position: relative; overflow: hidden; cursor: zoom-in; background: var(--hero-bg); display: block; border: none; padding: 0; width: 100%; }
-    .cell img { width: 100%; display: block; object-fit: cover; transition: transform 0.8s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.3s; }
-    .cell:hover img { transform: scale(1.04); }
+    .cell img { width: 100%; display: block; object-fit: cover; filter: grayscale(45%) contrast(1.02); transition: opacity 0.3s, filter 0.45s ease; }
+    .cell:hover img { filter: none; }
+
+    /* staggered reveal */
+    .cell.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.25,0.46,0.45,0.94); }
+    .cell.reveal.in { opacity: 1; transform: none; }
     .cell__num { position: absolute; top: 0.7rem; left: 0.7rem; font-size: 0.5rem; letter-spacing: 0.16em; color: #F5F4F0; background: rgba(12,12,10,0.5); backdrop-filter: blur(4px); padding: 0.35rem 0.55rem; opacity: 0.8; transition: background 0.25s; }
     .cell:hover .cell__num { background: var(--accent); opacity: 1; }
     .cell__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 2rem 0.8rem 0.7rem; background: linear-gradient(transparent, rgba(12,12,10,0.8)); font-size: 0.56rem; letter-spacing: 0.1em; color: rgba(245,244,240,0.85); text-align: left; opacity: 0; transition: opacity 0.28s; }
@@ -161,11 +165,23 @@
     const dims = ['800/1050','800/600','800/900','800/640','800/1000','800/700'];
     const grid = document.getElementById('grid');
     grid.innerHTML = frames.map((f, i) => `
-      <button class="cell" data-i="${i}">
+      <button class="cell reveal" data-i="${i}" style="transition-delay:${(i % 3) * 90}ms">
         <span class="cell__num">${String(i+1).padStart(2,'0')}</span>
         <img src="https://picsum.photos/seed/${f.seed}/${dims[i]}" alt="${f.cap}">
         <span class="cell__cap">${f.cap}</span>
       </button>`).join('');
+
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        if (en.isIntersecting) {
+          en.target.classList.add('in');
+          io.unobserve(en.target);
+          // clear the stagger delay so it doesn't slow the hover transitions later
+          setTimeout(() => { en.target.style.transitionDelay = ''; }, 1200);
+        }
+      });
+    }, { threshold: 0.12 });
+    grid.querySelectorAll('.cell').forEach(c => io.observe(c));
 
     const lb = document.getElementById('lb'), lbImg = document.getElementById('lbImg');
     const lbCur = document.getElementById('lbCur'), lbCap = document.getElementById('lbCap'), lbCapNum = document.getElementById('lbCapNum');
@@ -176,6 +192,8 @@
       lbCur.textContent = String(idx+1).padStart(2,'0');
       lbCapNum.textContent = String(idx+1).padStart(2,'0');
       lbCap.textContent = frames[idx].cap;
+      // preload neighbours for instant prev/next
+      [idx+1, idx-1].forEach(n => { const m = (n + frames.length) % frames.length; new Image().src = `https://picsum.photos/seed/${frames[m].seed}/1400/1050`; });
     }
     grid.addEventListener('click', e => {
       const cell = e.target.closest('.cell'); if (!cell) return;
