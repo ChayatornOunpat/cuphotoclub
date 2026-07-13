@@ -31,10 +31,38 @@ const imageCells = computed(() => {
 })
 
 const pad = (n: number) => String(n).padStart(2, '0')
+
+// ── Live frame counter (same rAF scroll tracking as AlbumChapters) ──
+const rootEl = ref<HTMLElement | null>(null)
+const currentFrame = ref(1)
+let scrollRaf = 0
+
+function trackScroll() {
+  scrollRaf = 0
+  const root = rootEl.value
+  if (!root) return
+  const fold = window.innerHeight * 0.7
+  let frame = 1
+  root.querySelectorAll<HTMLElement>('[data-frame-n]').forEach((el) => {
+    if (el.getBoundingClientRect().top < fold) frame = Math.max(frame, Number(el.dataset.frameN))
+  })
+  currentFrame.value = frame
+}
+function onScroll() {
+  if (!scrollRaf) scrollRaf = requestAnimationFrame(trackScroll)
+}
+onMounted(() => {
+  window.addEventListener('scroll', onScroll, { passive: true })
+  trackScroll()
+})
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
+})
 </script>
 
 <template>
-  <article>
+  <article ref="rootEl">
     <div class="split">
       <!-- STICKY META -->
       <aside class="meta">
@@ -55,7 +83,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
           <div v-if="album.location" class="meta__fact"><span class="k">{{ t('albums.location') }}</span><span class="v">{{ album.location }}</span></div>
           <div class="meta__fact"><span class="k">{{ t('albums.frames') }}</span><span class="v">{{ imageCells.length }}</span></div>
         </div>
-        <div class="meta__count">{{ t('albums.scrollSet') }}</div>
+        <div class="meta__count"><span>{{ t('albums.frameLabel') }} <b>{{ pad(currentFrame) }}</b> / {{ pad(imageCells.length) }}</span></div>
       </aside>
 
       <!-- SCROLLING FRAMES -->
@@ -63,6 +91,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
         <figure
           v-for="(img, i) in imageCells"
           :key="i"
+          :data-frame-n="i + 1"
           :data-row-n="img.row"
           :data-cell-n="img.cell"
           :class="{ 'is-admin-selected': selectedRow === img.row && (selectedCell === img.cell || selectedCell === undefined) }"
@@ -100,6 +129,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 .meta__fact .v { color: var(--dark); }
 .meta__count { margin-top: 2rem; font-size: 0.54rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 1rem; }
 .meta__count::before { content: ''; width: 30px; height: 1px; background: var(--accent); }
+.meta__count b { color: var(--accent); font-weight: 500; }
 
 .frames { display: flex; flex-direction: column; gap: 2rem; }
 figure { margin: 0; }

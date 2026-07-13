@@ -40,6 +40,8 @@ const activeCat = ref(queryCategory(route.query.category))
 const searchQuery = ref(queryText(route.query.q))
 const normalizedSearch = computed(() => searchQuery.value.trim().toLowerCase())
 const categoryMenuOpen = ref(false)
+const searchOpen = ref(Boolean(normalizedSearch.value))
+const searchInput = ref<HTMLInputElement | null>(null)
 const inlineCategoryLimit = 4
 const sortedCategories = computed(() =>
   [...categories.value].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
@@ -55,15 +57,16 @@ const inlineCategories = computed(() => {
   return cats
 })
 const filtered = computed(() => {
-  const byCategory = activeCat.value === 'all'
-    ? galleryAlbums.value
-    : galleryAlbums.value.filter(a => a.category === activeCat.value)
   const q = normalizedSearch.value
-  if (!q) return byCategory
-  return byCategory.filter(a =>
+  if (q) return galleryAlbums.value.filter(a =>
     [a.title, a.category, a.location, a.excerpt, a.date, a.dateEnd]
       .some(value => String(value ?? '').toLowerCase().includes(q))
   )
+
+  const byCategory = activeCat.value === 'all'
+    ? galleryAlbums.value
+    : galleryAlbums.value.filter(a => a.category === activeCat.value)
+  return byCategory
 })
 
 const pageSize = 30
@@ -84,11 +87,20 @@ watch(normalizedSearch, () => {
 watch(searchQuery, value => {
   const query = { ...route.query }
   delete query.q
+  delete query.category
   const q = value.trim()
+  if (q) {
+    searchOpen.value = true
+    activeCat.value = 'all'
+  }
   router.replace({ query: q ? { ...query, q } : query })
 })
 watch(() => route.query.q, value => {
   const next = queryText(value)
+  if (next.trim()) {
+    searchOpen.value = true
+    activeCat.value = 'all'
+  }
   if (next !== searchQuery.value.trim()) searchQuery.value = next
 })
 watch(totalPages, () => {
@@ -126,12 +138,36 @@ function goToPage(n: number) {
 }
 
 function selectCategory(category: string) {
+  searchOpen.value = false
+  searchQuery.value = ''
   activeCat.value = category
   const query = { ...route.query }
   delete query.category
+  delete query.q
   router.replace({
     query: category === 'all' ? query : { ...query, category }
   })
+}
+
+function toggleSearch() {
+  categoryMenuOpen.value = false
+  const query = { ...route.query }
+  if (searchOpen.value && !normalizedSearch.value) {
+    searchOpen.value = false
+    return
+  }
+  if (searchOpen.value) {
+    searchQuery.value = ''
+    delete query.q
+    router.replace({ query })
+    return
+  }
+
+  searchOpen.value = true
+  activeCat.value = 'all'
+  delete query.category
+  router.replace({ query })
+  nextTick(() => searchInput.value?.focus())
 }
 
 function imageCount(a: NonNullable<typeof albums.value>[number]): number {
@@ -193,62 +229,78 @@ useSeoMeta({
             <h2 class="index-bar__title">{{ t('albums.sequencedBy') }}</h2>
           </div>
           <div class="index-bar__controls">
-            <div class="search">
-              <input
-                v-model="searchQuery"
-                type="search"
-                class="search__input"
-                :placeholder="t('albums.searchPlaceholder')"
-                :aria-label="t('albums.searchLabel')"
-              >
-              <button
-                v-if="searchQuery"
-                type="button"
-                class="search__clear"
-                :aria-label="t('albums.clearSearch')"
-                @click="searchQuery = ''"
-              >✕</button>
-            </div>
-            <div class="filter">
-              <button :class="{ active: activeCat === 'all' }" @click="selectCategory('all')">
-                {{ t('common.all') }} <sup>{{ galleryAlbums.length }}</sup>
-              </button>
-              <button
-                v-for="cat in inlineCategories"
-                :key="cat.name"
-                :class="{ active: activeCat === cat.name }"
-                :lang="textLang(cat.name)"
-                @click="selectCategory(cat.name)"
-              >
-                {{ cat.name }} <sup>{{ cat.count }}</sup>
-              </button>
-              <div v-if="secondaryCategories.length" class="filter__menu">
-                <button
-                  type="button"
-                  class="filter__more"
-                  :class="{ active: activeSecondaryCategory }"
-                  :aria-expanded="categoryMenuOpen"
-                  aria-haspopup="menu"
-                  @click="categoryMenuOpen = !categoryMenuOpen"
-                >
-                  {{ t('albums.categoryMenu') }} <sup>{{ secondaryCategories.length }}</sup>
-                </button>
-                <div v-if="categoryMenuOpen" class="filter__panel" role="menu">
+            <div class="filter" :class="{ searching: searchOpen }">
+              <Transition name="archive-filter" mode="out-in">
+                <div v-if="!searchOpen" key="categories" class="filter__categories">
+                  <button :class="{ active: activeCat === 'all' }" @click="selectCategory('all')">
+                    {{ t('common.all') }} <sup>{{ galleryAlbums.length }}</sup>
+                  </button>
                   <button
-                    v-for="cat in secondaryCategories"
-                    :key="`menu-${cat.name}`"
-                    type="button"
-                    role="menuitemradio"
-                    :aria-checked="activeCat === cat.name"
+                    v-for="cat in inlineCategories"
+                    :key="cat.name"
                     :class="{ active: activeCat === cat.name }"
                     :lang="textLang(cat.name)"
                     @click="selectCategory(cat.name)"
                   >
-                    <span>{{ cat.name }}</span>
-                    <sup>{{ cat.count }}</sup>
+                    {{ cat.name }} <sup>{{ cat.count }}</sup>
+                  </button>
+                  <div v-if="secondaryCategories.length" class="filter__menu">
+                    <button
+                      type="button"
+                      class="filter__more"
+                      :class="{ active: activeSecondaryCategory }"
+                      :aria-expanded="categoryMenuOpen"
+                      aria-haspopup="menu"
+                      @click="categoryMenuOpen = !categoryMenuOpen"
+                    >
+                      {{ t('albums.categoryMenu') }} <sup>{{ secondaryCategories.length }}</sup>
+                    </button>
+                    <div v-if="categoryMenuOpen" class="filter__panel" role="menu">
+                      <button
+                        v-for="cat in secondaryCategories"
+                        :key="`menu-${cat.name}`"
+                        type="button"
+                        role="menuitemradio"
+                        :aria-checked="activeCat === cat.name"
+                        :class="{ active: activeCat === cat.name }"
+                        :lang="textLang(cat.name)"
+                        @click="selectCategory(cat.name)"
+                      >
+                        <span>{{ cat.name }}</span>
+                        <sup>{{ cat.count }}</sup>
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="filter-search__button"
+                    :aria-label="t('albums.searchLabel')"
+                    @click="toggleSearch"
+                  >
+                    <Icon name="heroicons:magnifying-glass" aria-hidden="true" />
                   </button>
                 </div>
-              </div>
+                <div v-else key="search" class="filter__search-state">
+                  <div class="search">
+                    <input
+                      ref="searchInput"
+                      v-model="searchQuery"
+                      type="search"
+                      class="search__input"
+                      :placeholder="t('albums.searchPlaceholder')"
+                      :aria-label="t('albums.searchLabel')"
+                    >
+                  </div>
+                  <button
+                    type="button"
+                    class="filter-search__button active"
+                    :aria-label="t('albums.clearSearch')"
+                    @click="toggleSearch"
+                  >
+                    <span aria-hidden="true">✕</span>
+                  </button>
+                </div>
+              </Transition>
             </div>
           </div>
         </div>
@@ -338,15 +390,16 @@ useSeoMeta({
 .section-pad { padding: 5rem 3rem 6rem; }
 .wrap { max-width: 1380px; margin: 0 auto; }
 
-.index-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem; flex-wrap: wrap; margin-bottom: 3.5rem; }
+.index-bar { display: grid; grid-template-columns: minmax(18rem, 1fr) minmax(22rem, 46rem); align-items: end; gap: clamp(2rem, 5vw, 5.5rem); margin-bottom: 3.5rem; }
 .eyebrow { font-size: 0.54rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.25rem; }
+.eyebrow::after { content: ''; display: block; width: min(22rem, 26vw); height: 1px; background: var(--subtle); }
 .eyebrow .num { color: var(--accent); font-weight: 500; }
 .index-bar__title { font-family: var(--font-serif); font-size: clamp(1.6rem, 2.4vw, 2.3rem); font-weight: 300; letter-spacing: -0.02em; line-height: 1.1; }
 .index-bar__title em { font-style: italic; color: var(--accent); }
 
-.index-bar__controls { display: flex; flex-direction: column; align-items: flex-end; gap: 1.4rem; }
+.index-bar__controls { min-width: 0; }
 
-.search { position: relative; width: min(20rem, 100%); }
+.search { position: relative; width: 100%; min-width: 0; }
 .search__input {
   width: 100%;
   background: none;
@@ -355,7 +408,7 @@ useSeoMeta({
   border-radius: 0;
   padding: 0.45rem 1.6rem 0.45rem 0;
   font-family: var(--font-sans);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   letter-spacing: 0.08em;
   color: var(--dark);
   transition: border-color 0.2s;
@@ -378,7 +431,24 @@ useSeoMeta({
 }
 .search__clear:hover { color: var(--accent); }
 
-.filter { display: flex; flex-wrap: wrap; gap: 0.4rem 1.6rem; max-width: 760px; justify-content: flex-end; align-items: flex-start; }
+.filter { display: flex; flex-wrap: nowrap; gap: 0.4rem 1.25rem; justify-content: flex-end; align-items: center; min-width: 0; }
+.filter.searching {
+  width: min(28rem, 100%);
+  margin-left: auto;
+}
+.filter__categories,
+.filter__search-state {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.4rem 1.25rem;
+  width: 100%;
+  min-width: 0;
+}
+.filter__search-state {
+  gap: 0.85rem;
+}
 .filter button { background: none; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 0.6rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); padding: 0.35rem 0; position: relative; transition: color 0.2s; }
 .filter button:hover { color: var(--dark); }
 .filter button sup { font-size: 0.78em; color: var(--subtle); margin-left: 0.2em; transition: color 0.2s; }
@@ -430,6 +500,43 @@ useSeoMeta({
 .filter__panel button sup {
   flex-shrink: 0;
 }
+.filter__search-state .search {
+  flex: 1 1 auto;
+}
+.filter__search-state .search__input {
+  padding-block: 0.35rem;
+}
+.filter-search__button {
+  width: 1.45rem;
+  height: 1.45rem;
+  display: grid;
+  place-items: center;
+  flex: 0 0 1.45rem;
+  padding: 0;
+}
+.filter-search__button :deep(svg) {
+  width: 0.9rem;
+  height: 0.9rem;
+  stroke-width: 1.8;
+}
+.filter-search__button span {
+  font-size: 0.72rem;
+  line-height: 1;
+}
+.filter-search__button.active { color: var(--accent); }
+.filter-search__button.active::after { display: none; }
+.archive-filter-enter-active {
+  transition: opacity 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.archive-filter-leave-active {
+  transition: opacity 0.14s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.archive-filter-enter-from {
+  opacity: 0;
+}
+.archive-filter-leave-to {
+  opacity: 0;
+}
 
 .feature { display: grid; grid-template-columns: 1.45fr 1fr; gap: 0; margin-bottom: 4.5rem; background: var(--hero-bg); cursor: pointer; overflow: hidden; text-decoration: none; }
 .feature__img { position: relative; overflow: hidden; min-height: 460px; }
@@ -471,6 +578,8 @@ useSeoMeta({
 .pager__status { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 
 @media (max-width: 1000px) {
+  .index-bar { grid-template-columns: 1fr; }
+  .index-bar__controls { max-width: 100%; }
   .feature { grid-template-columns: 1fr; }
   .feature__img { min-height: 320px; }
 }
@@ -479,8 +588,31 @@ useSeoMeta({
   .page-head__body, .page-head__foot { padding-left: 1.5rem; padding-right: 1.5rem; }
   .page-head__foot { grid-template-columns: 1fr; }
   .page-head__stats { justify-content: flex-start; }
-  .filter { justify-content: flex-start; }
-  .index-bar { flex-direction: column; align-items: flex-start; }
-  .index-bar__controls { align-items: flex-start; width: 100%; }
+  .index-bar__controls { width: 100%; }
+  .filter { justify-content: flex-start; overflow-x: auto; padding-bottom: 0.25rem; }
+  .filter.searching { width: 100%; margin-left: 0; overflow-x: visible; }
+  .filter__categories {
+    justify-content: flex-start;
+  }
+  .filter__categories > button,
+  .filter__menu {
+    flex: 0 0 auto;
+  }
+  .filter__search-state {
+    justify-content: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .archive-filter-enter-active,
+  .archive-filter-leave-active,
+  .filter button,
+  .search__input,
+  .filter-search__button :deep(svg) {
+    transition-duration: 0.01ms !important;
+  }
+  .archive-filter-enter-from,
+  .archive-filter-leave-to {
+    transform: none;
+  }
 }
 </style>

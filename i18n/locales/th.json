@@ -144,6 +144,7 @@
     "frameRange": "ภาพที่ {from}–{to}",
     "close": "ปิด ✕",
     "scrollSet": "เลื่อนดูชุดภาพ →",
+    "frameLabel": "ภาพที่",
     "category": "หมวดหมู่",
     "date": "วันที่",
     "location": "สถานที่",

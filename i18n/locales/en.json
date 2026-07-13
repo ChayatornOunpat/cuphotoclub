@@ -144,6 +144,7 @@
     "frameRange": "Frames {from}–{to}",
     "close": "Close ✕",
     "scrollSet": "Scroll the set →",
+    "frameLabel": "Frame",
     "category": "Category",
     "date": "Date",
     "location": "Location",
