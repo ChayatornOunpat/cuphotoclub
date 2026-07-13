@@ -68,7 +68,7 @@ onUnmounted(() => {
   <article>
     <!-- COMPACT HEADER -->
     <header class="head" :class="`head--${coverOrientation}`" data-chrome-header>
-      <div class="head__bg" data-parallax>
+      <div class="head__bg" data-parallax data-hero-dim>
         <AppImg :src="cover" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="head__img" eager />
       </div>
       <div v-if="coverOrientation !== 'landscape'" class="head__subject" aria-hidden="true">

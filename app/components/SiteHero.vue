@@ -24,7 +24,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 <template>
   <header id="hero" class="hero" data-chrome-header>
-    <div class="hero__bg" :style="{ transform: `translateY(${offset}px)` }">
+    <div class="hero__bg" data-hero-dim :style="{ transform: `translateY(${offset}px)` }">
       <AppImg v-if="hero.image" :src="hero.image" alt="" width="1920" height="1080" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" eager />
     </div>
     <div class="hero__body">

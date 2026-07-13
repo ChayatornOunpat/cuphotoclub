@@ -13,11 +13,20 @@ useHead(localeHead)
 //   [data-chrome-header] → nav goes light once this element scrolls past
 //                          (no such element on a page → nav is always light)
 //   [data-parallax]      → translated on scroll for a parallax header
+//   [data-hero-dim]      → darkened as its header scrolls upward
 const site = ref(defaultSite)
 const localizedSite = useLocalizedSite(site)
 
 const navLight = ref(false)
 const progress = ref(0)
+
+function heroDimProgress(el: HTMLElement): number {
+  const header = el.closest<HTMLElement>('[data-chrome-header]')
+  if (!header) return 0
+  const rect = header.getBoundingClientRect()
+  const distance = Math.min(Math.max(-rect.top, 0), rect.height * 0.62)
+  return distance / (rect.height * 0.62 || 1)
+}
 
 function onScroll() {
   const total = document.body.scrollHeight - window.innerHeight
@@ -28,6 +37,9 @@ function onScroll() {
 
   const els = document.querySelectorAll<HTMLElement>('[data-parallax]')
   for (const el of els) el.style.transform = `translateY(${window.scrollY * 0.2}px)`
+
+  const dimmable = document.querySelectorAll<HTMLElement>('[data-hero-dim]')
+  for (const el of dimmable) el.style.setProperty('--hero-dim', heroDimProgress(el).toFixed(3))
 }
 
 onMounted(() => {

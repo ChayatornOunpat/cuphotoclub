@@ -319,3 +319,18 @@ html:lang(th) :where(.hero__title em, .about__heading em, .history__quote) {
   background: var(--accent);
   transition: width 0.1s linear;
 }
+
+/* Scroll-tested hero dimming. Components opt in by placing data-hero-dim on
+   their image background wrapper; layout/site scroll handlers drive --hero-dim. */
+[data-hero-dim] {
+  --hero-dim: 0;
+}
+
+[data-hero-dim]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: rgba(12, 12, 10, calc(var(--hero-dim) * 0.38));
+}
