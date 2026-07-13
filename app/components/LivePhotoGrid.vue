@@ -80,6 +80,15 @@ const blocks = ref<Block[]>([])
 const queue = ref<string[]>([])
 const shown = new Set<string>()
 
+// Srcs whose bytes are fetched + decoded. Faces render at opacity 0 until
+// their src lands here (see .cube__face.is-loaded) so a cell never shows the
+// cream body-bg "white tile" while a photo is still in flight.
+const loadedSrcs = reactive(new Set<string>())
+
+function markFaceLoaded(src: string) {
+  if (src) loadedSrcs.add(src)
+}
+
 // Id of the block currently under pointer/keyboard focus. We skip it in
 // performSwap so the tile a user is inspecting doesn't flip away mid-hover.
 const hoveredId = ref<number | null>(null)
@@ -246,12 +255,33 @@ function recycleActiveImages() {
   queue.value.unshift(...recycled)
 }
 
+// Ids of blocks whose fill photo is still being preloaded, so overlapping
+// calls (tick refill + reshape/split aftermath) never double-assign a cell.
+const pendingFillIds = new Set<number>()
+
+// Fills empty cells, but only reveals each photo after its bytes are fetched
+// and decoded — assigning the src directly would paint the cream body-bg
+// through the empty face while the download is in flight.
 function fillEmptyBlocks() {
   for (const block of blocks.value) {
-    if (block.layers[block.activeLayer]) continue
+    if (block.layers[block.activeLayer] || pendingFillIds.has(block.id)) continue
     const src = nextImage()
     if (!src) break
-    block.layers[block.activeLayer] = src
+    pendingFillIds.add(block.id)
+    void preloadGridImage(src)
+      .then(() => {
+        const idx = blocks.value.findIndex(b => b.id === block.id)
+        const target = idx === -1 ? null : blocks.value[idx]!
+        if (!target || target.layers[target.activeLayer]) {
+          releaseImage(src)
+          return
+        }
+        const layers: [string, string] = [...target.layers]
+        layers[target.activeLayer] = src
+        blocks.value[idx] = { ...target, layers }
+      })
+      .catch(() => releaseImage(src))
+      .finally(() => pendingFillIds.delete(block.id))
   }
 }
 
@@ -328,6 +358,7 @@ async function preloadGridImage(src: string): Promise<PreloadedGridImage> {
     throw new Error(`Unable to read photo grid image dimensions: ${src}`)
   }
 
+  markFaceLoaded(src)
   return { ratio: img.naturalWidth / img.naturalHeight }
 }
 
@@ -408,6 +439,8 @@ function tryReshape(block: Block, targetShape: SizeClass, src: string): boolean 
       .filter(cell => !targetCells.has(cellKey(cell.row, cell.col)))
       .sort((a, b) => a.row - b.row || a.col - b.col)
 
+    // Leftover cells start empty — the preload-gated fillEmptyBlocks assigns
+    // them photos once fetched, instead of painting an in-flight src.
     for (const cell of leftovers) {
       const id = nextBlockId++
       blocks.value.push({
@@ -415,11 +448,12 @@ function tryReshape(block: Block, targetShape: SizeClass, src: string): boolean 
         row: cell.row,
         col: cell.col,
         shape: 'sm',
-        layers: [nextImage() ?? '', ''],
+        layers: ['', ''],
         activeLayer: 0
       })
       markOccupancy(cell.row, cell.col, 1, 1, id)
     }
+    fillEmptyBlocks()
 
     queue.value.push(...retired)
     return true
@@ -445,15 +479,15 @@ function trySplit(block: Block, src: string): boolean {
   blocks.value = blocks.value.filter(b => b.id !== block.id)
   markOccupancy(block.row, block.col, w, h, -1)
 
-  const pulled: string[] = [src]
-  for (let i = 1; i < cells.length; i++) pulled.push(nextImage() ?? '')
-
+  // The anchor keeps the (already preloaded) triggering photo; the other freed
+  // cells start empty and are filled by the preload-gated fillEmptyBlocks below.
   const created: Block[] = cells.map((cell, i) => {
     const id = nextBlockId++
     markOccupancy(cell.r, cell.c, 1, 1, id)
-    return { id, row: cell.r, col: cell.c, shape: 'sm', layers: [pulled[i] ?? '', ''], activeLayer: 0 }
+    return { id, row: cell.r, col: cell.c, shape: 'sm', layers: [i === 0 ? src : '', ''], activeLayer: 0 }
   })
   blocks.value.push(...created)
+  fillEmptyBlocks()
   return true
 }
 
@@ -670,6 +704,8 @@ onBeforeUnmount(() => {
             loading="lazy"
             decoding="async"
             class="cube__face cube__face--front"
+            :class="{ 'is-loaded': loadedSrcs.has(block.layers[0]) }"
+            @load="markFaceLoaded(block.layers[0])"
           >
           <img
             v-if="block.layers[1]"
@@ -678,6 +714,8 @@ onBeforeUnmount(() => {
             loading="lazy"
             decoding="async"
             class="cube__face cube__face--back"
+            :class="{ 'is-loaded': loadedSrcs.has(block.layers[1]) }"
+            @load="markFaceLoaded(block.layers[1])"
           >
         </div>
         <div class="photogrid__overlay" aria-hidden="true">
@@ -800,8 +838,14 @@ onBeforeUnmount(() => {
   /* Only the hover zoom animates here — the flip lives on the parent .cube, so
      this transition never competes with rotateY. Composing scale after the
      face's own rotateY keeps backface-visibility working. */
-  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
   background: var(--body-bg, #0c0c0a);
+  /* Invisible until the photo is fetched + decoded (is-loaded), so a face
+     mid-download never paints as a blank tile. */
+  opacity: 0;
+}
+.cube__face.is-loaded {
+  opacity: 1;
 }
 .cube__face--front {
   transform: rotateY(0deg);
