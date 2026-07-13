@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
       .where(eq(schema.events.status, 'published'))
   ])
 
-  const albumSlugs = albums.filter(a => a.visibility === 'public').map(a => a.slug)
+  const albumSlugs = albums.filter(a => a.visibility === 'public').map(a => decodeRouteSegment(a.slug))
   const postSlugs = posts.filter(p => p.visibility === 'public').map(p => p.id)
   const eventSlugs = eventRows.map(e => e.slug)
 

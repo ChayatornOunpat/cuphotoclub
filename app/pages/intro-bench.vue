@@ -29,7 +29,7 @@ const featuredAlbums = computed(() =>
       title: a.title,
       category: 'Album',
       cover: imageSrc(a.coverKey),
-      path: `/albums/${a.slug}`
+      path: albumRoutePath(a.slug)
     }))
     .filter(a => a.cover)
 )

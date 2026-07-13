@@ -10,10 +10,10 @@ definePageMeta({ layout: 'site' })
 const route = useRoute()
 const slug = computed(() => {
   const value = route.params.slug
-  return Array.isArray(value) ? value.join('/') : String(value)
+  return decodePathSegment(Array.isArray(value) ? value.join('/') : String(value))
 })
 
-const { data: album } = await useAsyncData(`album-${route.path}`, async () => {
+const { data: album } = await useAsyncData(`album-${slug.value}`, async () => {
   return await $fetch(`/api/albums/${slug.value}`).catch(() => null)
 })
 
