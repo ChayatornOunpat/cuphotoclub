@@ -230,77 +230,75 @@ useSeoMeta({
           </div>
           <div class="index-bar__controls">
             <div class="filter" :class="{ searching: searchOpen }">
-              <Transition name="archive-filter" mode="out-in">
-                <div v-if="!searchOpen" key="categories" class="filter__categories">
-                  <button :class="{ active: activeCat === 'all' }" @click="selectCategory('all')">
-                    {{ t('common.all') }} <sup>{{ galleryAlbums.length }}</sup>
-                  </button>
+              <div v-if="!searchOpen" class="filter__categories">
+                <button :class="{ active: activeCat === 'all' }" @click="selectCategory('all')">
+                  {{ t('common.all') }} <sup>{{ galleryAlbums.length }}</sup>
+                </button>
+                <button
+                  v-for="cat in inlineCategories"
+                  :key="cat.name"
+                  :class="{ active: activeCat === cat.name }"
+                  :lang="textLang(cat.name)"
+                  @click="selectCategory(cat.name)"
+                >
+                  {{ cat.name }} <sup>{{ cat.count }}</sup>
+                </button>
+                <div v-if="secondaryCategories.length" class="filter__menu">
                   <button
-                    v-for="cat in inlineCategories"
-                    :key="cat.name"
-                    :class="{ active: activeCat === cat.name }"
-                    :lang="textLang(cat.name)"
-                    @click="selectCategory(cat.name)"
+                    type="button"
+                    class="filter__more"
+                    :class="{ active: activeSecondaryCategory }"
+                    :aria-expanded="categoryMenuOpen"
+                    aria-haspopup="menu"
+                    @click="categoryMenuOpen = !categoryMenuOpen"
                   >
-                    {{ cat.name }} <sup>{{ cat.count }}</sup>
+                    {{ t('albums.categoryMenu') }} <sup>{{ secondaryCategories.length }}</sup>
                   </button>
-                  <div v-if="secondaryCategories.length" class="filter__menu">
+                  <div v-if="categoryMenuOpen" class="filter__panel" role="menu">
                     <button
+                      v-for="cat in secondaryCategories"
+                      :key="`menu-${cat.name}`"
                       type="button"
-                      class="filter__more"
-                      :class="{ active: activeSecondaryCategory }"
-                      :aria-expanded="categoryMenuOpen"
-                      aria-haspopup="menu"
-                      @click="categoryMenuOpen = !categoryMenuOpen"
+                      role="menuitemradio"
+                      :aria-checked="activeCat === cat.name"
+                      :class="{ active: activeCat === cat.name }"
+                      :lang="textLang(cat.name)"
+                      @click="selectCategory(cat.name)"
                     >
-                      {{ t('albums.categoryMenu') }} <sup>{{ secondaryCategories.length }}</sup>
+                      <span>{{ cat.name }}</span>
+                      <sup>{{ cat.count }}</sup>
                     </button>
-                    <div v-if="categoryMenuOpen" class="filter__panel" role="menu">
-                      <button
-                        v-for="cat in secondaryCategories"
-                        :key="`menu-${cat.name}`"
-                        type="button"
-                        role="menuitemradio"
-                        :aria-checked="activeCat === cat.name"
-                        :class="{ active: activeCat === cat.name }"
-                        :lang="textLang(cat.name)"
-                        @click="selectCategory(cat.name)"
-                      >
-                        <span>{{ cat.name }}</span>
-                        <sup>{{ cat.count }}</sup>
-                      </button>
-                    </div>
                   </div>
-                  <button
-                    type="button"
-                    class="filter-search__button"
+                </div>
+                <button
+                  type="button"
+                  class="filter-search__button"
+                  :aria-label="t('albums.searchLabel')"
+                  @click="toggleSearch"
+                >
+                  <Icon name="heroicons:magnifying-glass" aria-hidden="true" />
+                </button>
+              </div>
+              <div v-else class="filter__search-state">
+                <div class="search">
+                  <input
+                    ref="searchInput"
+                    v-model="searchQuery"
+                    type="search"
+                    class="search__input"
+                    :placeholder="t('albums.searchPlaceholder')"
                     :aria-label="t('albums.searchLabel')"
-                    @click="toggleSearch"
                   >
-                    <Icon name="heroicons:magnifying-glass" aria-hidden="true" />
-                  </button>
                 </div>
-                <div v-else key="search" class="filter__search-state">
-                  <div class="search">
-                    <input
-                      ref="searchInput"
-                      v-model="searchQuery"
-                      type="search"
-                      class="search__input"
-                      :placeholder="t('albums.searchPlaceholder')"
-                      :aria-label="t('albums.searchLabel')"
-                    >
-                  </div>
-                  <button
-                    type="button"
-                    class="filter-search__button active"
-                    :aria-label="t('albums.clearSearch')"
-                    @click="toggleSearch"
-                  >
-                    <span aria-hidden="true">✕</span>
-                  </button>
-                </div>
-              </Transition>
+                <button
+                  type="button"
+                  class="filter-search__button active"
+                  :aria-label="t('albums.clearSearch')"
+                  @click="toggleSearch"
+                >
+                  <span aria-hidden="true">✕</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -525,18 +523,6 @@ useSeoMeta({
 }
 .filter-search__button.active { color: var(--accent); }
 .filter-search__button.active::after { display: none; }
-.archive-filter-enter-active {
-  transition: opacity 0.22s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.archive-filter-leave-active {
-  transition: opacity 0.14s cubic-bezier(0.25, 1, 0.5, 1);
-}
-.archive-filter-enter-from {
-  opacity: 0;
-}
-.archive-filter-leave-to {
-  opacity: 0;
-}
 
 .feature { display: grid; grid-template-columns: 1.45fr 1fr; gap: 0; margin-bottom: 4.5rem; background: var(--hero-bg); cursor: pointer; overflow: hidden; text-decoration: none; }
 .feature__img { position: relative; overflow: hidden; min-height: 460px; }
@@ -603,16 +589,10 @@ useSeoMeta({
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .archive-filter-enter-active,
-  .archive-filter-leave-active,
   .filter button,
   .search__input,
   .filter-search__button :deep(svg) {
     transition-duration: 0.01ms !important;
-  }
-  .archive-filter-enter-from,
-  .archive-filter-leave-to {
-    transform: none;
   }
 }
 </style>

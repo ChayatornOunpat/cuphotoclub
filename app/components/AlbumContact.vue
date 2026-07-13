@@ -77,7 +77,7 @@ onUnmounted(() => {
       <span v-if="disableNavigation" class="head__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="head__back">{{ t('albums.coverBack') }}</NuxtLink>
       <div class="head__body">
-        <p class="head__kicker"><span class="head__kicker-category">{{ t('albums.albumKicker', { category: album.category }) }}</span> · <span class="head__kicker-date">{{ dateDisplay }}</span></p>
+        <p class="head__kicker"><span class="head__kicker-category" :lang="textLang(album.category)">{{ t('albums.albumKicker', { category: album.category }) }}</span> · <span class="head__kicker-date">{{ dateDisplay }}</span></p>
         <h1 class="head__title" :lang="textLang(album.title)">{{ album.title }}</h1>
         <p class="head__sub" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
       </div>

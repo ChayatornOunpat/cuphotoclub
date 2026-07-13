@@ -270,10 +270,31 @@ html:lang(th) :where(.hero__title em, .about__heading em, .history__quote) {
   letter-spacing: 0 !important;
 }
 
-:where(.album__cat, .feature__cat, .crumb .here, figcaption, .cell__cap, .lb__counter, .lb__cap):lang(th) {
+:where(
+  .album__cat,
+  .feature__cat,
+  .crumb .here,
+  .cover__kicker,
+  .cover__meta span,
+  .head__kicker span,
+  .meta__fact .v,
+  .dk-head__kicker,
+  .dk-head__meta span,
+  figcaption,
+  .cell__cap,
+  .lb__counter,
+  .lb__cap
+):lang(th) {
   font-family: 'Noto Serif Thai', serif !important;
   letter-spacing: 0.035em !important;
   text-transform: none !important;
+}
+
+.album-modal__title:lang(th) {
+  font-family: 'Noto Serif Thai', serif !important;
+  line-height: 1.18 !important;
+  letter-spacing: 0 !important;
+  font-weight: 300 !important;
 }
 
 /* The signature pink line that separates dark → light */

@@ -135,7 +135,7 @@ onBeforeUnmount(() => {
 
           <div class="album-modal__body">
             <p class="album-modal__kicker">{{ t('common.album') }}</p>
-            <h2 class="album-modal__title">{{ albumTitle }}</h2>
+            <h2 class="album-modal__title" :lang="textLang(albumTitle)">{{ albumTitle }}</h2>
             <p class="album-modal__meta">
               <span v-if="formattedDate" class="album-modal__meta-item">{{ formattedDate }}</span>
               <span v-if="formattedDate" class="album-modal__dot" aria-hidden="true">·</span>

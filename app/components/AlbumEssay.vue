@@ -80,12 +80,12 @@ const excerptStyle = computed(() => {
       <span v-if="disableNavigation" class="cover__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="cover__back">{{ t('albums.coverBack') }}</NuxtLink>
       <div class="cover__body">
-        <p class="cover__kicker">{{ t('albums.albumKicker', { category: album.category }) }}</p>
+        <p class="cover__kicker" :lang="textLang(album.category)">{{ t('albums.albumKicker', { category: album.category }) }}</p>
         <h1 class="cover__title" :lang="textLang(album.title)">{{ album.title }}</h1>
         <div class="cover__meta">
           <span>{{ dateDisplay }}</span><span class="dot" />
           <span>{{ t('albums.metaFrames', { count: totalImages }) }}</span>
-          <template v-if="album.location"><span class="dot" /><span>{{ album.location }}</span></template>
+          <template v-if="album.location"><span class="dot" /><span :lang="textLang(album.location)">{{ album.location }}</span></template>
         </div>
       </div>
     </header>

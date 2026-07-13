@@ -65,13 +65,13 @@ function plateSizes(span: number) {
       <span v-if="disableNavigation" class="dk-head__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="dk-head__back">{{ t('albums.coverBack') }}</NuxtLink>
 
-      <p class="dk-head__kicker">{{ t('albums.albumKicker', { category: album.category }) }}</p>
+      <p class="dk-head__kicker" :lang="textLang(album.category)">{{ t('albums.albumKicker', { category: album.category }) }}</p>
       <h1 class="dk-head__title" :lang="textLang(album.title)">{{ album.title }}</h1>
       <p v-if="album.excerpt" class="dk-head__excerpt" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
       <div class="dk-head__meta">
         <span>{{ dateDisplay }}</span><span class="dot" />
         <span>{{ t('albums.metaFrames', { count: totalImages }) }}</span>
-        <template v-if="album.location"><span class="dot" /><span>{{ album.location }}</span></template>
+        <template v-if="album.location"><span class="dot" /><span :lang="textLang(album.location)">{{ album.location }}</span></template>
       </div>
 
       <div v-if="album.coverSrc" class="dk-head__print">

@@ -69,8 +69,8 @@ onUnmounted(() => {
         <div class="crumb">
           <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ t('albums.stickyBreadcrumb') }}</span>
           <NuxtLink v-else :to="localePath('/albums')">{{ t('albums.stickyBreadcrumb') }}</NuxtLink><span>/</span>
-          <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true">{{ album.category }}</span>
-          <NuxtLink v-else :to="categoryAlbumsPath">{{ album.category }}</NuxtLink><span>/</span>
+          <span v-if="disableNavigation" class="crumb__link is-disabled" aria-disabled="true" :lang="textLang(album.category)">{{ album.category }}</span>
+          <NuxtLink v-else :to="categoryAlbumsPath" :lang="textLang(album.category)">{{ album.category }}</NuxtLink><span>/</span>
           <span class="here" :lang="textLang(album.title)">{{ album.title }}</span>
         </div>
         <div class="meta__thumb"><AppImg :src="cover" :alt="album.title" sizes="sm:100vw lg:360px" /></div>
@@ -78,9 +78,9 @@ onUnmounted(() => {
         <h1 class="meta__title" :lang="textLang(album.title)">{{ album.title }}</h1>
         <p class="meta__excerpt" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
         <div class="meta__facts">
-          <div class="meta__fact"><span class="k">{{ t('albums.category') }}</span><span class="v">{{ album.category }}</span></div>
+          <div class="meta__fact"><span class="k">{{ t('albums.category') }}</span><span class="v" :lang="textLang(album.category)">{{ album.category }}</span></div>
           <div class="meta__fact"><span class="k">{{ t('albums.date') }}</span><span class="v">{{ dateDisplay }}</span></div>
-          <div v-if="album.location" class="meta__fact"><span class="k">{{ t('albums.location') }}</span><span class="v">{{ album.location }}</span></div>
+          <div v-if="album.location" class="meta__fact"><span class="k">{{ t('albums.location') }}</span><span class="v" :lang="textLang(album.location)">{{ album.location }}</span></div>
           <div class="meta__fact"><span class="k">{{ t('albums.frames') }}</span><span class="v">{{ imageCells.length }}</span></div>
         </div>
         <div class="meta__count"><span>{{ t('albums.frameLabel') }} <b>{{ pad(currentFrame) }}</b> / {{ pad(imageCells.length) }}</span></div>
