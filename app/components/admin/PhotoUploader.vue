@@ -8,6 +8,7 @@ const uploading = ref(false)
 const total = ref(0)
 const done = ref(0)
 const errorCount = ref(0)
+const rejectedCount = ref(0)
 const dragOver = ref(false)
 
 async function readDims(file: File): Promise<{ w: number, h: number } | null> {
@@ -24,6 +25,7 @@ async function readDims(file: File): Promise<{ w: number, h: number } | null> {
 async function upload(files: File[]) {
   if (uploading.value) return
   const images = files.filter(f => f.type.startsWith('image/'))
+  rejectedCount.value = files.length - images.length
   if (!images.length) return
   uploading.value = true
   errorCount.value = 0
@@ -81,11 +83,12 @@ function onDrop(e: DragEvent) {
       <input ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="onPick">
     </div>
 
-    <div v-if="uploading || errorCount" class="mt-3 text-sm">
+    <div v-if="uploading || errorCount || rejectedCount" class="mt-3 text-sm">
       <p v-if="uploading" class="flex items-center gap-2 text-ink-soft">
         <UiSpinner /> {{ t('uploader.uploading', { done, total }) }}
       </p>
       <p v-else-if="errorCount" class="text-red-600">{{ t('uploader.failed', errorCount, { n: errorCount }) }}</p>
+      <p v-if="!uploading && rejectedCount" class="text-red-600">{{ t('uploader.rejectedType', rejectedCount, { n: rejectedCount }) }}</p>
     </div>
   </div>
 </template>

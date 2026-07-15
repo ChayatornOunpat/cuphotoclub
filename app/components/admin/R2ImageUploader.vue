@@ -27,6 +27,7 @@ const done = ref(0)
 const errorCount = ref(0)
 const skippedCount = ref(0)
 const duplicateCount = ref(0)
+const rejectedCount = ref(0)
 const resourcePauseSeconds = ref(0)
 const resourceLimitStopped = ref(false)
 const pendingQueue = ref<File[]>([])
@@ -462,15 +463,17 @@ async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet:
 }
 
 async function upload(files: File[], retry = false) {
-  duplicateCount.value = 0
-  const images = uniqueUncompleted(files.filter(file => file.type.startsWith('image/')))
-  if (!images.length) return
-
   // Do not accept another batch while an upload is in progress. Keeping the
   // active batch as the only batch makes progress and failure reporting clear.
   if (uploading.value) {
     return
   }
+
+  duplicateCount.value = 0
+  const photos = files.filter(file => file.type.startsWith('image/'))
+  rejectedCount.value = files.length - photos.length
+  const images = uniqueUncompleted(photos)
+  if (!images.length) return
 
   uploading.value = true
   shouldStopCurrentUpload = false
@@ -618,6 +621,7 @@ function onDrop(e: DragEvent) {
       <p v-if="!uploading && resourceLimitStopped" class="r2up__error">
         Upload stopped after Cloudflare Worker limits were hit. Retry failed files after the cooldown.
       </p>
+      <p v-if="!uploading && rejectedCount" class="r2up__error">{{ t('uploader.rejectedType', rejectedCount, { n: rejectedCount }) }}</p>
       <p v-if="!uploading && errorCount" class="r2up__error">{{ t('uploader.failed', errorCount, { n: errorCount }) }}</p>
       <p v-if="!uploading && skippedCount" class="r2up__error">{{ t('uploader.skipped', skippedCount, { n: skippedCount }) }}</p>
       <p v-if="!uploading && duplicateCount" class="r2up__note">{{ t('uploader.duplicatesSkipped', duplicateCount, { n: duplicateCount }) }}</p>

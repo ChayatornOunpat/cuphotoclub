@@ -99,6 +99,63 @@ const dragOverCellIndex = ref<{ row: number, cell: number } | null>(null)
 const activeField = ref<'title' | 'category' | 'date' | 'dateEnd' | 'location' | 'excerpt'>('title')
 const titleInput = ref<HTMLTextAreaElement | null>(null)
 const categoryInput = ref<HTMLInputElement | null>(null)
+
+// Category dropdown: existing categories fetched once on first open
+const categoryMenuOpen = ref(false)
+const categoryMenuEl = ref<HTMLElement | null>(null)
+const existingCategories = ref<string[]>([])
+const categoriesLoaded = ref(false)
+const categoriesLoading = ref(false)
+const categorySearch = ref('')
+const categorySearchInput = ref<HTMLInputElement | null>(null)
+
+const filteredCategories = computed(() => {
+  const query = categorySearch.value.trim().toLowerCase()
+  if (!query) return existingCategories.value
+  return existingCategories.value.filter(cat => cat.toLowerCase().includes(query))
+})
+
+async function toggleCategoryMenu() {
+  categoryMenuOpen.value = !categoryMenuOpen.value
+  if (!categoryMenuOpen.value) return
+  categorySearch.value = ''
+  nextTick(() => categorySearchInput.value?.focus())
+  if (categoriesLoaded.value || categoriesLoading.value) return
+  categoriesLoading.value = true
+  try {
+    const albums = await $fetch<Array<{ category?: string }>>('/api/admin/albums')
+    existingCategories.value = [...new Set(albums.map(a => (a.category || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b))
+    categoriesLoaded.value = true
+  } catch {
+    // Leave categoriesLoaded false so the next open retries the fetch.
+  } finally {
+    categoriesLoading.value = false
+  }
+}
+
+function pickCategory(name: string) {
+  form.category = name
+  activeField.value = 'category'
+  categoryMenuOpen.value = false
+}
+
+function pickFirstFilteredCategory() {
+  const [first] = filteredCategories.value
+  if (first) pickCategory(first)
+}
+
+function onCategoryMenuOutside(e: PointerEvent) {
+  if (!categoryMenuEl.value?.contains(e.target as Node)) categoryMenuOpen.value = false
+}
+watch(categoryMenuOpen, (open) => {
+  if (!import.meta.client) return
+  if (open) document.addEventListener('pointerdown', onCategoryMenuOutside)
+  else document.removeEventListener('pointerdown', onCategoryMenuOutside)
+})
+onUnmounted(() => {
+  if (import.meta.client) document.removeEventListener('pointerdown', onCategoryMenuOutside)
+})
 const dateInput = ref<FocusSelectable | null>(null)
 const dateEndInput = ref<FocusSelectable | null>(null)
 const publishedInput = ref<FocusSelectable | null>(null)
@@ -1496,7 +1553,43 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           </div>
           <div class="field field--category" :class="{ active: activeField === 'category' }">
             <label>{{ t('adminForm.category') }}</label>
-            <input ref="categoryInput" v-model="form.category" type="text" :placeholder="t('adminForm.categoryPlaceholder')" @focus="activeField = 'category'">
+            <div ref="categoryMenuEl" class="category-select">
+              <input ref="categoryInput" v-model="form.category" type="text" :placeholder="t('adminForm.categoryPlaceholder')" @focus="activeField = 'category'">
+              <button
+                type="button"
+                class="category-select__toggle"
+                :class="{ open: categoryMenuOpen }"
+                :aria-expanded="categoryMenuOpen"
+                :aria-label="t('adminForm.categoryPick')"
+                @click="toggleCategoryMenu"
+              >
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><polyline points="2.5 4.5 6 8 9.5 4.5" /></svg>
+              </button>
+              <div v-if="categoryMenuOpen" class="category-select__panel" role="listbox">
+                <input
+                  v-if="existingCategories.length"
+                  ref="categorySearchInput"
+                  v-model="categorySearch"
+                  type="text"
+                  class="category-select__search"
+                  :placeholder="t('adminForm.categorySearch')"
+                  @keydown.enter.prevent="pickFirstFilteredCategory"
+                  @keydown.esc.stop="categoryMenuOpen = false"
+                >
+                <p v-if="categoriesLoading" class="category-select__note">{{ t('adminForm.categoryLoading') }}</p>
+                <p v-else-if="categoriesLoaded && !existingCategories.length" class="category-select__note">{{ t('adminForm.categoryEmpty') }}</p>
+                <p v-else-if="categoriesLoaded && !filteredCategories.length" class="category-select__note">{{ t('adminForm.categoryNoMatch') }}</p>
+                <button
+                  v-for="cat in filteredCategories"
+                  :key="cat"
+                  type="button"
+                  role="option"
+                  :aria-selected="cat === form.category"
+                  :class="{ active: cat === form.category }"
+                  @click="pickCategory(cat)"
+                >{{ cat }}</button>
+              </div>
+            </div>
           </div>
           <div class="field field--dates" :class="{ active: activeField === 'date' || activeField === 'dateEnd' }">
             <label>{{ t('adminForm.dates') }} <span class="opt">{{ t('adminForm.datesHint') }}</span></label>
@@ -2482,6 +2575,76 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .anchored-fields .field--dates { grid-column: 2 / -1; }
 .anchored-fields .field--location { grid-column: 1 / 2; }
 .anchored-fields .field--excerpt { grid-column: 2 / -1; }
+
+/* ── Category dropdown ── */
+.category-select { position: relative; min-width: 0; }
+.category-select input { padding-right: 1.9rem; }
+.category-select__toggle {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 1.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-left: 1px solid var(--subtle);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.category-select__toggle:hover { color: var(--accent); }
+.category-select__toggle svg { width: 0.7rem; height: 0.7rem; transition: transform 0.15s; }
+.category-select__toggle.open svg { transform: rotate(180deg); }
+.category-select__panel {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: 11rem;
+  overflow-y: auto;
+  border: 1px solid color-mix(in srgb, var(--dark) 20%, var(--subtle));
+  background: #fff;
+  box-shadow: 0 0.5rem 1.5rem rgba(26, 25, 24, 0.14);
+}
+.category-select__search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--subtle);
+  background: #fff;
+  padding: 0.4rem 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--dark);
+  outline: none;
+}
+.category-select__search:focus { border-bottom-color: var(--accent); }
+.category-select__panel button {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0.4rem 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--dark);
+  text-align: left;
+  cursor: pointer;
+}
+.category-select__panel button:hover { background: color-mix(in srgb, var(--accent) 7%, #fff); }
+.category-select__panel button.active { color: var(--accent); }
+.category-select__note {
+  padding: 0.4rem 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  color: var(--muted);
+}
 
 .date-range { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
 .date-range > :deep(.ui-date-input) { flex: 1; min-width: 0; }
