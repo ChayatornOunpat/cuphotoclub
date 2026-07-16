@@ -355,8 +355,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 1.6rem;
-  padding: 0 3rem;
-  height: 3.1rem;
+  padding: 0.35rem 3rem 0.3rem;
+  min-height: 3.45rem;
   background: color-mix(in srgb, var(--body-bg) 92%, transparent);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--subtle);
@@ -390,7 +390,7 @@ onUnmounted(() => {
 
 /* ── Chapters ── */
 .body { max-width: 1380px; margin: 0 auto; padding: 0 1.5rem 6rem; }
-.chapter { padding-top: 4.5rem; scroll-margin-top: 8rem; }
+.chapter { padding-top: 4.5rem; scroll-margin-top: 8.35rem; }
 .chapter:first-of-type { padding-top: 3rem; }
 .chapter__head { display: flex; align-items: baseline; gap: 1.25rem; margin-bottom: 0.9rem; padding: 0 0.15rem; }
 .chapter__num { font-size: 0.56rem; letter-spacing: 0.24em; color: var(--accent); font-weight: 500; }
@@ -640,11 +640,11 @@ onUnmounted(() => {
     padding-top: 38svh;
   }
 
-  .chbar { top: 3.6rem; padding: 0 1.25rem; gap: 1rem; }
+  .chbar { top: 3.6rem; padding: 0.35rem 1.25rem 0.3rem; gap: 1rem; }
   .chbar__hint { display: none; }
 
   .body { padding: 0 0.6rem 4rem; }
-  .chapter { padding-top: 3rem; scroll-margin-top: 7rem; }
+  .chapter { padding-top: 3rem; scroll-margin-top: 7.35rem; }
   .chapter__head { padding: 0 0.65rem; flex-wrap: wrap; gap: 0.5rem 1rem; }
   .chapter__rule { margin-left: 0.65rem; margin-right: 0.65rem; }
   .jcell { height: 150px; }
