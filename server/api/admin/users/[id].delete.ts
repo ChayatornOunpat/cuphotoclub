@@ -13,11 +13,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: 'เฉพาะเจ้าของเท่านั้นที่ลบบัญชีเจ้าของได้' })
   }
   if (target.role === 'owner') {
-    const [{ c }] = await db
+    const [ownerCount] = await db
       .select({ c: count() })
       .from(schema.users)
       .where(and(eq(schema.users.role, 'owner'), eq(schema.users.active, true)))
-    if (c <= 1) throw createError({ statusCode: 400, message: 'ต้องมีเจ้าของที่ใช้งานอยู่อย่างน้อยหนึ่งคน' })
+    if (ownerCount!.c <= 1) throw createError({ statusCode: 400, message: 'ต้องมีเจ้าของที่ใช้งานอยู่อย่างน้อยหนึ่งคน' })
   }
 
   await db.delete(schema.users).where(eq(schema.users.id, id))

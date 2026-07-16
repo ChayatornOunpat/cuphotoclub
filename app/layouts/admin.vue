@@ -27,6 +27,7 @@ async function logout() {
     <main class="admin__main">
       <slot />
     </main>
+    <AdminUploadDock />
   </div>
 </template>
 

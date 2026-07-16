@@ -2,7 +2,7 @@
 const { locale, locales } = useI18n()
 const switchLocalePath = useSwitchLocalePath()
 
-const options = computed(() => locales.value as { code: string }[])
+const options = computed(() => locales.value as { code: 'en' | 'th' }[])
 </script>
 
 <template>

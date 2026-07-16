@@ -10,7 +10,7 @@ const emit = defineEmits<{ focus: [] }>()
 const nativeEl = ref<HTMLInputElement | null>(null)
 const textEl = ref<HTMLInputElement | null>(null)
 
-function isISODate(value?: string | null) {
+function isISODate(value?: string | null): value is string {
   return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 

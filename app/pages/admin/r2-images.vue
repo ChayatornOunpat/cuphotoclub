@@ -110,7 +110,7 @@ const filteredImages = computed(() => {
 })
 
 const prefixOptions = computed(() => {
-  const firstSegments = new Set(images.value.map(image => image.key.split('/')[0]).filter(Boolean))
+  const firstSegments = new Set(images.value.map(image => image.key.split('/')[0] ?? '').filter(Boolean))
   return [...firstSegments].sort((a, b) => a.localeCompare(b))
 })
 

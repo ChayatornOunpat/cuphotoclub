@@ -16,11 +16,11 @@ export default defineEventHandler(async (event) => {
   ])
 
   return {
-    albums: albums.c,
-    publishedAlbums: publishedAlbums.c,
-    photos: photos.c,
-    posts: posts.c,
-    events: events.c,
-    unreadMessages: unread.c
+    albums: albums!.c,
+    publishedAlbums: publishedAlbums!.c,
+    photos: photos!.c,
+    posts: posts!.c,
+    events: events!.c,
+    unreadMessages: unread!.c
   }
 })

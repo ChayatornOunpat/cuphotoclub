@@ -117,10 +117,16 @@ function removeBlock(index: number) {
 // images can legitimately be external URLs (see TEMPLATES above), not just
 // uploads — the picker is a shortcut, not the only way in.
 
-type ImageTarget = { kind: 'hero' } | { kind: 'avatar' } | { kind: 'block', index: number, field: 'src' | 'src1' | 'src2' }
+type ImageTarget =
+  | { kind: 'hero' }
+  | { kind: 'avatar' }
+  | { kind: 'story' }
+  | { kind: 'block', index: number, field: 'src' | 'src1' | 'src2' }
 
 const imagePickerOpen = ref(false)
 const imagePickerTarget = ref<ImageTarget | null>(null)
+const uploadedPhotoKeys = ref<string[]>([])
+const clearImagesOpen = ref(false)
 
 function openImagePicker(target: ImageTarget) {
   imagePickerTarget.value = target
@@ -130,7 +136,11 @@ function openImagePicker(target: ImageTarget) {
 function onImagePick(keys: string[]) {
   const target = imagePickerTarget.value
   const key = keys[0]
-  if (!target || !key) return
+  if (!target || (!key && target.kind !== 'story')) return
+  if (target.kind === 'story') {
+    insertPhotoStory(keys)
+    return
+  }
   const path = `/images/${key}`
   if (target.kind === 'hero') form.image = path
   else if (target.kind === 'avatar') form.authorAvatar = path
@@ -138,6 +148,69 @@ function onImagePick(keys: string[]) {
     const block = form.blocks[target.index] as Record<string, unknown>
     block[target.field] = path
   }
+}
+
+function onPhotosUploaded(keys: string[]) {
+  uploadedPhotoKeys.value = [...new Set([...uploadedPhotoKeys.value, ...keys])]
+  insertPhotoStory(keys)
+}
+
+function insertPhotoStory(keys: string[]) {
+  const paths = keys.map(key => `/images/${key}`).filter(Boolean)
+  if (!paths.length) return
+
+  if (!form.image) form.image = paths[0]!
+
+  const blocks: PostBlock[] = []
+  for (let i = 0; i < paths.length; i += 2) {
+    const first = paths[i]!
+    const second = paths[i + 1]
+    if (second) {
+      blocks.push({ id: uid(), type: 'photo-pair', src1: first, src2: second, caption: '' })
+    } else {
+      blocks.push({ id: uid(), type: 'photo-full', src: first, caption: '' })
+    }
+  }
+
+  const hasOnlyEmptyStarter = form.blocks.length === 1
+    && form.blocks[0]?.type === 'text'
+    && !(form.blocks[0] as any).content?.trim()
+
+  if (hasOnlyEmptyStarter) form.blocks = blocks
+  else form.blocks.push(...blocks)
+}
+
+const articleImageCount = computed(() => {
+  let count = form.image ? 1 : 0
+  if (form.authorAvatar) count += 1
+  for (const block of form.blocks) {
+    const item = block as Record<string, unknown>
+    if (block.type === 'image' && item.src) count += 1
+    if (block.type === 'photo-full' && item.src) count += 1
+    if (block.type === 'photo-pair') {
+      if (item.src1) count += 1
+      if (item.src2) count += 1
+    }
+  }
+  return count
+})
+
+function clearArticleImages() {
+  form.image = ''
+  form.authorAvatar = ''
+  form.blocks = form.blocks
+    .map((block) => {
+      if (block.type === 'image') return { ...block, src: '' }
+      if (block.type === 'photo-full') return { ...block, src: '' }
+      if (block.type === 'photo-pair') return { ...block, src1: '', src2: '' }
+      return block
+    })
+    .filter(block => !(
+      (block.type === 'image' || block.type === 'photo-full') && !(block as any).caption?.trim()
+    ))
+    .filter(block => !(block.type === 'photo-pair' && !(block as any).caption?.trim()))
+  if (!form.blocks.length) form.blocks = [makeBlock('text')]
+  clearImagesOpen.value = false
 }
 
 function onPaletteKey(e: KeyboardEvent) {
@@ -278,9 +351,9 @@ function onSubmit() {
   payload.published = payload.published.trim()
   payload.image = payload.image.trim()
   payload.excerpt = payload.excerpt.trim()
-  payload.author = payload.author.trim()
-  payload.authorBio = payload.authorBio.trim()
-  payload.authorAvatar = payload.authorAvatar.trim()
+  payload.author = (payload.author ?? '').trim()
+  payload.authorBio = (payload.authorBio ?? '').trim()
+  payload.authorAvatar = (payload.authorAvatar ?? '').trim()
   for (const block of payload.blocks) {
     const item = block as Record<string, unknown>
     for (const key of ['content', 'question', 'answer', 'src', 'src1', 'src2', 'caption', 'cite']) {
@@ -395,6 +468,33 @@ function onSubmit() {
             <img v-if="form.authorAvatar" :src="form.authorAvatar" alt="" class="field-img-preview field-img-preview--round">
             <input v-model="form.authorAvatar" type="text" placeholder="https://...">
             <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'avatar' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
+          </div>
+        </div>
+        <div class="field field--span3">
+          <label>{{ t('adminPostForm.photoLibrary') }}</label>
+          <div class="photo-tools">
+            <AdminR2ImageUploader
+              v-model="uploadedPhotoKeys"
+              :prefix="mediaPrefix"
+              dropzone-class="photo-tools__dropzone"
+              @uploaded="onPhotosUploaded"
+            />
+            <div class="photo-tools__actions">
+              <button type="button" class="photo-tools__btn" @click="openImagePicker({ kind: 'story' })">
+                <Icon name="heroicons:photo" class="photo-tools__icon" />
+                <span>{{ t('adminPostForm.insertPhotoStory') }}</span>
+              </button>
+              <button
+                type="button"
+                class="photo-tools__btn photo-tools__btn--danger"
+                :disabled="articleImageCount === 0"
+                @click="clearImagesOpen = true"
+              >
+                <Icon name="heroicons:x-mark" class="photo-tools__icon" />
+                <span>{{ t('adminPostForm.clearArticleImages') }}</span>
+              </button>
+              <p class="photo-tools__hint">{{ t('adminPostForm.photoLibraryHint') }}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -759,9 +859,24 @@ function onSubmit() {
     <AdminImagePickerModal
       v-model="imagePickerOpen"
       :prefix="mediaPrefix"
+      :multiple="imagePickerTarget?.kind === 'story'"
       :title="t('adminPicker.chooseFromLibrary')"
       @select="onImagePick"
     />
+
+    <UiModal
+      v-model="clearImagesOpen"
+      :title="t('adminPostForm.clearArticleImagesTitle')"
+      size="md"
+    >
+      <div class="confirm-modal">
+        <p>{{ t('adminPostForm.clearArticleImagesBody', { count: articleImageCount }) }}</p>
+        <div class="confirm-modal__actions">
+          <UiButton variant="secondary" @click="clearImagesOpen = false">{{ t('admin.cancel') }}</UiButton>
+          <UiButton variant="danger" :disabled="articleImageCount === 0" @click="clearArticleImages">{{ t('adminPostForm.clearArticleImagesConfirm') }}</UiButton>
+        </div>
+      </div>
+    </UiModal>
 
   </form>
 </template>
@@ -825,6 +940,64 @@ function onSubmit() {
   transition: border-color 0.2s, color 0.2s;
 }
 .field-img-pick:hover { border-color: var(--accent); color: var(--accent); }
+
+.photo-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(15rem, 0.55fr);
+  gap: 1rem;
+  align-items: start;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  padding: 0.85rem;
+}
+.photo-tools__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.photo-tools__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: 2.45rem;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.54rem;
+  letter-spacing: 0.14em;
+  line-height: 1.25;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.photo-tools__btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.photo-tools__btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.photo-tools__btn--danger:hover:not(:disabled) {
+  border-color: #b0243c;
+  color: #b0243c;
+  background: color-mix(in srgb, #b0243c 4%, transparent);
+}
+.photo-tools__icon {
+  width: 0.82rem;
+  height: 0.82rem;
+  flex-shrink: 0;
+}
+.photo-tools__hint {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.58rem;
+  line-height: 1.55;
+}
 
 .visibility-toggle {
   display: grid;
@@ -1020,6 +1193,23 @@ function onSubmit() {
 /* ─── Preview shell ──────────────────────────────────────────────────────── */
 .preview-shell { margin: 0 -2rem; overflow: visible; }
 
+.confirm-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+.confirm-modal p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+  margin: 0;
+}
+.confirm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
 /* ─── Post shell ─────────────────────────────────────────────────────────── */
 .post { overflow: visible; }
 
@@ -1183,6 +1373,7 @@ function onSubmit() {
 @media (max-width: 900px) {
   .dock-fields { grid-template-columns: 1fr 1fr; }
   .field--span2, .field--span3 { grid-column: span 2; }
+  .photo-tools { grid-template-columns: 1fr; }
   .block-row { grid-template-columns: 22px 72px 1fr auto; }
   .sp-head { grid-template-columns: 1fr; min-height: auto; }
   .sp-head__img { min-height: 50svh; }

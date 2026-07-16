@@ -5,14 +5,14 @@ function stripQuotes(value: string) {
 }
 
 function readScalar(lines: string[], index: number) {
-  const line = lines[index]
+  const line = lines[index] ?? ''
   const [, raw = ''] = line.match(/^[^:]+:\s*(.*)$/) ?? []
   const value = raw.trim()
 
   if (value === '>-' || value === '|') {
     const parts: string[] = []
     for (let i = index + 1; i < lines.length; i++) {
-      const next = lines[i]
+      const next = lines[i] ?? ''
       if (/^\w[^:]*:/.test(next)) break
       if (next.trim()) parts.push(next.trim())
     }
@@ -76,17 +76,17 @@ function parseAlbumMarkdown(filename: string, source: string): Album | null {
   const match = source.match(/^\s*---\r?\n([\s\S]*?)\r?\n---/)
   if (!match) return null
 
-  const lines = match[1].split(/\r?\n/)
+  const lines = match[1]!.split(/\r?\n/)
   const data: Record<string, string | number | { src: string, caption?: string }[]> = {}
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+    const line = lines[i]!
     if (!line.trim() || line.trim().startsWith('#')) continue
 
     if (line.startsWith('images:')) {
       const images: { src: string, caption?: string }[] = []
       for (let j = i + 1; j < lines.length; j++) {
-        const imageLine = lines[j].trim()
+        const imageLine = lines[j]!.trim()
         if (!imageLine.startsWith('-')) break
         const image = readInlineObject(imageLine)
         if (image.src) images.push({ src: image.src, caption: image.caption })

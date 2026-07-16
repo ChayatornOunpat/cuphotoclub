@@ -126,7 +126,9 @@ function dismissConstructionNotice() {
 }
 
 function prewarmPhotoGridWhenIdle() {
-  if ('requestIdleCallback' in window) {
+  // typeof check (not `in`): `in` narrows window to never in the else branch
+  // because lib.dom declares requestIdleCallback unconditionally.
+  if (typeof window.requestIdleCallback === 'function') {
     window.requestIdleCallback(() => void prewarmPhotoGrid(), { timeout: 3000 })
     return
   }

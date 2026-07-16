@@ -41,7 +41,16 @@ const primarySections = computed(() => [
   }
 ])
 
-const secondarySections = computed(() => [
+interface SecondarySection {
+  key: string
+  title: string
+  count: number | null
+  meta: string
+  to: string
+  target?: '_blank'
+}
+
+const secondarySections = computed<SecondarySection[]>(() => [
   {
     key: 'members',
     title: t('admin.membersTitle'),

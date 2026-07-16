@@ -29,6 +29,7 @@ export default defineEventHandler(async (event) => {
       sortOrder:  d.sortOrder ?? 0
     })
     .returning()
+  if (!created) throw createError({ statusCode: 500, message: 'สร้างสมาชิกไม่สำเร็จ' })
 
   await recordAdminAudit(actor, {
     action: 'create',

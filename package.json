@@ -2,10 +2,11 @@
   "name": "cuphotoclub",
   "type": "module",
   "private": true,
-  "packageManager": "pnpm@10.7.1",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "build": "nuxt build --preset=cloudflare-pages",
     "build:node": "nuxt build",
+    "typecheck": "nuxi typecheck",
     "dev": "nuxt dev",
     "dev:real": "node ./scripts/dev-real.mjs",
     "online": "node ./scripts/online.mjs",
@@ -35,12 +36,14 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "better-sqlite3": "^12.11.1",
     "@iconify-json/heroicons": "^1.2.3",
     "@iconify-json/simple-icons": "^1.2.87",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.1",
+    "better-sqlite3": "^12.11.1",
     "drizzle-kit": "^0.31.10",
-    "tailwindcss": "^4.3.1"
+    "tailwindcss": "^4.3.1",
+    "typescript": "^5.9.3",
+    "vue-tsc": "^3.3.7"
   }
 }

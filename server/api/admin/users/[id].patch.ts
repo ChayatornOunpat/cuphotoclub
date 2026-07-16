@@ -30,11 +30,11 @@ export default defineEventHandler(async (event) => {
   // Never strip the last active owner.
   const demotingOwner = target.role === 'owner' && ((data.role && data.role !== 'owner') || data.active === false)
   if (demotingOwner) {
-    const [{ c }] = await db
+    const [ownerCount] = await db
       .select({ c: count() })
       .from(schema.users)
       .where(and(eq(schema.users.role, 'owner'), eq(schema.users.active, true)))
-    if (c <= 1) throw createError({ statusCode: 400, message: 'ต้องมีเจ้าของที่ใช้งานอยู่อย่างน้อยหนึ่งคน' })
+    if (ownerCount!.c <= 1) throw createError({ statusCode: 400, message: 'ต้องมีเจ้าของที่ใช้งานอยู่อย่างน้อยหนึ่งคน' })
   }
 
   const updates: Record<string, unknown> = {}

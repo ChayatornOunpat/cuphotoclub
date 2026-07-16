@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
       updatedAt: now
     })
     .returning()
+  if (!created) throw createError({ statusCode: 500, message: 'สร้างอัลบั้มไม่สำเร็จ' })
 
   await recordAdminAudit(actor, {
     action: 'create',

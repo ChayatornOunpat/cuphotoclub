@@ -1074,7 +1074,7 @@ function trimmedAlbumPayload(): AlbumInput {
   payload.date = payload.date.trim()
   payload.dateEnd = payload.dateEnd?.trim() || undefined
   payload.published = payload.published.trim()
-  payload.location = payload.location.trim()
+  payload.location = (payload.location ?? '').trim()
   payload.excerpt = payload.excerpt.trim()
   payload.coverSrc = payload.coverSrc.trim()
   for (const row of payload.rows) {

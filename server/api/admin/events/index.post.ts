@@ -45,6 +45,7 @@ export default defineEventHandler(async (event) => {
       publishedAt: status === 'published' ? new Date() : null
     })
     .returning()
+  if (!created) throw createError({ statusCode: 500, message: 'สร้างกิจกรรมไม่สำเร็จ' })
 
   await recordAdminAudit(actor, {
     action: 'create',

@@ -19,12 +19,15 @@ const emit = defineEmits<{
   uploaded: [keys: string[]]
 }>()
 
+const task = useUploadTask()
+
 const fileInput = ref<HTMLInputElement>()
 const uploading = ref(false)
 const dragOver = ref(false)
 const total = ref(0)
 const done = ref(0)
 const errorCount = ref(0)
+const cancelledCount = ref(0)
 const skippedCount = ref(0)
 const duplicateCount = ref(0)
 const rejectedCount = ref(0)
@@ -47,6 +50,7 @@ const autoCompress = ref(true)
 let resourcePausePromise: Promise<void> | null = null
 let resourcePauseTimer: ReturnType<typeof setInterval> | null = null
 let shouldStopCurrentUpload = false
+let uploadSignal: AbortSignal | null = null
 const fileOrderCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
 interface UploadManifestItem {
@@ -196,7 +200,7 @@ async function mapWithConcurrency<T, R>(
   const workers = Array.from({ length: Math.min(Math.max(concurrency, 1), items.length) }, async () => {
     while (next < items.length) {
       const index = next++
-      results[index] = await worker(items[index], index)
+      results[index] = await worker(items[index]!, index)
     }
   })
   await Promise.all(workers)
@@ -257,6 +261,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   if (resourcePauseTimer) clearInterval(resourcePauseTimer)
+  // Closing the modal does not cancel the upload — hand the task off to the
+  // floating dock. A finished task the user already saw here is cleared instead.
+  if (uploading.value) task.value.ownerVisible = false
+  else if (task.value.status !== 'uploading') task.value.status = 'idle'
 })
 
 function chooseFiles() {
@@ -325,6 +333,7 @@ async function uploadPreparedFile(
       if (!model.value.includes(item.key) && !uploadedKeySet.has(item.key)) {
         uploadedKeySet.add(item.key)
         uploadedKeys.push(item.key)
+        task.value.uploadedCount = uploadedKeys.length
       }
       rememberCompletedSignature(signature)
       return false
@@ -335,6 +344,7 @@ async function uploadPreparedFile(
       if (!model.value.includes(key) && !uploadedKeySet.has(key)) {
         uploadedKeySet.add(key)
         uploadedKeys.push(key)
+        task.value.uploadedCount = uploadedKeys.length
       }
       rememberCompletedSignature(signature)
       return false
@@ -342,7 +352,15 @@ async function uploadPreparedFile(
 
     throw new Error('Upload manifest item is missing session identity.')
   } catch (err) {
+    // A user cancel aborts in-flight requests; those failures are cancellations,
+    // not errors.
+    if (task.value.cancelRequested) {
+      cancelledCount.value++
+      task.value.cancelledCount = cancelledCount.value
+      return false
+    }
     errorCount.value++
+    task.value.errorCount = errorCount.value
     if (isWorkerResourceLimitError(err)) {
       shouldStopCurrentUpload = true
       resourceLimitStopped.value = true
@@ -356,6 +374,7 @@ async function uploadPreparedFile(
     })
   } finally {
     done.value++
+    task.value.done = done.value
   }
   return stoppedByResourceLimit
 }
@@ -371,7 +390,8 @@ async function uploadPreparedFileDirect(item: UploadManifestItem) {
     upload?: { url: string, headers: Record<string, string>, expiresAt: string }
   }>(`${base}/presign`, {
     method: 'POST',
-    body: { seq: item.seq }
+    body: { seq: item.seq },
+    signal: uploadSignal ?? undefined
   })
 
   if (presigned.duplicate || presigned.status === 'exists' || presigned.status === 'uploaded') {
@@ -382,10 +402,13 @@ async function uploadPreparedFileDirect(item: UploadManifestItem) {
     throw new Error('Direct R2 upload did not return an upload URL.')
   }
 
+  // The completion call carries no signal on purpose: once the PUT landed,
+  // aborting between PUT and complete would strand an unconfirmed object.
   const response = await fetch(presigned.upload.url, {
     method: 'PUT',
     headers: presigned.upload.headers,
-    body: item.toUpload
+    body: item.toUpload,
+    signal: uploadSignal ?? undefined
   })
 
   if (!response.ok) {
@@ -396,6 +419,14 @@ async function uploadPreparedFileDirect(item: UploadManifestItem) {
   return await $fetch<{ key: string }>(`${base}/complete`, { method: 'POST' })
 }
 
+function markUploadFailed(file: File, reason: string) {
+  errorCount.value++
+  done.value++
+  failedUploads.value.push({ file, name: file.name, reason })
+  task.value.errorCount = errorCount.value
+  task.value.done = done.value
+}
+
 function markUploadStopped(files: File[]) {
   if (!files.length) return
   const reason = 'Not attempted because Cloudflare Worker limits were hit. Retry failed files after the cooldown.'
@@ -404,16 +435,34 @@ function markUploadStopped(files: File[]) {
     done.value++
     failedUploads.value.push({ file, name: file.name, reason })
   }
+  task.value.errorCount = errorCount.value
+  task.value.done = done.value
+}
+
+function markUploadCancelled(files: File[]) {
+  if (!files.length) return
+  cancelledCount.value += files.length
+  done.value += files.length
+  task.value.cancelledCount = cancelledCount.value
+  task.value.done = done.value
 }
 
 async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet: Set<string>, sequenceBase: number) {
   for (let sessionStart = 0; sessionStart < files.length; sessionStart += UPLOAD_SESSION_SIZE) {
+    if (task.value.cancelRequested) {
+      markUploadCancelled(files.slice(sessionStart))
+      break
+    }
     if (shouldStopCurrentUpload) {
       markUploadStopped(files.slice(sessionStart))
       break
     }
 
     await waitForResourceLimitPause()
+    if (task.value.cancelRequested) {
+      markUploadCancelled(files.slice(sessionStart))
+      break
+    }
     if (shouldStopCurrentUpload) {
       markUploadStopped(files.slice(sessionStart))
       break
@@ -439,11 +488,19 @@ async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet:
     }
 
     for (let index = 0; index < preparedSession.length; index += UPLOAD_CONCURRENCY) {
+      if (task.value.cancelRequested) {
+        markUploadCancelled([...preparedSession.slice(index).map(item => item.file), ...files.slice(sessionStart + UPLOAD_SESSION_SIZE)])
+        return
+      }
       if (shouldStopCurrentUpload) {
         markUploadStopped([...preparedSession.slice(index).map(item => item.file), ...files.slice(sessionStart + UPLOAD_SESSION_SIZE)])
         return
       }
       await waitForResourceLimitPause()
+      if (task.value.cancelRequested) {
+        markUploadCancelled([...preparedSession.slice(index).map(item => item.file), ...files.slice(sessionStart + UPLOAD_SESSION_SIZE)])
+        return
+      }
       if (shouldStopCurrentUpload) {
         markUploadStopped([...preparedSession.slice(index).map(item => item.file), ...files.slice(sessionStart + UPLOAD_SESSION_SIZE)])
         return
@@ -451,6 +508,10 @@ async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet:
 
       const batch = preparedSession.slice(index, index + UPLOAD_CONCURRENCY)
       const stopped = await Promise.all(batch.map(item => uploadPreparedFile(item, uploadedKeys, uploadedKeySet)))
+      if (task.value.cancelRequested) {
+        markUploadCancelled([...preparedSession.slice(index + UPLOAD_CONCURRENCY).map(item => item.file), ...files.slice(sessionStart + UPLOAD_SESSION_SIZE)])
+        return
+      }
       if (shouldStopCurrentUpload || stopped.some(Boolean)) {
         markUploadStopped([...preparedSession.slice(index + UPLOAD_CONCURRENCY).map(item => item.file), ...files.slice(sessionStart + UPLOAD_SESSION_SIZE)])
         return
@@ -479,9 +540,24 @@ async function upload(files: File[], retry = false) {
   shouldStopCurrentUpload = false
   resourceLimitStopped.value = false
   errorCount.value = 0
+  cancelledCount.value = 0
   skippedCount.value = 0
   if (!retry) failedUploads.value = []
   total.value = images.length
+
+  const abortController = new AbortController()
+  uploadSignal = abortController.signal
+  registerUploadAbort(abortController)
+  task.value = {
+    status: 'uploading',
+    total: images.length,
+    done: 0,
+    uploadedCount: 0,
+    errorCount: 0,
+    cancelledCount: 0,
+    cancelRequested: false,
+    ownerVisible: true
+  }
 
   let batch = images
   const allUploadedKeys: string[] = []
@@ -502,7 +578,7 @@ async function upload(files: File[], retry = false) {
     await uploadMany(toProcess, allUploadedKeys, uploadedKeySet, sequenceBase + sequenceOffset)
     sequenceOffset += toProcess.length
 
-    if (shouldStopCurrentUpload) break
+    if (shouldStopCurrentUpload || task.value.cancelRequested) break
     if (!props.multiple) break
 
     // Drain anything queued while this batch was running
@@ -525,7 +601,14 @@ async function upload(files: File[], retry = false) {
   uploading.value = false
   total.value = 0
   done.value = 0
+  registerUploadAbort(null)
+  uploadSignal = null
+  task.value.status = task.value.cancelRequested ? 'cancelled' : 'done'
   if (fileInput.value) fileInput.value.value = ''
+}
+
+function cancelUpload() {
+  requestUploadCancel(task)
 }
 
 function retryFailed() {
@@ -586,7 +669,10 @@ function onDrop(e: DragEvent) {
         <p v-if="resourcePauseSeconds" class="r2up__uploading-pause">
           {{ t('uploader.resourcePause', { seconds: resourcePauseSeconds }) }}
         </p>
-        <p class="r2up__uploading-stay">{{ t('uploader.stayOnPage') }}</p>
+        <button type="button" class="r2up__cancel" :disabled="task.cancelRequested" @click="cancelUpload">
+          {{ task.cancelRequested ? t('uploader.cancelling') : t('uploader.cancel') }}
+        </button>
+        <p class="r2up__uploading-stay">{{ t('uploader.backgroundNote') }}</p>
       </div>
       <template v-else-if="canAddMore">
         <svg class="r2up__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">
@@ -621,14 +707,15 @@ function onDrop(e: DragEvent) {
       <p v-if="!uploading && resourceLimitStopped" class="r2up__error">
         Upload stopped after Cloudflare Worker limits were hit. Retry failed files after the cooldown.
       </p>
-      <p v-if="!uploading && rejectedCount" class="r2up__error">{{ t('uploader.rejectedType', rejectedCount, { n: rejectedCount }) }}</p>
-      <p v-if="!uploading && errorCount" class="r2up__error">{{ t('uploader.failed', errorCount, { n: errorCount }) }}</p>
-      <p v-if="!uploading && skippedCount" class="r2up__error">{{ t('uploader.skipped', skippedCount, { n: skippedCount }) }}</p>
-      <p v-if="!uploading && duplicateCount" class="r2up__note">{{ t('uploader.duplicatesSkipped', duplicateCount, { n: duplicateCount }) }}</p>
+      <p v-if="!uploading && rejectedCount" class="r2up__error">{{ t('uploader.rejectedType', { n: rejectedCount }, rejectedCount) }}</p>
+      <p v-if="!uploading && errorCount" class="r2up__error">{{ t('uploader.failed', { n: errorCount }, errorCount) }}</p>
+      <p v-if="!uploading && skippedCount" class="r2up__error">{{ t('uploader.skipped', { n: skippedCount }, skippedCount) }}</p>
+      <p v-if="!uploading && cancelledCount" class="r2up__note">{{ t('uploader.cancelledNote', { n: cancelledCount }, cancelledCount) }}</p>
+      <p v-if="!uploading && duplicateCount" class="r2up__note">{{ t('uploader.duplicatesSkipped', { n: duplicateCount }, duplicateCount) }}</p>
 
       <div v-if="!uploading && failedUploads.length" class="r2up__failures">
         <div class="r2up__failures-head">
-          <span>{{ t('uploader.failedListTitle', failedUploads.length, { n: failedUploads.length }) }}</span>
+          <span>{{ t('uploader.failedListTitle', { n: failedUploads.length }, failedUploads.length) }}</span>
           <button type="button" class="r2up__retry" @click="retryFailed">{{ t('uploader.retryFailed') }}</button>
         </div>
         <ul>
@@ -638,7 +725,7 @@ function onDrop(e: DragEvent) {
           </li>
         </ul>
         <p v-if="failedUploads.length > 8" class="r2up__more">
-          {{ t('uploader.moreFailed', failedUploads.length - 8, { n: failedUploads.length - 8 }) }}
+          {{ t('uploader.moreFailed', { n: failedUploads.length - 8 }, failedUploads.length - 8) }}
         </p>
       </div>
 
@@ -813,6 +900,22 @@ function onDrop(e: DragEvent) {
   color: #8f1c30;
   background: color-mix(in srgb, #b0243c 5%, var(--body-bg));
 }
+
+.r2up__cancel {
+  margin-top: 0.85rem;
+  border: 1px solid var(--subtle);
+  background: none;
+  padding: 0.4rem 0.85rem;
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.r2up__cancel:hover:not(:disabled) { color: #b0243c; border-color: #b0243c; }
+.r2up__cancel:disabled { opacity: 0.55; cursor: default; }
 
 .r2up__uploading-stay {
   margin-top: 0.7rem;

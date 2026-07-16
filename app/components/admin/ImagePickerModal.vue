@@ -63,7 +63,7 @@ const sortedImages = computed(() => {
 })
 
 const thumbnailGridStyle = computed(() => {
-  const option = THUMBNAIL_SIZE_OPTIONS.find(item => item.value === thumbnailSize.value) ?? THUMBNAIL_SIZE_OPTIONS[1]
+  const option = THUMBNAIL_SIZE_OPTIONS.find(item => item.value === thumbnailSize.value) ?? THUMBNAIL_SIZE_OPTIONS[1]!
   return {
     '--picker-thumb-height': `${option.height}px`,
     '--picker-thumb-max-width': `${option.maxWidth}px`

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AlbumInput } from '~~/shared/types'
+import type { Album, AlbumInput } from '~~/shared/types'
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { t } = useI18n()
@@ -7,7 +7,7 @@ const localePath = useLocalePath()
 const route = useRoute()
 const slug = route.params.slug as string
 
-const { data: album } = await useFetch(`/api/admin/albums/${slug}`)
+const { data: album } = await useFetch<Album>(`/api/admin/albums/${slug}`)
 if (!album.value) throw createError({ statusCode: 404, statusMessage: 'Album not found', fatal: true })
 
 // R2 media lives under the album's immutable id, never its (renamable) slug.

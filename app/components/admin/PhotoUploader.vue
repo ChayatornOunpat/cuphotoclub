@@ -87,8 +87,8 @@ function onDrop(e: DragEvent) {
       <p v-if="uploading" class="flex items-center gap-2 text-ink-soft">
         <UiSpinner /> {{ t('uploader.uploading', { done, total }) }}
       </p>
-      <p v-else-if="errorCount" class="text-red-600">{{ t('uploader.failed', errorCount, { n: errorCount }) }}</p>
-      <p v-if="!uploading && rejectedCount" class="text-red-600">{{ t('uploader.rejectedType', rejectedCount, { n: rejectedCount }) }}</p>
+      <p v-else-if="errorCount" class="text-red-600">{{ t('uploader.failed', { n: errorCount }, errorCount) }}</p>
+      <p v-if="!uploading && rejectedCount" class="text-red-600">{{ t('uploader.rejectedType', { n: rejectedCount }, rejectedCount) }}</p>
     </div>
   </div>
 </template>

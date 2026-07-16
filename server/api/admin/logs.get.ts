@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   const pageSize = queryNumber(query.pageSize, 50, 10, 100)
   const offset = (page - 1) * pageSize
 
-  const [logs, [{ total }]] = await Promise.all([
+  const [logs, [totalRow]] = await Promise.all([
     db
       .select()
       .from(schema.adminAuditLogs)
@@ -29,6 +29,6 @@ export default defineEventHandler(async (event) => {
     logs,
     page,
     pageSize,
-    total
+    total: totalRow!.total
   }
 })

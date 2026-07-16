@@ -11,6 +11,7 @@ const emit = defineEmits<{ updated: [keys: string[]] }>()
 
 const { t } = useI18n()
 const modalTitle = computed(() => props.title || t('adminPhotoManager.title'))
+const task = useUploadTask()
 
 const libraryKeys = ref<string[]>([])
 const loading = ref(false)
@@ -67,7 +68,12 @@ function onUploaded(keys: string[]) {
         <NuxtLink class="pm__manage-link" to="/admin/r2-images">
           {{ t('adminPhotoManager.manageR2') }}
         </NuxtLink>
-        <UiButton variant="secondary" @click="open = false">{{ t('adminPhotoManager.done') }}</UiButton>
+        <span v-if="task.status === 'uploading'" class="pm__bg-note">
+          {{ t('adminPhotoManager.backgroundHint') }}
+        </span>
+        <UiButton variant="secondary" @click="open = false">
+          {{ task.status === 'uploading' ? t('adminPhotoManager.minimize') : t('adminPhotoManager.done') }}
+        </UiButton>
       </div>
     </div>
   </UiModal>
@@ -133,4 +139,11 @@ function onUploaded(keys: string[]) {
   transition: color 0.15s;
 }
 .pm__manage-link:hover { color: var(--accent); }
+
+.pm__bg-note {
+  font-size: 0.54rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-align: right;
+}
 </style>

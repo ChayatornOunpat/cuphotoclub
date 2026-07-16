@@ -47,7 +47,7 @@ export async function mapUploadSessionItems<T, R>(
   const workers = Array.from({ length: Math.min(Math.max(concurrency, 1), items.length) }, async () => {
     while (next < items.length) {
       const index = next++
-      results[index] = await worker(items[index], index)
+      results[index] = await worker(items[index]!, index)
     }
   })
 

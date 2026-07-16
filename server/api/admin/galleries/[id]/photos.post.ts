@@ -25,15 +25,16 @@ export default defineEventHandler(async (event) => {
   const key = `photos/${album.slug}/originals/${crypto.randomUUID()}.${ext}`
   await blob.put(key, file.data, { contentType: type })
 
-  const [{ maxOrder }] = await db
+  const [maxOrderRow] = await db
     .select({ maxOrder: sql<number>`coalesce(max(sort_order), -1)` })
     .from(schema.photos)
     .where(eq(schema.photos.albumId, albumId))
 
   const [created] = await db
     .insert(schema.photos)
-    .values({ albumId, r2Key: key, width, height, sortOrder: Number(maxOrder) + 1 })
+    .values({ albumId, r2Key: key, width, height, sortOrder: Number(maxOrderRow!.maxOrder) + 1 })
     .returning()
+  if (!created) throw createError({ statusCode: 500, message: 'บันทึกรูปภาพไม่สำเร็จ' })
 
   await db.update(schema.albums).set({ updatedAt: new Date() }).where(eq(schema.albums.id, albumId))
   await recordAdminAudit(actor, {

@@ -12,8 +12,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 429, message: 'พยายามสร้างบัญชีบ่อยเกินไป กรุณาลองใหม่ภายหลัง' })
   }
 
-  const [{ c }] = await db.select({ c: count() }).from(schema.users)
-  if (c > 0) {
+  const [countRow] = await db.select({ c: count() }).from(schema.users)
+  if (countRow!.c > 0) {
     throw createError({ statusCode: 403, message: 'ระบบมีบัญชีผู้ดูแลแล้ว กรุณาเข้าสู่ระบบด้วยบัญชีเดิม' })
   }
 
@@ -34,6 +34,7 @@ export default defineEventHandler(async (event) => {
       active: true
     })
     .returning()
+  if (!created) throw createError({ statusCode: 500, message: 'สร้างบัญชีไม่สำเร็จ' })
 
   await recordAdminAudit(
     { id: created.id, email: created.email, name: created.name },

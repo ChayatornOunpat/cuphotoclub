@@ -85,7 +85,7 @@ const currentTierGb = computed(() => {
   const d = data.value
   if (!d?.projections.length) return null
   const match = d.projections.find(p => d.storageGb <= p.gb)
-  return (match ?? d.projections[d.projections.length - 1]).gb
+  return (match ?? d.projections.at(-1)!).gb
 })
 </script>
 

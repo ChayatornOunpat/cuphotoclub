@@ -92,6 +92,9 @@ export default defineNuxtConfig({
       secretAccessKey: process.env.NUXT_R2_SECRET_ACCESS_KEY || ''
     },
     session: {
+      // Placeholder for the type only — the real secret always comes from
+      // NUXT_SESSION_PASSWORD at runtime (nuxt-auth-utils).
+      password: '',
       cookie: {
         secure: process.env.NODE_ENV === 'production'
       }

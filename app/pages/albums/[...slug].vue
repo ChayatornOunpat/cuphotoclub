@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Album } from '~~/shared/types'
 import AlbumEssay from '~/components/AlbumEssay.vue'
 import AlbumSticky from '~/components/AlbumSticky.vue'
 import AlbumContact from '~/components/AlbumContact.vue'
@@ -13,8 +14,10 @@ const slug = computed(() => {
   return decodePathSegment(Array.isArray(value) ? value.join('/') : String(value))
 })
 
+// Both /api/albums/[id] and /api/albums/[slug] match this URL shape, so the
+// inferred fetch type is a union — this page only ever gets the content Album.
 const { data: album } = await useAsyncData(`album-${slug.value}`, async () => {
-  return await $fetch(`/api/albums/${slug.value}`).catch(() => null)
+  return await $fetch<Album>(`/api/albums/${slug.value}`).catch(() => null)
 })
 
 if (!album.value) {

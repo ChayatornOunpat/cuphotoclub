@@ -9,7 +9,7 @@ async function sha256(value: string) {
   return hex(await crypto.subtle.digest('SHA-256', encoder.encode(value)))
 }
 
-async function hmac(key: ArrayBuffer | Uint8Array, value: string) {
+async function hmac(key: ArrayBuffer | Uint8Array<ArrayBuffer>, value: string) {
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
     key,

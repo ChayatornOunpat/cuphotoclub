@@ -21,8 +21,9 @@ const { coverOrientation } = useCoverOrientation(() => cover.value)
 const imageCells = computed(() => {
   const result: { src: string, caption?: string, row: number, cell: number }[] = []
   for (let ri = 0; ri < props.album.rows.length; ri++) {
-    for (let ci = 0; ci < props.album.rows[ri].cells.length; ci++) {
-      const cell = props.album.rows[ri].cells[ci]
+    const row = props.album.rows[ri]!
+    for (let ci = 0; ci < row.cells.length; ci++) {
+      const cell = row.cells[ci]!
       if (cell.type === 'image') result.push({ src: cell.src ?? '', caption: cell.caption, row: ri, cell: ci })
     }
   }

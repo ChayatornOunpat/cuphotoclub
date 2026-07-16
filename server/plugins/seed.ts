@@ -4,7 +4,11 @@
 export default defineNitroPlugin(() => {
   if (!import.meta.dev) return
   if (realDataOnly()) return
-  if (!process.env.ADMIN_SEED_EMAIL || !process.env.ADMIN_SEED_PASSWORD) return
+  // Capture as consts: the narrowing from a guard on process.env doesn't
+  // survive into the async closure below.
+  const email = process.env.ADMIN_SEED_EMAIL
+  const password = process.env.ADMIN_SEED_PASSWORD
+  if (!email || !password) return
 
   // Runs at startup; retry briefly in case NuxtHub's dev migrations haven't applied yet.
   void (async () => {
@@ -16,8 +20,6 @@ export default defineNitroPlugin(() => {
           .limit(1)
         if (existing) return
 
-        const email = process.env.ADMIN_SEED_EMAIL
-        const password = process.env.ADMIN_SEED_PASSWORD
         const passwordHash = await hashPassword(password)
 
         await db.insert(schema.users).values({

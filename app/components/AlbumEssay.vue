@@ -31,8 +31,9 @@ const imageNumbers = computed(() => {
   const map = new Map<string, number>()
   let n = 1
   for (let ri = 0; ri < props.album.rows.length; ri++) {
-    for (let ci = 0; ci < props.album.rows[ri].cells.length; ci++) {
-      if (props.album.rows[ri].cells[ci].type === 'image') {
+    const row = props.album.rows[ri]!
+    for (let ci = 0; ci < row.cells.length; ci++) {
+      if (row.cells[ci]!.type === 'image') {
         map.set(`${ri}-${ci}`, n++)
       }
     }

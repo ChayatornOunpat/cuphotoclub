@@ -8,10 +8,11 @@ export default defineEventHandler(async (event) => {
   const [album] = await db.select().from(schema.albums).where(eq(schema.albums.id, id)).limit(1)
   if (!album) throw createError({ statusCode: 404, message: 'ไม่พบอัลบั้ม' })
 
-  const [{ photoCount }] = await db
+  const [photoCountRow] = await db
     .select({ photoCount: sql<number>`count(*)` })
     .from(schema.photos)
     .where(eq(schema.photos.albumId, id))
+  const photoCount = photoCountRow!.photoCount
 
   await db.delete(schema.photos).where(eq(schema.photos.albumId, id))
   await db.delete(schema.albums).where(eq(schema.albums.id, id))

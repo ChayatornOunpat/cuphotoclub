@@ -117,15 +117,6 @@ export interface Post {
 /** Fields the admin supplies when creating/updating (no id). */
 export type PostInput = Omit<Post, 'id' | 'updatedAt'>
 
-// Shape of the authenticated user stored in the session by nuxt-auth-utils.
-declare module '#auth-utils' {
-  interface User {
-    id: number
-    email: string
-    name?: string | null
-    role: Role
-    avatarUrl?: string | null
-  }
-}
-
-export {}
+// The #auth-utils session User augmentation lives in app/types/auth.d.ts and
+// server/types/auth.d.ts — the standalone `shared` TS project cannot resolve
+// that module, so the augmentation must not live here.

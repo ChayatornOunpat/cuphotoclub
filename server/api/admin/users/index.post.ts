@@ -34,6 +34,7 @@ export default defineEventHandler(async (event) => {
     .insert(schema.users)
     .values({ email, name: data.name ?? null, role: data.role, passwordHash, active: true })
     .returning()
+  if (!created) throw createError({ statusCode: 500, message: 'สร้างบัญชีไม่สำเร็จ' })
 
   await recordAdminAudit(actor, {
     action: 'create',

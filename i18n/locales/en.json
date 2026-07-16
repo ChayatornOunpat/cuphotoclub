@@ -463,7 +463,9 @@
     "title": "Photos",
     "uploaded": "Uploaded ({count})",
     "manageR2": "Manage R2 images",
-    "done": "Done"
+    "done": "Done",
+    "minimize": "Minimize",
+    "backgroundHint": "Closing this window keeps the upload running"
   },
   "uploader": {
     "dragHere": "Drag photos here or",
@@ -486,7 +488,18 @@
     "on": "On",
     "off": "Off",
     "compressOn": "Originals never stored · resized to {dim}px · JPEG {quality}%",
-    "compressOff": "Original file uploaded as-is — no compression"
+    "compressOff": "Original file uploaded as-is — no compression",
+    "backgroundNote": "You can close this window — the upload keeps running. Don't close the browser tab.",
+    "cancel": "Cancel upload",
+    "cancelling": "Cancelling…",
+    "cancelledNote": "{n} file cancelled | {n} files cancelled"
+  },
+  "uploadDock": {
+    "uploading": "Uploading photos",
+    "complete": "Upload complete",
+    "cancelled": "Upload cancelled",
+    "uploadedCount": "{n} file uploaded | {n} files uploaded",
+    "dismiss": "Dismiss"
   },
   "adminForm": {
     "title": "Title",
@@ -672,6 +685,13 @@
     "authorBio": "Author Bio",
     "authorBioPlaceholder": "Short bio shown below the article...",
     "authorAvatar": "Author Avatar URL",
+    "photoLibrary": "Photo library",
+    "insertPhotoStory": "Insert photo story",
+    "photoLibraryHint": "Upload or select multiple images to append them as full-bleed and paired story blocks. The first image also fills an empty hero image.",
+    "clearArticleImages": "Clear article images",
+    "clearArticleImagesTitle": "Clear article images",
+    "clearArticleImagesBody": "Remove {count} image reference(s) from this post? Uploaded library photos stay in storage. Empty image-only blocks will be removed.",
+    "clearArticleImagesConfirm": "Clear images",
     "phLead": "Opening lead paragraph...",
     "phPullquote": "Pull quote text...",
     "phInset": "Callout / sidebar text...",
