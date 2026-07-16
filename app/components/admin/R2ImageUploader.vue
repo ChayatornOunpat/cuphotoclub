@@ -244,31 +244,40 @@ async function compressImage(file: File): Promise<File> {
 
 const canAddMore = computed(() => !props.maxFiles || model.value.length < props.maxFiles)
 
+// True while any upload runs — this instance's own, or a background one started
+// by a previous (unmounted) instance. Progress renders from the shared task so
+// a reopened modal shows the running upload instead of an empty dropzone.
+const uploadActive = computed(() => uploading.value || task.value.status === 'uploading')
+
 const progressPercent = computed(() =>
-  total.value ? Math.min(100, Math.round((done.value / total.value) * 100)) : 0
+  task.value.total ? Math.min(100, Math.round((task.value.done / task.value.total) * 100)) : 0
 )
 
 // Warn before closing/refreshing the tab while an upload is in flight.
 function onBeforeUnload(e: BeforeUnloadEvent) {
-  if (!uploading.value) return
+  if (!uploadActive.value) return
   e.preventDefault()
   e.returnValue = ''
 }
 onMounted(() => {
   loadCompletedSignatures()
   window.addEventListener('beforeunload', onBeforeUnload)
+  // Adopt a background upload: show it here and hide the floating dock.
+  if (task.value.status === 'uploading') task.value.ownerVisible = true
 })
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   if (resourcePauseTimer) clearInterval(resourcePauseTimer)
   // Closing the modal does not cancel the upload — hand the task off to the
-  // floating dock. A finished task the user already saw here is cleared instead.
-  if (uploading.value) task.value.ownerVisible = false
-  else if (task.value.status !== 'uploading') task.value.status = 'idle'
+  // floating dock. A finished task is cleared unless it still has failures or
+  // cancellations worth surfacing in the dock.
+  if (task.value.status === 'uploading') task.value.ownerVisible = false
+  else if (!task.value.errorCount && !task.value.cancelledCount) task.value.status = 'idle'
+  else task.value.ownerVisible = false
 })
 
 function chooseFiles() {
-  if (!uploading.value && canAddMore.value) fileInput.value?.click()
+  if (!uploadActive.value && canAddMore.value) fileInput.value?.click()
 }
 
 async function createUploadSessionBatch(files: File[], sessionStart: number, sequenceBase: number) {
@@ -524,9 +533,9 @@ async function uploadMany(files: File[], uploadedKeys: string[], uploadedKeySet:
 }
 
 async function upload(files: File[], retry = false) {
-  // Do not accept another batch while an upload is in progress. Keeping the
-  // active batch as the only batch makes progress and failure reporting clear.
-  if (uploading.value) {
+  // Do not accept another batch while an upload is in progress — including a
+  // background upload owned by a previous instance of this component.
+  if (uploadActive.value) {
     return
   }
 
@@ -628,12 +637,12 @@ function onPick(e: Event) {
 }
 
 function onDragOver() {
-  dragOver.value = !uploading.value && canAddMore.value
+  dragOver.value = !uploadActive.value && canAddMore.value
 }
 
 function onDrop(e: DragEvent) {
   dragOver.value = false
-  if (uploading.value || !canAddMore.value || !e.dataTransfer?.files?.length) return
+  if (uploadActive.value || !canAddMore.value || !e.dataTransfer?.files?.length) return
   upload(normalizeUploadOrder(Array.from(e.dataTransfer.files)))
 }
 </script>
@@ -645,7 +654,7 @@ function onDrop(e: DragEvent) {
       class="r2up__zone"
       :class="[
         dragOver ? 'is-drag-over' : '',
-        uploading ? 'is-uploading' : '',
+        uploadActive ? 'is-uploading' : '',
         !canAddMore ? 'is-full' : '',
         dropzoneClass
       ]"
@@ -653,15 +662,15 @@ function onDrop(e: DragEvent) {
       @dragleave.prevent="dragOver = false"
       @drop.prevent="onDrop"
     >
-      <div v-if="uploading" class="r2up__uploading">
+      <div v-if="uploadActive" class="r2up__uploading">
         <div class="r2up__uploading-mark" aria-hidden="true">
           <span /><span /><span />
         </div>
         <p class="r2up__uploading-kicker">{{ t('uploader.uploadingKicker') }}</p>
         <p class="r2up__uploading-count">
-          <strong>{{ done }}</strong>
+          <strong>{{ task.done }}</strong>
           <span class="r2up__uploading-sep">/</span>
-          {{ total }}
+          {{ task.total }}
         </p>
         <div class="r2up__uploading-meter" role="progressbar" :aria-valuenow="progressPercent" aria-valuemin="0" aria-valuemax="100">
           <span :style="{ transform: `scaleX(${progressPercent / 100})` }" />
@@ -672,7 +681,6 @@ function onDrop(e: DragEvent) {
         <button type="button" class="r2up__cancel" :disabled="task.cancelRequested" @click="cancelUpload">
           {{ task.cancelRequested ? t('uploader.cancelling') : t('uploader.cancel') }}
         </button>
-        <p class="r2up__uploading-stay">{{ t('uploader.backgroundNote') }}</p>
       </div>
       <template v-else-if="canAddMore">
         <svg class="r2up__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">
@@ -916,15 +924,6 @@ function onDrop(e: DragEvent) {
 }
 .r2up__cancel:hover:not(:disabled) { color: #b0243c; border-color: #b0243c; }
 .r2up__cancel:disabled { opacity: 0.55; cursor: default; }
-
-.r2up__uploading-stay {
-  margin-top: 0.7rem;
-  font-family: var(--font-sans);
-  font-size: 0.5rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
 
 @keyframes r2upPulse {
   0%, 100% { transform: scaleY(0.45); opacity: 0.55; }

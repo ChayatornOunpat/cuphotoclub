@@ -33,6 +33,12 @@ watch(open, val => {
   if (val) { uploadQueue.value = []; load() }
 })
 
+// A background upload (started before the modal was reopened) finishing won't
+// emit `uploaded` into this instance — refresh the library when it completes.
+watch(() => task.value.status, (status) => {
+  if (status === 'done' && open.value) load()
+})
+
 function onUploaded(keys: string[]) {
   libraryKeys.value = [...keys, ...libraryKeys.value]
   emit('updated', keys)
@@ -68,9 +74,6 @@ function onUploaded(keys: string[]) {
         <NuxtLink class="pm__manage-link" to="/admin/r2-images">
           {{ t('adminPhotoManager.manageR2') }}
         </NuxtLink>
-        <span v-if="task.status === 'uploading'" class="pm__bg-note">
-          {{ t('adminPhotoManager.backgroundHint') }}
-        </span>
         <UiButton variant="secondary" @click="open = false">
           {{ task.status === 'uploading' ? t('adminPhotoManager.minimize') : t('adminPhotoManager.done') }}
         </UiButton>
@@ -140,10 +143,4 @@ function onUploaded(keys: string[]) {
 }
 .pm__manage-link:hover { color: var(--accent); }
 
-.pm__bg-note {
-  font-size: 0.54rem;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  text-align: right;
-}
 </style>

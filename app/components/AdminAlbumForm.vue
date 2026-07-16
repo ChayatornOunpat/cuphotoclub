@@ -94,6 +94,10 @@ const draggingRowIndex = ref<number | null>(null)
 const draggingCellInfo = ref<{ row: number, cell: number } | null>(null)
 const dragOverRowIndex = ref<number | null>(null)
 const dragOverCellIndex = ref<{ row: number, cell: number } | null>(null)
+const EDGE_SCROLL_ZONE = 96
+const EDGE_SCROLL_MAX_SPEED = 24
+let edgeScrollFrame: number | null = null
+let edgeScrollSpeed = 0
 
 // Content editing refs
 const activeField = ref<'title' | 'category' | 'date' | 'dateEnd' | 'location' | 'excerpt'>('title')
@@ -156,6 +160,7 @@ watch(categoryMenuOpen, (open) => {
 onUnmounted(() => {
   if (import.meta.client) document.removeEventListener('pointerdown', onCategoryMenuOutside)
 })
+onUnmounted(stopEdgeAutoScroll)
 const dateInput = ref<FocusSelectable | null>(null)
 const dateEndInput = ref<FocusSelectable | null>(null)
 const publishedInput = ref<FocusSelectable | null>(null)
@@ -834,12 +839,74 @@ function setDefaultFont(value: TextFont) {
 }
 
 // Row drag (reorder)
+function hasActiveDrag() {
+  return draggingRowIndex.value !== null || draggingFromPalette.value !== null || draggingCellInfo.value !== null
+}
+
+function stopEdgeAutoScroll() {
+  edgeScrollSpeed = 0
+  if (edgeScrollFrame !== null) {
+    cancelAnimationFrame(edgeScrollFrame)
+    edgeScrollFrame = null
+  }
+  if (import.meta.client) {
+    window.removeEventListener('dragover', onViewportDragOver)
+    window.removeEventListener('drop', stopEdgeAutoScroll)
+    window.removeEventListener('dragend', stopEdgeAutoScroll)
+  }
+}
+
+function tickEdgeAutoScroll() {
+  if (!edgeScrollSpeed || !hasActiveDrag()) {
+    stopEdgeAutoScroll()
+    return
+  }
+  window.scrollBy(0, edgeScrollSpeed)
+  edgeScrollFrame = requestAnimationFrame(tickEdgeAutoScroll)
+}
+
+function updateEdgeAutoScroll(clientY: number) {
+  if (!import.meta.client || !hasActiveDrag()) return
+
+  const viewportHeight = window.innerHeight
+  const topDistance = Math.max(clientY, 0)
+  const bottomDistance = Math.max(viewportHeight - clientY, 0)
+
+  if (topDistance < EDGE_SCROLL_ZONE) {
+    edgeScrollSpeed = -Math.ceil((1 - topDistance / EDGE_SCROLL_ZONE) * EDGE_SCROLL_MAX_SPEED)
+  } else if (bottomDistance < EDGE_SCROLL_ZONE) {
+    edgeScrollSpeed = Math.ceil((1 - bottomDistance / EDGE_SCROLL_ZONE) * EDGE_SCROLL_MAX_SPEED)
+  } else {
+    edgeScrollSpeed = 0
+  }
+
+  if (edgeScrollSpeed && edgeScrollFrame === null) {
+    edgeScrollFrame = requestAnimationFrame(tickEdgeAutoScroll)
+  } else if (!edgeScrollSpeed && edgeScrollFrame !== null) {
+    cancelAnimationFrame(edgeScrollFrame)
+    edgeScrollFrame = null
+  }
+}
+
+function onViewportDragOver(event: DragEvent) {
+  updateEdgeAutoScroll(event.clientY)
+}
+
+function startEdgeAutoScroll() {
+  if (!import.meta.client) return
+  window.addEventListener('dragover', onViewportDragOver)
+  window.addEventListener('drop', stopEdgeAutoScroll)
+  window.addEventListener('dragend', stopEdgeAutoScroll)
+}
+
 function onRowDragStart(ri: number) {
   draggingRowIndex.value = ri
+  startEdgeAutoScroll()
 }
-function onRowDragOver(ri: number) {
+function onRowDragOver(ri: number, event?: DragEvent) {
   if (draggingRowIndex.value !== null || draggingFromPalette.value !== null || draggingCellInfo.value !== null) {
     dragOverRowIndex.value = ri
+    if (event) updateEdgeAutoScroll(event.clientY)
   }
 }
 
@@ -910,19 +977,23 @@ function onRowDrop(ri: number) {
   draggingCellInfo.value = null
   dragOverRowIndex.value = null
   dragOverCellIndex.value = null
+  stopEdgeAutoScroll()
 }
 function onRowDragEnd() {
   draggingRowIndex.value = null
   dragOverRowIndex.value = null
+  stopEdgeAutoScroll()
 }
 
 // Cell drag (reorder within a row, or move to a different row)
 function onCellDragStart(ri: number, ci: number) {
   draggingCellInfo.value = { row: ri, cell: ci }
+  startEdgeAutoScroll()
 }
-function onCellDragOver(ri: number, ci: number) {
+function onCellDragOver(ri: number, ci: number, event?: DragEvent) {
   if (draggingCellInfo.value !== null) {
     dragOverCellIndex.value = { row: ri, cell: ci }
+    if (event) updateEdgeAutoScroll(event.clientY)
   }
 }
 function onCellDrop(ri: number, ci: number) {
@@ -931,19 +1002,23 @@ function onCellDrop(ri: number, ci: number) {
   }
   draggingCellInfo.value = null
   dragOverCellIndex.value = null
+  stopEdgeAutoScroll()
 }
 function onCellDragEnd() {
   draggingCellInfo.value = null
   dragOverCellIndex.value = null
+  stopEdgeAutoScroll()
 }
 
 // Palette drag
 function onPaletteDragStart(type: CellType, span: CellSpan) {
   draggingFromPalette.value = { type, span }
+  startEdgeAutoScroll()
 }
 function onPaletteDragEnd() {
   draggingFromPalette.value = null
   dragOverRowIndex.value = null
+  stopEdgeAutoScroll()
 }
 
 // Canvas drop (palette → new row at end)
@@ -954,6 +1029,7 @@ function onCanvasDragStart(e: DragEvent) {
   const ri = parseInt(cellEl.getAttribute('data-row-n') || '0')
   const ci = parseInt(cellEl.getAttribute('data-cell-n') || '0')
   draggingCellInfo.value = { row: ri, cell: ci }
+  startEdgeAutoScroll()
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', `${ri}:${ci}`)
@@ -969,10 +1045,12 @@ function onCanvasDragStart(e: DragEvent) {
 function onCanvasDragEnd() {
   draggingCellInfo.value = null
   dragOverCellIndex.value = null
+  stopEdgeAutoScroll()
 }
 
 function onCanvasDragOver(e: DragEvent) {
   e.preventDefault()
+  updateEdgeAutoScroll(e.clientY)
   if (draggingCellInfo.value !== null) {
     const cellEl = (e.target as HTMLElement).closest('[data-cell-n]') as HTMLElement | null
     if (cellEl) {
@@ -1017,6 +1095,7 @@ function onCanvasDrop(event: DragEvent) {
     addCell(form.rows.length - 1, type, span)
     draggingFromPalette.value = null
   }
+  stopEdgeAutoScroll()
 }
 
 // Canvas click — select cell or open content dock
@@ -1310,7 +1389,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       </div>
 
       <!-- Palette -->
-      <div class="tray__section">
+      <div class="tray__section tray__section--palette">
         <!-- Essay: full span palette -->
         <template v-if="isEssay">
           <p class="tray__label">{{ t('adminForm.cellTypeImage') }}</p>
@@ -1397,7 +1476,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
         <div
           class="row-list"
           :class="{ 'drop-active': draggingFromPalette !== null }"
-          @dragover.prevent
+          @dragover.prevent="updateEdgeAutoScroll($event.clientY)"
           @drop.prevent="onRowDrop(form.rows.length)"
         >
           <div
@@ -1410,7 +1489,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               'is-dragging': draggingRowIndex === ri,
               'drop-target': dragOverRowIndex === ri && dragOverRowIndex !== draggingRowIndex
             }"
-            @dragover.prevent.stop="onRowDragOver(ri)"
+            @dragover.prevent.stop="onRowDragOver(ri, $event)"
             @drop.prevent.stop="onRowDrop(ri)"
             @click="selectRow(ri)"
           >
@@ -1450,7 +1529,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
                 draggable="true"
                 @click.stop="selectCell(ri, ci)"
                 @dragstart.stop="onCellDragStart(ri, ci)"
-                @dragover.prevent.stop="onCellDragOver(ri, ci)"
+                @dragover.prevent.stop="onCellDragOver(ri, ci, $event)"
                 @drop.prevent.stop="onCellDrop(ri, ci)"
                 @dragend.stop="onCellDragEnd"
               >
@@ -1849,6 +1928,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 
 /* ─── Left tray ─── */
 .tray {
+  --tray-topbar-offset: 3.42rem;
   width: var(--tray-width);
   min-width: 280px;
   max-width: min(460px, 42vw);
@@ -1968,6 +2048,13 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .tray__section {
   padding: 0.75rem 0.75rem 0.5rem;
   border-bottom: 1px solid var(--subtle);
+}
+.tray__section--palette {
+  position: sticky;
+  top: var(--tray-topbar-offset);
+  z-index: 1;
+  background: color-mix(in srgb, var(--body-bg) 96%, white);
+  box-shadow: 0 0.55rem 0.75rem -0.75rem rgba(26, 25, 24, 0.45);
 }
 .tray__section--grow { flex: 1; border-bottom: none; display: flex; flex-direction: column; }
 

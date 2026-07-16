@@ -464,8 +464,7 @@
     "uploaded": "Uploaded ({count})",
     "manageR2": "Manage R2 images",
     "done": "Done",
-    "minimize": "Minimize",
-    "backgroundHint": "Closing this window keeps the upload running"
+    "minimize": "Minimize"
   },
   "uploader": {
     "dragHere": "Drag photos here or",
@@ -475,7 +474,6 @@
     "uploading": "Uploading {done}/{total}…",
     "uploadingKicker": "Uploading",
     "resourcePause": "Worker limit hit · waiting {seconds}s before continuing",
-    "stayOnPage": "Stay on this page until the upload finishes",
     "failed": "{n} file failed to upload | {n} files failed to upload",
     "failedListTitle": "{n} failed file | {n} failed files",
     "retryFailed": "Retry failed",
@@ -489,7 +487,6 @@
     "off": "Off",
     "compressOn": "Originals never stored · resized to {dim}px · JPEG {quality}%",
     "compressOff": "Original file uploaded as-is — no compression",
-    "backgroundNote": "You can close this window — the upload keeps running. Don't close the browser tab.",
     "cancel": "Cancel upload",
     "cancelling": "Cancelling…",
     "cancelledNote": "{n} file cancelled | {n} files cancelled"
