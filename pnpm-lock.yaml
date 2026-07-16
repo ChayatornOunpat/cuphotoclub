@@ -50,6 +50,9 @@ importers:
       nuxt-auth-utils:
         specifier: 0.5.29
         version: 0.5.29(magicast@0.5.3)
+      ufo:
+        specifier: 1.6.4
+        version: 1.6.4
       unstorage:
         specifier: ^1.17.5
         version: 1.17.5(db0@0.3.4(@libsql/client@0.17.4)(better-sqlite3@12.11.1)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260620.1)(@libsql/client@0.17.4)(better-sqlite3@12.11.1)))(ioredis@5.11.1)

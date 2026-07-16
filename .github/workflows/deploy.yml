@@ -54,3 +54,24 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler pages deploy dist --project-name cuphotoclub --branch ${{ env.CLOUDFLARE_PAGES_PRODUCTION_BRANCH }}
+
+      # Stale swr cache entries keep serving HTML that references the previous
+      # build's JS chunks, giving visitors chunk-load errors ("the page didn't
+      # load fully") until the entries expire. Purge the CACHE KV namespace
+      # (wrangler.toml) so post-deploy renders always match the live build.
+      - name: Purge SWR cache KV
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CACHE_KV_NAMESPACE_ID: a3e533bb5602447b9a2eba0c4153a8a5
+        run: |
+          npx wrangler kv key list --namespace-id="$CACHE_KV_NAMESPACE_ID" > cache-keys.json
+          node -e "
+            const keys = JSON.parse(require('fs').readFileSync('cache-keys.json', 'utf8')).map(k => k.name)
+            require('fs').writeFileSync('cache-names.json', JSON.stringify(keys))
+            console.log(keys.length + ' cache entries to purge')
+          "
+          if [ "$(node -p "JSON.parse(require('fs').readFileSync('cache-names.json','utf8')).length")" -gt 0 ]; then
+            npx wrangler kv bulk delete cache-names.json --namespace-id="$CACHE_KV_NAMESPACE_ID" --force
+          fi

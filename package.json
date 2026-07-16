@@ -30,6 +30,7 @@
     "marked": "^18.0.5",
     "nuxt": "^4.4.8",
     "nuxt-auth-utils": "0.5.29",
+    "ufo": "1.6.4",
     "unstorage": "^1.17.5",
     "vue": "^3.5.35",
     "vue-router": "^5.1.0",
