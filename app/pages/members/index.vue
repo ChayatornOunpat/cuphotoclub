@@ -13,7 +13,7 @@ interface Member {
   featuredLinks: { label: string, url: string }[]
 }
 
-type PublicMemberFilter = 'all' | 'staff' | 'members' | `year:${number}` | `interest:${string}`
+type PublicMemberFilter = 'all' | 'staff' | 'members' | `position:${string}`
 
 const { t, locale } = useI18n()
 const [{ data: members }, { data: pageData }] = await Promise.all([
@@ -37,39 +37,23 @@ useSeoMeta({
 
 const activeFilter = ref<PublicMemberFilter>('all')
 const memberList = computed(() => members.value ?? [])
-const years = computed(() => [...new Set(memberList.value.map(m => m.schoolYear).filter((year): year is number => !!year))].sort((a, b) => a - b))
-const interests = computed(() => [...new Set(memberList.value.flatMap(m => m.interests ?? []))].sort((a, b) => a.localeCompare(b, locale.value)))
+const positions = computed(() => [...new Set(memberList.value.map(m => m.position?.trim()).filter((position): position is string => !!position))].sort((a, b) => a.localeCompare(b, locale.value)))
 const filterOptions = computed<{ value: PublicMemberFilter, label: string }[]>(() => [
   { value: 'all', label: t('members.filterAll') },
   { value: 'staff', label: t('members.filterStaff') },
   { value: 'members', label: t('members.filterMembers') },
-  ...years.value.map(year => ({ value: `year:${year}` as const, label: t('members.year', { n: year }) })),
-  ...interests.value.map(interest => ({ value: `interest:${interest}` as const, label: interest }))
+  ...positions.value.map(position => ({ value: `position:${position}` as const, label: position }))
 ])
 
 const visibleMembers = computed(() => memberList.value.filter((member) => {
   if (activeFilter.value === 'staff') return !!member.position
   if (activeFilter.value === 'members') return !member.position
-  if (activeFilter.value.startsWith('year:')) return member.schoolYear === Number(activeFilter.value.slice(5))
-  if (activeFilter.value.startsWith('interest:')) return (member.interests ?? []).includes(activeFilter.value.slice(9))
+  if (activeFilter.value.startsWith('position:')) return member.position?.trim() === activeFilter.value.slice(9)
   return true
 }))
 
-const staff = computed(() => visibleMembers.value.filter(m => m.position))
-const byYear = computed(() => {
-  const regular = visibleMembers.value.filter(m => !m.position)
-  const map = new Map<number | null, Member[]>()
-  for (const m of regular) {
-    const y = m.schoolYear
-    if (!map.has(y)) map.set(y, [])
-    map.get(y)!.push(m)
-  }
-  return [...map.entries()].sort((a, b) => {
-    if (a[0] === null) return 1
-    if (b[0] === null) return -1
-    return a[0] - b[0]
-  })
-})
+const staff = computed(() => [...visibleMembers.value.filter(m => m.position)].sort((a, b) => (a.position ?? '').localeCompare(b.position ?? '', locale.value)))
+const regularMembers = computed(() => visibleMembers.value.filter(m => !m.position))
 
 const selectedMember = ref<Member | null>(null)
 const memberModalOpen = computed({
@@ -144,21 +128,20 @@ function isExternalLink(url: string) {
             <div class="staff-card__body">
               <p class="staff-card__name">{{ m.nickname }}</p>
               <p class="staff-card__position">{{ m.position }}</p>
-              <p v-if="m.schoolYear" class="staff-card__year">{{ t('members.year', { n: m.schoolYear }) }}</p>
             </div>
           </button>
         </div>
       </template>
 
-      <!-- Members by year -->
-      <template v-for="([year, group], i) in byYear" :key="year">
+      <!-- Members -->
+      <template v-if="regularMembers.length">
         <div class="eyebrow">
-          <span class="num">{{ String(staff.length ? i + 2 : i + 1).padStart(2, '0') }}</span>
-          {{ year ? t('members.year', { n: year }) : t('members.unspecified') }}
+          <span class="num">{{ staff.length ? '02' : '01' }}</span>
+          {{ t('members.filterMembers') }}
         </div>
         <div class="chips">
           <button
-            v-for="m in group"
+            v-for="m in regularMembers"
             :key="m.id"
             type="button"
             class="chip"
@@ -175,7 +158,7 @@ function isExternalLink(url: string) {
       </template>
 
       <!-- Empty -->
-      <div v-if="!staff.length && !byYear.length" class="empty">
+      <div v-if="!staff.length && !regularMembers.length" class="empty">
         <Icon name="heroicons:user-group" />
         <p>{{ t('members.empty') }}</p>
       </div>
@@ -201,10 +184,6 @@ function isExternalLink(url: string) {
             <div>
               <dt>{{ t('members.role') }}</dt>
               <dd>{{ roleLabel(selectedMember) }}</dd>
-            </div>
-            <div>
-              <dt>{{ t('members.schoolYear') }}</dt>
-              <dd>{{ selectedMember.schoolYear ? t('members.year', { n: selectedMember.schoolYear }) : t('members.unspecified') }}</dd>
             </div>
           </dl>
 

@@ -175,7 +175,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
             <span class="pill-row">
               <span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span>
               <button
-                v-if="a.visibility === 'link-only'"
+                v-if="a.visibility !== 'draft'"
                 type="button"
                 class="icon-chip"
                 :class="{ 'is-copied': copiedId === a.id }"
@@ -212,7 +212,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
             <span class="pill-row">
               <span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span>
               <button
-                v-if="a.visibility === 'link-only'"
+                v-if="a.visibility !== 'draft'"
                 type="button"
                 class="icon-chip"
                 :class="{ 'is-copied': copiedId === a.id }"
@@ -297,6 +297,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 .visibility-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-width: 5.8rem;
   border: 1px solid currentColor;
   font-size: 0.58rem;
@@ -305,13 +306,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
   line-height: 1;
   padding: 0.42rem 0.62rem;
   text-transform: uppercase;
-}
-.visibility-pill::before {
-  content: '';
-  width: 0.42rem;
-  height: 0.42rem;
-  margin-right: 0.5rem;
-  background: currentColor;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 .pill-row { display: inline-flex; align-items: center; gap: 0.4rem; }
@@ -366,11 +361,6 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
   border-color: currentColor;
   font-size: 0.56rem;
   padding: 0.38rem 0.52rem;
-}
-.card__facts .visibility-pill::before {
-  width: 0.38rem;
-  height: 0.38rem;
-  margin-right: 0.42rem;
 }
 .card__facts .pill-row { border: 0; padding: 0; background: none; }
 .card__facts .icon-chip { width: 1.6rem; height: 1.6rem; }

@@ -790,7 +790,7 @@ function isChapterRow(row: AlbumRow) {
 }
 
 function rowListLabel(row: AlbumRow, index: number) {
-  if (isChapterRow(row)) return t('adminForm.chapterSeparator')
+  if (isChapterRow(row)) return row.cells[0]?.content?.trim() || t('adminForm.chapterSeparator')
   return isEssay.value ? t('adminForm.rowN', { n: index + 1 }) : t('adminForm.frameN', { n: index + 1 })
 }
 
@@ -2436,7 +2436,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   user-select: none;
 }
 .row-item__drag { color: var(--muted); font-size: 0.85rem; flex-shrink: 0; }
-.row-item__label { font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dark); flex: 1; }
+.row-item__label { font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dark); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row-item__usage { font-size: 0.5rem; letter-spacing: 0.06em; color: var(--muted); }
 .row-item__usage.full { color: var(--accent); }
 .row-item__type {

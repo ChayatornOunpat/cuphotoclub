@@ -45,6 +45,10 @@ const formError = ref('')
 const confirmTarget = ref<Member | null>(null)
 const deleting = ref(false)
 const activeFilter = ref<MemberFilter>('all')
+const draggingId = ref<number | null>(null)
+const dragOverId = ref<number | null>(null)
+const reorderSaving = ref(false)
+const reorderMsg = ref('')
 
 const form = reactive({
   nickname: '',
@@ -68,9 +72,8 @@ const hiddenCount = computed(() => memberList.value.filter(m => !m.active).lengt
 const orderedMembers = computed(() => [...memberList.value].sort((a, b) => {
   if (a.active !== b.active) return a.active ? -1 : 1
   if (!!a.position !== !!b.position) return a.position ? -1 : 1
-  const yearA = a.schoolYear ?? 99
-  const yearB = b.schoolYear ?? 99
-  if (yearA !== yearB) return yearA - yearB
+  const positionCompare = (a.position ?? '').localeCompare(b.position ?? '', 'th')
+  if (positionCompare !== 0) return positionCompare
   if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
   return a.nickname.localeCompare(b.nickname, 'th')
 }))
@@ -224,6 +227,71 @@ function roleLabel(member: Member) {
   return member.position || t('adminMembers.filterMembers')
 }
 
+function dragStart(member: Member) {
+  draggingId.value = member.id
+  dragOverId.value = null
+  reorderMsg.value = ''
+}
+
+function dragOver(member: Member) {
+  if (draggingId.value === null || draggingId.value === member.id) return
+  dragOverId.value = member.id
+}
+
+function clearDragState() {
+  draggingId.value = null
+  dragOverId.value = null
+}
+
+function reorderLocalMembers(nextVisible: Member[]) {
+  if (!members.value) return
+  const byId = new Map(nextVisible.map((member, index) => [member.id, { member, sortOrder: index }]))
+  members.value = members.value.map((member) => {
+    const next = byId.get(member.id)
+    return next ? { ...next.member, sortOrder: next.sortOrder } : member
+  })
+}
+
+async function dropOn(member: Member) {
+  if (draggingId.value === null || draggingId.value === member.id) {
+    clearDragState()
+    return
+  }
+
+  const current = visibleMembers.value
+  const from = current.findIndex(item => item.id === draggingId.value)
+  const to = current.findIndex(item => item.id === member.id)
+  if (from < 0 || to < 0) {
+    clearDragState()
+    return
+  }
+
+  const nextVisible = [...current]
+  const [moved] = nextVisible.splice(from, 1)
+  if (!moved) {
+    clearDragState()
+    return
+  }
+  nextVisible.splice(to, 0, moved)
+  clearDragState()
+  reorderLocalMembers(nextVisible)
+
+  reorderSaving.value = true
+  reorderMsg.value = ''
+  try {
+    await Promise.all(nextVisible.map((item, index) => (
+      $fetch(`/api/admin/members/${item.id}`, { method: 'PATCH', body: { sortOrder: index } })
+    )))
+    reorderMsg.value = t('adminMembers.reorderSaved')
+    await refresh()
+  } catch (e) {
+    reorderMsg.value = errMsg(e)
+    await refresh()
+  } finally {
+    reorderSaving.value = false
+  }
+}
+
 function linksToText(links: { label: string, url: string }[]) {
   return links.map(link => `${link.label} | ${link.url}`).join('\n')
 }
@@ -302,6 +370,7 @@ function textToLinks(value: string) {
         <div>
           <p class="kicker">Directory</p>
           <h2>{{ t('adminMembers.directoryHeading') }}</h2>
+          <p class="directory-hint">{{ t('adminMembers.reorderHint') }}</p>
         </div>
         <div class="filters" role="tablist" aria-label="Member filters">
           <button
@@ -319,11 +388,15 @@ function textToLinks(value: string) {
           </button>
         </div>
       </div>
+      <p v-if="reorderMsg || reorderSaving" class="reorder-state">
+        {{ reorderSaving ? t('adminMembers.reorderSaving') : reorderMsg }}
+      </p>
 
       <div class="table-wrap">
         <table v-if="visibleMembers.length" class="members-table">
           <thead>
             <tr>
+              <th class="drag-head">{{ t('adminMembers.colReorder') }}</th>
               <th>{{ t('adminMembers.colMember') }}</th>
               <th>{{ t('adminMembers.colType') }}</th>
               <th>{{ t('adminMembers.colYear') }}</th>
@@ -334,7 +407,31 @@ function textToLinks(value: string) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="member in visibleMembers" :key="member.id" :class="{ 'is-hidden': !member.active }">
+            <tr
+              v-for="member in visibleMembers"
+              :key="member.id"
+              :class="{
+                'is-hidden': !member.active,
+                'is-dragging': draggingId === member.id,
+                'is-drag-over': dragOverId === member.id
+              }"
+              @dragover.prevent="dragOver(member)"
+              @dragleave="dragOverId = dragOverId === member.id ? null : dragOverId"
+              @drop.prevent="dropOn(member)"
+              @dragend="clearDragState"
+            >
+              <td :data-label="t('adminMembers.colReorder')" class="drag-cell">
+                <button
+                  type="button"
+                  class="drag-handle"
+                  draggable="true"
+                  :aria-label="t('adminMembers.dragMember', { name: member.nickname })"
+                  :title="t('adminMembers.dragToReorder')"
+                  @dragstart="dragStart(member)"
+                >
+                  <Icon name="heroicons:bars-3" class="drag-handle__icon" />
+                </button>
+              </td>
               <td :data-label="t('adminMembers.colMember')">
                 <div class="member-cell">
                   <span class="avatar">
@@ -574,6 +671,20 @@ function textToLinks(value: string) {
   font-weight: 200;
 }
 
+.directory-hint {
+  margin-top: 0.35rem;
+  max-width: 32rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.6;
+}
+
+.reorder-state {
+  margin: -0.2rem 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
 .intro-actions {
   display: flex;
   align-items: center;
@@ -659,8 +770,49 @@ function textToLinks(value: string) {
 .members-table tbody tr:hover {
   background: color-mix(in srgb, var(--paper) 38%, transparent);
 }
+.members-table tbody tr.is-dragging {
+  opacity: 0.38;
+}
+.members-table tbody tr.is-drag-over {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
 .members-table tbody tr.is-hidden {
   opacity: 0.64;
+}
+
+.drag-head {
+  width: 2.8rem;
+}
+
+.drag-cell {
+  width: 2.8rem;
+  padding-right: 0.25rem;
+}
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: grab;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.drag-handle:hover {
+  border-color: var(--subtle);
+  background: color-mix(in srgb, var(--paper) 48%, transparent);
+  color: var(--dark);
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.drag-handle__icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .member-cell {
@@ -995,13 +1147,17 @@ function textToLinks(value: string) {
     text-transform: uppercase;
   }
 
-  .members-table td:first-child {
-    grid-template-columns: 1fr;
+  .members-table td:nth-child(2) {
+    grid-template-columns: 6.5rem 1fr;
     padding-bottom: 0.85rem;
   }
-  .members-table td:first-child::before,
+  .members-table td:nth-child(2)::before,
   .actions-cell::before {
     display: none;
+  }
+
+  .drag-cell {
+    width: auto;
   }
 
   .member-cell {
