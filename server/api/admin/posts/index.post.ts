@@ -20,5 +20,6 @@ export default defineEventHandler(async (event) => {
       published: created.published
     }
   })
+  await purgeSwrCache()
   return created
 })

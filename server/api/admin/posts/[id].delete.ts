@@ -13,5 +13,6 @@ export default defineEventHandler(async (event) => {
       published: post?.published
     }
   })
+  await purgeSwrCache()
   return { ok: true }
 })

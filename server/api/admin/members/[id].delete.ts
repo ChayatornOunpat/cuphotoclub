@@ -21,5 +21,6 @@ export default defineEventHandler(async (event) => {
       position: row.position
     }
   })
+  await purgeSwrCache()
   return { ok: true }
 })

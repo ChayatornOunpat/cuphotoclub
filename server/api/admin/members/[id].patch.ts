@@ -6,6 +6,12 @@ const bodySchema = z.object({
   schoolYear: z.number().int().min(1).max(4).nullable().optional(),
   position:   z.string().trim().max(100).nullable().optional(),
   instagram:  z.string().trim().max(60).nullable().optional(),
+  bio:        z.string().trim().max(500).nullable().optional(),
+  interests:  z.array(z.string().trim().min(1).max(40)).max(12).optional(),
+  featuredLinks: z.array(z.object({
+    label: z.string().trim().min(1).max(80),
+    url: z.string().trim().min(1).max(240)
+  })).max(6).optional(),
   photoR2Key: z.string().nullable().optional(),
   active:     z.boolean().optional(),
   sortOrder:  z.number().int().optional()
@@ -28,6 +34,9 @@ export default defineEventHandler(async (event) => {
   if (d.schoolYear !== undefined) updates.schoolYear = d.schoolYear
   if (d.position   !== undefined) updates.position   = d.position
   if (d.instagram  !== undefined) updates.instagram  = d.instagram
+  if (d.bio        !== undefined) updates.bio        = d.bio
+  if (d.interests  !== undefined) updates.interests  = d.interests
+  if (d.featuredLinks !== undefined) updates.featuredLinks = d.featuredLinks
   if (d.active     !== undefined) updates.active     = d.active
   if (d.sortOrder  !== undefined) updates.sortOrder  = d.sortOrder
   if (d.photoR2Key !== undefined) {
@@ -51,6 +60,7 @@ export default defineEventHandler(async (event) => {
         changed: Object.keys(updates)
       }
     })
+    await purgeSwrCache()
   }
   return { ok: true }
 })

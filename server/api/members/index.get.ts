@@ -9,6 +9,9 @@ export default defineEventHandler(async () => {
       schoolYear: schema.members.schoolYear,
       position:   schema.members.position,
       instagram:  schema.members.instagram,
+      bio:        schema.members.bio,
+      interests:  schema.members.interests,
+      featuredLinks: schema.members.featuredLinks,
       sortOrder:  schema.members.sortOrder
     })
     .from(schema.members)

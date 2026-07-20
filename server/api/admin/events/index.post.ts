@@ -58,6 +58,7 @@ export default defineEventHandler(async (event) => {
       eventDate: created.eventDate?.toISOString?.()
     }
   })
+  await purgeSwrCache()
 
   return created
 })

@@ -10,6 +10,9 @@ interface Member {
   schoolYear: number | null
   position: string | null
   instagram: string | null
+  bio: string | null
+  interests: string[]
+  featuredLinks: { label: string, url: string }[]
   active: boolean
   sortOrder: number
 }
@@ -48,6 +51,9 @@ const form = reactive({
   schoolYear: '',
   position: '',
   instagram: '',
+  bio: '',
+  interests: '',
+  featuredLinks: '',
   photoR2Key: null as string | null,
   sortOrder: '0',
   active: true
@@ -89,6 +95,9 @@ function resetForm() {
     schoolYear: '',
     position: '',
     instagram: '',
+    bio: '',
+    interests: '',
+    featuredLinks: '',
     photoR2Key: null,
     sortOrder: '0',
     active: true
@@ -109,6 +118,9 @@ function openEdit(member: Member) {
     schoolYear: member.schoolYear ? String(member.schoolYear) : '',
     position: member.position ?? '',
     instagram: member.instagram ?? '',
+    bio: member.bio ?? '',
+    interests: (member.interests ?? []).join(', '),
+    featuredLinks: linksToText(member.featuredLinks ?? []),
     photoR2Key: member.photoR2Key,
     sortOrder: String(member.sortOrder ?? 0),
     active: member.active
@@ -128,6 +140,13 @@ function bodyFromForm() {
     schoolYear: form.schoolYear ? Number(form.schoolYear) : null,
     position: form.position.trim() || null,
     instagram: form.instagram.replace(/^@/, '').trim() || null,
+    bio: form.bio.trim() || null,
+    interests: form.interests
+      .split(',')
+      .map(item => item.trim())
+      .filter(Boolean)
+      .slice(0, 12),
+    featuredLinks: textToLinks(form.featuredLinks),
     photoR2Key: form.photoR2Key,
     sortOrder: form.sortOrder ? Number(form.sortOrder) : 0,
     active: form.active
@@ -203,6 +222,21 @@ function yearLabel(year: number | null) {
 
 function roleLabel(member: Member) {
   return member.position || t('adminMembers.filterMembers')
+}
+
+function linksToText(links: { label: string, url: string }[]) {
+  return links.map(link => `${link.label} | ${link.url}`).join('\n')
+}
+
+function textToLinks(value: string) {
+  return value
+    .split('\n')
+    .map((line) => {
+      const [label, ...urlParts] = line.split('|')
+      return { label: label?.trim() ?? '', url: urlParts.join('|').trim() }
+    })
+    .filter(link => link.label && link.url)
+    .slice(0, 6)
 }
 </script>
 
@@ -392,6 +426,21 @@ function roleLabel(member: Member) {
             <label class="check-field">
               <input v-model="form.active" type="checkbox">
               <span>{{ t('adminMembers.showOnPage') }}</span>
+            </label>
+
+            <label class="form-field fields-grid__wide" for="m-bio">
+              <span>{{ t('adminMembers.bio') }}</span>
+              <textarea id="m-bio" v-model="form.bio" rows="3" :placeholder="t('adminMembers.bioPlaceholder')" />
+            </label>
+
+            <label class="form-field fields-grid__wide" for="m-interests">
+              <span>{{ t('adminMembers.interests') }}</span>
+              <input id="m-interests" v-model="form.interests" type="text" :placeholder="t('adminMembers.interestsPlaceholder')">
+            </label>
+
+            <label class="form-field fields-grid__wide" for="m-links">
+              <span>{{ t('adminMembers.featuredLinks') }}</span>
+              <textarea id="m-links" v-model="form.featuredLinks" rows="3" :placeholder="t('adminMembers.featuredLinksPlaceholder')" />
             </label>
           </div>
         </div>
@@ -773,7 +822,8 @@ function roleLabel(member: Member) {
 }
 
 .form-field input,
-.form-field select {
+.form-field select,
+.form-field textarea {
   width: 100%;
   border: 1px solid var(--subtle);
   background: #fff;
@@ -785,8 +835,18 @@ function roleLabel(member: Member) {
   transition: border-color 0.15s;
 }
 .form-field input:focus,
-.form-field select:focus {
+.form-field select:focus,
+.form-field textarea:focus {
   border-color: var(--accent);
+}
+.form-field textarea {
+  min-height: 6rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.fields-grid__wide {
+  grid-column: 1 / -1;
 }
 
 .check-field {

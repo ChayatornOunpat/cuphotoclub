@@ -128,6 +128,9 @@ export const members = sqliteTable('members', {
   schoolYear: integer('school_year'),          // 1–4
   position:   text('position'),                // null = regular member
   instagram:  text('instagram'),               // handle only, no @
+  bio:        text('bio'),
+  interests:  text('interests', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+  featuredLinks: text('featured_links', { mode: 'json' }).$type<{ label: string, url: string }[]>().notNull().default(sql`'[]'`),
   active:     integer('active', { mode: 'boolean' }).notNull().default(true),
   sortOrder:  integer('sort_order').notNull().default(0),
   createdAt

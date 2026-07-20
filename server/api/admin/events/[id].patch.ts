@@ -64,5 +64,6 @@ export default defineEventHandler(async (event) => {
       changed: Object.keys(updates).filter(key => key !== 'updatedAt')
     }
   })
+  await purgeSwrCache()
   return { ok: true }
 })

@@ -14,5 +14,6 @@ export default defineEventHandler(async (event) => {
       style: album?.style
     }
   })
+  await purgeSwrCache()
   return { ok: true }
 })

@@ -2165,8 +2165,8 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .palette-action--text:hover { border-color: #6b7fd4; background: color-mix(in srgb, #6b7fd4 6%, var(--body-bg)); color: #6b7fd4; }
 .palette-action--chapter { border-color: color-mix(in srgb, var(--accent) 42%, var(--subtle)); background: color-mix(in srgb, var(--accent) 4%, var(--body-bg)); }
 .palette-action--chapter:hover { border-color: var(--accent); color: var(--accent); }
-.palette-action--pad { border-style: dashed; color: var(--muted); }
-.palette-action--pad:hover { border-color: var(--muted); border-style: solid; background: color-mix(in srgb, var(--muted) 6%, var(--body-bg)); }
+.palette-action--pad { border-style: dashed; }
+.palette-action--pad:hover { border-color: var(--dark); border-style: solid; background: color-mix(in srgb, var(--dark) 4%, var(--body-bg)); }
 
 /* Media */
 .upload-btn {

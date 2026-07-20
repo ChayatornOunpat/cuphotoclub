@@ -21,5 +21,6 @@ export default defineEventHandler(async (event) => {
       eventDate: row.eventDate?.toISOString?.()
     }
   })
+  await purgeSwrCache()
   return { ok: true }
 })

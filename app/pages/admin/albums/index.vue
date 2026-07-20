@@ -25,6 +25,21 @@ function visibilityClass(value?: string) {
   }
 }
 
+const origin = useRequestURL().origin
+const copiedId = ref('')
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
+
+async function copyPublicLink(album: NonNullable<typeof albums.value>[number]) {
+  try {
+    await navigator.clipboard.writeText(`${origin}${previewPath(album)}`)
+  } catch {
+    return
+  }
+  copiedId.value = album.id
+  if (copiedTimer) clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => { copiedId.value = '' }, 1600)
+}
+
 function previewPath(album: NonNullable<typeof albums.value>[number]) {
   // Live ('public') and 'link-only' albums are reachable on their real public
   // page (the API only 404s drafts), so open that directly — no preview/admin
@@ -156,7 +171,22 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
         <tr v-for="a in visibleAlbums" :key="a.id">
           <td class="t-title" :class="{ 't-title--draft': !a.title }">{{ a.title || t('admin.untitledDraft') }}</td>
           <td>{{ a.category }}</td>
-          <td><span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span></td>
+          <td>
+            <span class="pill-row">
+              <span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span>
+              <button
+                v-if="a.visibility === 'link-only'"
+                type="button"
+                class="icon-chip"
+                :class="{ 'is-copied': copiedId === a.id }"
+                :title="copiedId === a.id ? t('admin.linkCopied') : t('admin.copyPublicLink')"
+                :aria-label="copiedId === a.id ? t('admin.linkCopied') : t('admin.copyPublicLink')"
+                @click="copyPublicLink(a)"
+              >
+                <Icon :name="copiedId === a.id ? 'heroicons:check' : 'heroicons:link'" class="icon-chip__icon" />
+              </button>
+            </span>
+          </td>
           <td><span class="pill">{{ a.style }}</span></td>
           <td>{{ imageCount(a) }}</td>
           <td class="t-muted">{{ albumDateDisplay(a) }}</td>
@@ -179,7 +209,20 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
           <h2 :class="{ 'card__title--draft': !a.title }">{{ a.title || t('admin.untitledDraft') }}</h2>
           <p>{{ a.excerpt }}</p>
           <div class="card__facts">
-            <span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span>
+            <span class="pill-row">
+              <span class="visibility-pill" :class="visibilityClass(a.visibility)">{{ visibilityLabel(a.visibility) }}</span>
+              <button
+                v-if="a.visibility === 'link-only'"
+                type="button"
+                class="icon-chip"
+                :class="{ 'is-copied': copiedId === a.id }"
+                :title="copiedId === a.id ? t('admin.linkCopied') : t('admin.copyPublicLink')"
+                :aria-label="copiedId === a.id ? t('admin.linkCopied') : t('admin.copyPublicLink')"
+                @click="copyPublicLink(a)"
+              >
+                <Icon :name="copiedId === a.id ? 'heroicons:check' : 'heroicons:link'" class="icon-chip__icon" />
+              </button>
+            </span>
             <span>{{ imageCount(a) }} {{ t('common.frames') }}</span>
             <span>{{ a.style }}</span>
           </div>
@@ -269,7 +312,27 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
   height: 0.42rem;
   margin-right: 0.5rem;
   background: currentColor;
+  flex-shrink: 0;
 }
+.pill-row { display: inline-flex; align-items: center; gap: 0.4rem; }
+.icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex-shrink: 0;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.icon-chip:hover { border-color: #4d5fb8; color: #4d5fb8; background: color-mix(in srgb, #4d5fb8 6%, transparent); }
+.icon-chip:active { transform: translateY(1px); }
+.icon-chip.is-copied { border-color: #4d5fb8; color: #4d5fb8; background: color-mix(in srgb, #4d5fb8 14%, transparent); }
+.icon-chip__icon { width: 0.85rem; height: 0.85rem; }
 .pill--muted { color: var(--muted); }
 .pill--draft {
   background: color-mix(in srgb, #b0243c 12%, var(--body-bg));
@@ -309,6 +372,9 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
   height: 0.38rem;
   margin-right: 0.42rem;
 }
+.card__facts .pill-row { border: 0; padding: 0; background: none; }
+.card__facts .icon-chip { width: 1.6rem; height: 1.6rem; }
+.card__facts .icon-chip__icon { width: 0.72rem; height: 0.72rem; }
 .card__actions { display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.8rem; }
 .card__actions .link { margin-left: 0; }
 @media (max-width: 760px) {

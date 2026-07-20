@@ -31,5 +31,6 @@ export default defineEventHandler(async (event) => {
       ...(before ? {} : { recreatedAfterDelete: true })
     }
   })
+  await purgeSwrCache()
   return updated
 })
