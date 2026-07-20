@@ -752,8 +752,20 @@ function selectRow(ri: number) {
 function addCellFromPalette(type: CellType, span: CellSpan) {
   if (selectedRow.value !== null) {
     const row = form.rows[selectedRow.value]
-    if (row && (!isEssay.value || rowUsed(row) + span <= 6)) {
+    // Fixed styles (sticky/contact/darkroom/chapters) are one cell per row —
+    // an occupied row always gets a new row inserted after it, never a second cell.
+    if (row && row.cells.length === 0) {
       addCell(selectedRow.value, type, span)
+      return
+    }
+    if (row && isEssay.value && rowUsed(row) + span <= 6) {
+      addCell(selectedRow.value, type, span)
+      return
+    }
+    if (row && !isEssay.value) {
+      const insertAt = selectedRow.value + 1
+      form.rows.splice(insertAt, 0, { cells: [] })
+      addCell(insertAt, type, span)
       return
     }
   }
@@ -778,9 +790,16 @@ function isChapterRow(row: AlbumRow) {
 }
 
 function rowListLabel(row: AlbumRow, index: number) {
-  return isChapterRow(row)
-    ? t('adminForm.chapterSeparator')
-    : t('adminForm.rowN', { n: index + 1 })
+  if (isChapterRow(row)) return t('adminForm.chapterSeparator')
+  return isEssay.value ? t('adminForm.rowN', { n: index + 1 }) : t('adminForm.frameN', { n: index + 1 })
+}
+
+// Fixed styles collapse row + cell into one flat item — selecting the row
+// selects its (only) cell directly so the edit dock opens immediately.
+function selectFixedRow(ri: number) {
+  const row = form.rows[ri]
+  if (row?.cells.length) selectCell(ri, 0)
+  else selectRow(ri)
 }
 
 function cellChipLabel(cell: AlbumCell) {
@@ -1442,24 +1461,28 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           </div>
         </template>
 
-        <!-- Sticky / Contact: fixed layout, no spans -->
+        <!-- Sticky / Contact / Darkroom / Chapters: flat frame sequence,
+             one frame per row — a plain action list instead of essay's
+             span-grid chips, since there's no grid here to configure. -->
         <template v-else>
           <p class="tray__label">{{ t('adminForm.paletteAdd') }}</p>
-          <div class="palette palette--fixed">
-            <button type="button" class="palette__chip palette__chip--image" :title="t('adminForm.paletteAddImageFixed')" @click="addCellFromPalette('image', 6)">
-              <span class="chip__type">{{ t('adminForm.cellTypeImage') }}</span>
+          <div class="palette-actions">
+            <button type="button" class="palette-action palette-action--image" @click="addCellFromPalette('image', 6)">
+              <Icon name="heroicons:photo" class="palette-action__icon" />
+              <span>{{ t('adminForm.paletteAddImageFixed') }}</span>
             </button>
             <button
               type="button"
-              class="palette__chip palette__chip--text"
-              :class="{ 'palette__chip--chapter': isChapters }"
-              :title="isChapters ? t('adminForm.paletteAddChapter') : t('adminForm.paletteAddTextFixed')"
+              class="palette-action palette-action--text"
+              :class="{ 'palette-action--chapter': isChapters }"
               @click="isChapters ? addChapterSeparator() : addCellFromPalette('text', 6)"
             >
-              <span class="chip__type">{{ isChapters ? t('adminForm.cellTypeChapter') : t('adminForm.cellTypeText') }}</span>
+              <Icon :name="isChapters ? 'heroicons:bookmark' : 'heroicons:document-text'" class="palette-action__icon" />
+              <span>{{ isChapters ? t('adminForm.paletteAddChapter') : t('adminForm.paletteAddTextFixed') }}</span>
             </button>
-            <button type="button" class="palette__chip palette__chip--pad" :title="t('adminForm.paletteAddSpacer')" @click="addCellFromPalette('pad', 6)">
-              <span class="chip__type">{{ t('adminForm.cellTypePad') }}</span>
+            <button type="button" class="palette-action palette-action--pad" @click="addCellFromPalette('pad', 6)">
+              <Icon name="heroicons:arrows-up-down" class="palette-action__icon" />
+              <span>{{ t('adminForm.paletteAddSpacer') }}</span>
             </button>
           </div>
           <p v-if="isChapters" class="media-empty media-empty--hint">{{ t('adminForm.chapterPaletteHint') }}</p>
@@ -1469,7 +1492,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       <!-- Row List -->
       <div class="tray__section tray__section--grow">
         <p class="tray__label">
-          {{ t('adminForm.rows') }}
+          {{ isEssay ? t('adminForm.rows') : t('adminForm.frames') }}
           <span class="tray__count">{{ form.rows.length }}</span>
         </p>
 
@@ -1487,13 +1510,16 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               'is-selected': selectedRow === ri,
               'is-chapter-row': isChapterRow(row),
               'is-dragging': draggingRowIndex === ri,
-              'drop-target': dragOverRowIndex === ri && dragOverRowIndex !== draggingRowIndex
+              'drop-target': dragOverRowIndex === ri && dragOverRowIndex !== draggingRowIndex,
+              'row-item--flat': !isEssay
             }"
             @dragover.prevent.stop="onRowDragOver(ri, $event)"
             @drop.prevent.stop="onRowDrop(ri)"
-            @click="selectRow(ri)"
+            @click="isEssay ? selectRow(ri) : selectFixedRow(ri)"
           >
-            <!-- Row header -->
+            <!-- Row header — for fixed styles (sticky/contact/darkroom/chapters)
+                 this IS the whole item: one row always holds exactly one cell,
+                 so its type is shown inline instead of in a nested cell chip. -->
             <div
               class="row-item__head"
               draggable="true"
@@ -1503,16 +1529,17 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               <span class="row-item__drag">⠿</span>
               <span class="row-item__label">{{ rowListLabel(row, ri) }}</span>
               <span v-if="isEssay" class="row-item__usage" :class="{ full: rowUsed(row) >= 6 }">{{ rowUsed(row) }}/6</span>
+              <span v-else-if="row.cells[0]" class="row-item__type" :class="`row-item__type--${row.cells[0].type}`">{{ cellChipLabel(row.cells[0]) }}</span>
               <button
                 type="button"
                 class="row-item__del"
-                :aria-label="t('adminForm.removeRowN', { n: ri + 1 })"
+                :aria-label="isEssay ? t('adminForm.removeRowN', { n: ri + 1 }) : t('adminForm.removeFrameN', { n: ri + 1 })"
                 @click.stop="removeRow(ri)"
               >×</button>
             </div>
 
-            <!-- Cell chips -->
-            <div class="row-item__cells" :class="{ 'mode-fixed': !isEssay }">
+            <!-- Cell chips — essay only; fixed styles never nest more than one cell -->
+            <div v-if="isEssay" class="row-item__cells">
               <div
                 v-for="(cell, ci) in row.cells"
                 :key="ci"
@@ -1543,6 +1570,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               </div>
               <div v-if="row.cells.length === 0" class="row-item__empty" style="grid-column: 1 / -1">{{ t('adminForm.dropCellsHere') }}</div>
             </div>
+            <div v-else-if="row.cells.length === 0" class="row-item__empty row-item__empty--flat">{{ t('adminForm.dropCellsHere') }}</div>
           </div>
 
           <div
@@ -1554,7 +1582,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           </div>
         </div>
 
-        <button type="button" class="row-add-btn" @click="addRow">{{ t('adminForm.newRow') }}</button>
+        <button type="button" class="row-add-btn" @click="addRow">{{ isEssay ? t('adminForm.newRow') : t('adminForm.newFrame') }}</button>
       </div>
     </aside>
 
@@ -2083,9 +2111,6 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   grid-template-columns: repeat(4, 1fr);
   gap: 0.25rem;
 }
-.palette--fixed {
-  grid-template-columns: repeat(3, 1fr);
-}
 .palette__chip {
   display: flex;
   flex-direction: column;
@@ -2109,6 +2134,39 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .palette__chip--image .chip__span { color: var(--accent); }
 .palette__chip--text  .chip__span { color: #6b7fd4; }
 .palette__chip--pad   .chip__span { color: var(--muted); }
+
+/* Palette — fixed styles (sticky/contact/darkroom/chapters): plain action
+   list instead of essay's span-grid chips */
+.palette-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.palette-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--subtle);
+  background: var(--body-bg);
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.palette-action__icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+.palette-action--image { border-color: color-mix(in srgb, var(--accent) 30%, var(--subtle)); }
+.palette-action--image:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--body-bg)); color: var(--accent); }
+.palette-action--text { border-color: color-mix(in srgb, #6b7fd4 30%, var(--subtle)); }
+.palette-action--text:hover { border-color: #6b7fd4; background: color-mix(in srgb, #6b7fd4 6%, var(--body-bg)); color: #6b7fd4; }
+.palette-action--chapter { border-color: color-mix(in srgb, var(--accent) 42%, var(--subtle)); background: color-mix(in srgb, var(--accent) 4%, var(--body-bg)); }
+.palette-action--chapter:hover { border-color: var(--accent); color: var(--accent); }
+.palette-action--pad { border-style: dashed; color: var(--muted); }
+.palette-action--pad:hover { border-color: var(--muted); border-style: solid; background: color-mix(in srgb, var(--muted) 6%, var(--body-bg)); }
 
 /* Media */
 .upload-btn {
@@ -2363,12 +2421,10 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .row-item.is-chapter-row .row-item__label {
   color: var(--accent);
 }
-.row-item.is-chapter-row .row-item__cells {
-  min-height: 2.15rem;
-  background: color-mix(in srgb, var(--accent) 3%, var(--body-bg));
-}
 .row-item.is-dragging { opacity: 0.4; }
 .row-item.drop-target { border-top: 2px solid var(--accent); }
+
+.row-item--flat .row-item__head { border-bottom: none; }
 
 .row-item__head {
   display: flex;
@@ -2383,6 +2439,18 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .row-item__label { font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dark); flex: 1; }
 .row-item__usage { font-size: 0.5rem; letter-spacing: 0.06em; color: var(--muted); }
 .row-item__usage.full { color: var(--accent); }
+.row-item__type {
+  flex-shrink: 0;
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--subtle);
+  color: var(--muted);
+}
+.row-item__type--image { border-color: color-mix(in srgb, var(--accent) 40%, var(--subtle)); color: var(--dark); }
+.row-item__type--text  { border-color: color-mix(in srgb, #6b7fd4 40%, var(--subtle)); color: var(--dark); }
+.row-item__type--pad   { border-style: dashed; }
 .row-item__del {
   flex-shrink: 0;
   background: none;
@@ -2406,15 +2474,6 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   min-height: 2.55rem;
   align-items: stretch;
 }
-.row-item__cells.mode-fixed {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem;
-}
-.row-item__cells.mode-fixed .cell-chip {
-  grid-column: unset;
-  flex: 0 0 auto;
-}
 .row-item__empty {
   font-size: 0.5rem;
   letter-spacing: 0.1em;
@@ -2422,6 +2481,9 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   color: var(--muted);
   align-self: center;
   opacity: 0.6;
+}
+.row-item__empty--flat {
+  padding: 0 0.6rem 0.55rem;
 }
 
 /* Cell chips — proportional to their span in a 6-column mini-grid */
@@ -2689,15 +2751,19 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   position: absolute;
   top: calc(100% + 2px);
   left: 0;
-  right: 0;
+  width: calc(300% + 1.44rem);
   z-index: 30;
-  max-height: 11rem;
+  max-height: 13rem;
   overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
   border: 1px solid color-mix(in srgb, var(--dark) 20%, var(--subtle));
   background: #fff;
   box-shadow: 0 0.5rem 1.5rem rgba(26, 25, 24, 0.14);
 }
 .category-select__search {
+  grid-column: 1 / -1;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -2723,10 +2789,12 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   color: var(--dark);
   text-align: left;
   cursor: pointer;
+  border-radius: 2px;
 }
 .category-select__panel button:hover { background: color-mix(in srgb, var(--accent) 7%, #fff); }
 .category-select__panel button.active { color: var(--accent); }
 .category-select__note {
+  grid-column: 1 / -1;
   padding: 0.4rem 0.5rem;
   font-family: var(--font-sans);
   font-size: 0.6rem;
@@ -3339,6 +3407,10 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   .anchored-fields .field--location {
     grid-column: auto;
   }
+  .category-select__panel {
+    width: calc(200% + 0.72rem);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .visibility-toggle {
     grid-template-columns: 1fr;
   }
@@ -3380,6 +3452,10 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   .anchored-fields .field--category,
   .anchored-fields .field--location {
     grid-column: 1 / -1;
+  }
+  .category-select__panel {
+    width: 100%;
+    grid-template-columns: 1fr;
   }
 }
 
