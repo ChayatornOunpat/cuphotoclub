@@ -803,6 +803,8 @@ function selectFixedRow(ri: number) {
 }
 
 function cellChipLabel(cell: AlbumCell) {
+  const name = cell.label?.trim()
+  if (name) return isEssay.value ? `${name} · ${cell.span}` : name
   const type = cell.type === 'image'
     ? 'img'
     : cell.type === 'text' && isChapters.value
@@ -1178,6 +1180,7 @@ function trimmedAlbumPayload(): AlbumInput {
   for (const row of payload.rows) {
     for (const cell of row.cells) {
       if (cell.caption) cell.caption = cell.caption.trim()
+      if (cell.label) cell.label = cell.label.trim()
       if (cell.content) cell.content = cell.content.trim()
       if (cell.src) cell.src = cell.src.trim()
     }
@@ -1801,7 +1804,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               : t('adminForm.cellTypeImage') }}
           </p>
           <h2>
-            {{ t('adminForm.cellLabel', { row: (selectedRow ?? 0) + 1, cell: (selectedCell ?? 0) + 1 }) }}
+            {{ selectedCellData?.label?.trim() || t('adminForm.cellLabel', { row: (selectedRow ?? 0) + 1, cell: (selectedCell ?? 0) + 1 }) }}
           </h2>
         </div>
         <button
@@ -1813,6 +1816,21 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           <span>{{ t('admin.delete') }}</span>
         </button>
       </div>
+
+      <section class="cell-control cell-control--name">
+        <label class="cell-control__label" for="cell-name">
+          {{ t('adminForm.cellName') }}
+          <span class="opt">{{ t('adminForm.cellNameOptional') }}</span>
+        </label>
+        <input
+          id="cell-name"
+          v-model="selectedCellData!.label"
+          type="text"
+          class="prop-input"
+          :placeholder="t('adminForm.cellLabel', { row: (selectedRow ?? 0) + 1, cell: (selectedCell ?? 0) + 1 })"
+        >
+        <p class="cell-control__hint">{{ t('adminForm.cellNameHint') }}</p>
+      </section>
 
       <!-- Image cell properties -->
       <div v-if="selectedCellData?.type === 'image'" class="cell-controls cell-controls--image">
@@ -2749,11 +2767,12 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .category-select__toggle.open svg { transform: rotate(180deg); }
 .category-select__panel {
   position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
-  width: calc(300% + 1.44rem);
+  top: -4.45rem;
+  left: calc(100% + 0.55rem);
+  width: calc(200% + 0.9rem);
   z-index: 30;
-  max-height: 13rem;
+  max-height: 13.65rem;
+  min-height: 13.65rem;
   overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2906,6 +2925,10 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 }
 .cell-control:last-child {
   border-right: 0;
+}
+.cell-control--name {
+  border-right: 0;
+  border-bottom: 1px solid var(--subtle);
 }
 .cell-control__label {
   display: flex;
@@ -3408,7 +3431,11 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
     grid-column: auto;
   }
   .category-select__panel {
+    top: calc(100% + 2px);
+    left: 0;
     width: calc(200% + 0.72rem);
+    min-height: 0;
+    max-height: 13rem;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .visibility-toggle {
@@ -3455,6 +3482,8 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   }
   .category-select__panel {
     width: 100%;
+    min-height: 0;
+    max-height: 13rem;
     grid-template-columns: 1fr;
   }
 }

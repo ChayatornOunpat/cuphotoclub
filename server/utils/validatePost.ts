@@ -27,7 +27,6 @@ export function validatePost(b: Record<string, unknown>): string | null {
   if (!String(b.tag ?? '').trim()) return 'Tag is required'
   if (!String(b.date ?? '').trim()) return 'Display date is required'
   if (!String(b.image ?? '').trim()) return 'Image URL is required'
-  if (!String(b.excerpt ?? '').trim()) return 'Excerpt is required'
   if (!blocksSchema.safeParse(b.blocks).success) return 'Invalid content blocks'
   return null
 }

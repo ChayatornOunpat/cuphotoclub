@@ -19,7 +19,8 @@ export interface AlbumCell {
   type: CellType
   span: CellSpan
   src?: string       // image cells
-  caption?: string   // image cells
+  caption?: string   // image cells; shown publicly (figure caption / alt text)
+  label?: string     // internal-only name for editors; never rendered publicly
   content?: string   // text cells
   align?: TextAlign  // text cells; undefined = inherit album default
   font?: TextFont    // text cells; undefined = inherit album default

@@ -18,6 +18,7 @@ const cellSchema = z.object({
   span: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(6)]),
   src: z.string().optional(),
   caption: z.string().optional(),
+  label: z.string().optional(),
   content: z.string().optional(),
   align: z.enum(['left', 'center', 'right']).optional(),
   font: z.enum(['serif', 'sans']).optional()
@@ -34,7 +35,6 @@ export function validateAlbum(b: Record<string, unknown>): string | null {
   if (typeof b.dateEnd === 'string' && b.dateEnd && typeof b.date === 'string' && b.dateEnd < b.date) return 'End date must be after start date'
   if (b.published !== undefined && b.published !== '' && !validISODate(b.published)) return 'Published date must use YYYY-MM-DD'
   if (b.visibility !== undefined && !VISIBILITY.includes(String(b.visibility))) return 'Invalid visibility'
-  if (!String(b.excerpt ?? '').trim()) return 'Excerpt is required'
   if (!STYLES.includes(String(b.style))) return 'Invalid style'
   if (b.placement !== undefined && b.placement !== 'gallery') return 'Albums can only use gallery placement'
   if (b.rows !== undefined && !rowsSchema.safeParse(b.rows).success) return 'Invalid rows structure'
