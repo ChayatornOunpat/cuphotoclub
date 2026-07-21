@@ -1818,14 +1818,14 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
         </button>
       </div>
 
-      <section class="cell-control cell-control--name">
+      <section v-if="selectedCellData" class="cell-control cell-control--name">
         <label class="cell-control__label" for="cell-name">
           {{ t('adminForm.cellName') }}
           <span class="opt">{{ t('adminForm.cellNameOptional') }}</span>
         </label>
         <input
           id="cell-name"
-          v-model="selectedCellData!.label"
+          v-model="selectedCellData.label"
           type="text"
           class="prop-input"
           :placeholder="t('adminForm.cellLabel', { row: (selectedRow ?? 0) + 1, cell: (selectedCell ?? 0) + 1 })"
