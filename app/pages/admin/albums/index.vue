@@ -8,13 +8,14 @@ const deleting = ref('')
 const confirmTarget = ref<{ id: string; title: string } | null>(null)
 const deleteError = ref('')
 const query = ref('')
+const SORT_STORAGE_KEY = 'admin-albums-sort'
 const sortBy = ref('newest')
 const viewMode = ref<'list' | 'cards'>('list')
 
 function visibilityLabel(value?: string) {
-  if (value === 'draft') return 'Draft'
-  if (value === 'link-only') return 'Link only'
-  return 'Public'
+  if (value === 'draft') return t('adminForm.visDraft')
+  if (value === 'link-only') return t('adminForm.visLinkOnly')
+  return t('adminForm.visPublic')
 }
 
 function visibilityClass(value?: string) {
@@ -65,7 +66,7 @@ const visibleAlbums = computed(() => {
   const rows = [...(albums.value ?? [])]
     .filter((album) => {
       if (!q) return true
-      return [album.title, album.category, album.location, album.excerpt, album.style]
+      return [album.title, album.category, album.location, album.excerpt, album.style, visibilityLabel(album.visibility)]
         .some(value => String(value ?? '').toLowerCase().includes(q))
     })
 
@@ -107,6 +108,10 @@ if (import.meta.client) {
   }
   onMounted(() => window.addEventListener('keydown', onKeydown))
   onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
+  const storedSort = localStorage.getItem(SORT_STORAGE_KEY)
+  if (storedSort) sortBy.value = storedSort
+  watch(sortBy, (value) => localStorage.setItem(SORT_STORAGE_KEY, value))
 }
 
 async function confirmDelete() {
@@ -165,7 +170,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 
     <table v-if="albums && albums.length && visibleAlbums.length && viewMode === 'list'" class="tbl">
       <thead>
-        <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableCategory') }}</th><th>Visibility</th><th>{{ t('admin.tableStyle') }}</th><th>{{ t('admin.tableFrames') }}</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
+        <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableCategory') }}</th><th>{{ t('admin.tableVisibility') }}</th><th>{{ t('admin.tableStyle') }}</th><th>{{ t('admin.tableFrames') }}</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
       </thead>
       <tbody>
         <tr v-for="a in visibleAlbums" :key="a.id">

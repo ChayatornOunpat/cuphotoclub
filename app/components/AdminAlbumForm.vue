@@ -1207,6 +1207,7 @@ function onSubmit() {
 const SPANS: CellSpan[] = [2, 3, 4, 6]
 const isEssay = computed(() => form.style === 'essay')
 const isChapters = computed(() => form.style === 'chapters')
+const isSticky = computed(() => form.style === 'sticky')
 
 // Style picker modal. Drop real screenshots into
 // public/admin/album-style-previews/{style}-{1,2,3}.webp and the picker will use them.
@@ -1483,7 +1484,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               <Icon :name="isChapters ? 'heroicons:bookmark' : 'heroicons:document-text'" class="palette-action__icon" />
               <span>{{ isChapters ? t('adminForm.paletteAddChapter') : t('adminForm.paletteAddTextFixed') }}</span>
             </button>
-            <button type="button" class="palette-action palette-action--pad" @click="addCellFromPalette('pad', 6)">
+            <button v-if="!isSticky" type="button" class="palette-action palette-action--pad" @click="addCellFromPalette('pad', 6)">
               <Icon name="heroicons:arrows-up-down" class="palette-action__icon" />
               <span>{{ t('adminForm.paletteAddSpacer') }}</span>
             </button>

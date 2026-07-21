@@ -30,6 +30,24 @@ const imageCells = computed(() => {
   return result
 })
 
+// Render sequence: images keep their lightbox index, spacer/text cells become
+// full-row breaks so the filmstrip cuts and the next image starts a fresh row.
+interface SeqImage { kind: 'image', i: number, src: string, caption?: string, row: number, cell: number }
+interface SeqBreak { kind: 'break', row: number, cell: number }
+const sequence = computed<(SeqImage | SeqBreak)[]>(() => {
+  const result: (SeqImage | SeqBreak)[] = []
+  let i = 0
+  for (let ri = 0; ri < props.album.rows.length; ri++) {
+    const row = props.album.rows[ri]!
+    for (let ci = 0; ci < row.cells.length; ci++) {
+      const cell = row.cells[ci]!
+      if (cell.type === 'image') result.push({ kind: 'image', i: i++, src: cell.src ?? '', caption: cell.caption, row: ri, cell: ci })
+      else if (cell.type === 'pad' || cell.type === 'text') result.push({ kind: 'break', row: ri, cell: ci })
+    }
+  }
+  return result
+})
+
 const pad = (n: number) => String(n).padStart(2, '0')
 
 // Lightbox
@@ -91,19 +109,27 @@ onUnmounted(() => {
         <div class="sheet__hint">{{ t('albums.clickToEnlarge') }}</div>
       </div>
       <div class="grid">
-        <button
-          v-for="(img, i) in imageCells"
-          :key="i"
-          type="button"
-          class="cell"
-          :data-row-n="img.row"
-          :data-cell-n="img.cell"
-          :class="{ 'is-admin-selected': selectedRow === img.row && (selectedCell === img.cell || selectedCell === undefined) }"
-          @click="show(i)"
-        >
-          <AppImg :src="img.src" :alt="img.caption || album.title" sizes="180px" />
-          <span v-if="img.caption" class="cell__cap" :lang="textLang(img.caption)">{{ img.caption }}</span>
-        </button>
+        <template v-for="item in sequence" :key="`${item.row}-${item.cell}`">
+          <button
+            v-if="item.kind === 'image'"
+            type="button"
+            class="cell"
+            :data-row-n="item.row"
+            :data-cell-n="item.cell"
+            :class="{ 'is-admin-selected': selectedRow === item.row && (selectedCell === item.cell || selectedCell === undefined) }"
+            @click="show(item.i)"
+          >
+            <AppImg :src="item.src" :alt="item.caption || album.title" sizes="180px" />
+            <span v-if="item.caption" class="cell__cap" :lang="textLang(item.caption)">{{ item.caption }}</span>
+          </button>
+          <div
+            v-else
+            class="cell cell--break"
+            :data-row-n="item.row"
+            :data-cell-n="item.cell"
+            :class="{ 'is-admin-selected': selectedRow === item.row && (selectedCell === item.cell || selectedCell === undefined) }"
+          />
+        </template>
       </div>
     </section>
 
@@ -216,6 +242,9 @@ onUnmounted(() => {
 
 .grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.65rem; }
 .cell { position: relative; overflow: hidden; cursor: zoom-in; background: var(--hero-bg); display: block; border: 1px solid var(--subtle); padding: 0; height: 210px; }
+/* spacer/text cut: full-width flex item with no height forces the filmstrip
+   to wrap here, leaving the row before it ragged instead of edge-to-edge. */
+.cell--break { flex-basis: 100%; width: 100%; height: 0; border: 0; background: none; cursor: default; }
 .cell :deep(img) { position: relative; height: 100%; width: auto; max-width: 70vw; display: block; object-fit: contain; transition: opacity 0.18s, transform 0.18s; }
 .cell:hover :deep(img) { opacity: 0.82; transform: scale(1.025); }
 .cell__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.4rem 0.45rem 0.4rem; background: linear-gradient(transparent, rgba(12, 12, 10, 0.84)); font-size: 0.48rem; letter-spacing: 0.08em; color: rgba(245, 244, 240, 0.85); text-align: left; opacity: 0; transition: opacity 0.18s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -417,6 +446,11 @@ onUnmounted(() => {
   .cell {
     height: auto;
     aspect-ratio: 1 / 1;
+  }
+  .cell--break {
+    grid-column: 1 / -1;
+    aspect-ratio: unset;
+    height: 0;
   }
   .cell :deep(img) {
     width: 100%;

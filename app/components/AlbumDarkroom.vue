@@ -20,8 +20,9 @@ const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.
 // admin preview selection and the cell span for print sizing.
 interface PlateItem { kind: 'image', src: string, caption?: string, span: number, n: number, row: number, cell: number }
 interface NoteItem { kind: 'text', content: string, row: number, cell: number }
-const sequence = computed<(PlateItem | NoteItem)[]>(() => {
-  const out: (PlateItem | NoteItem)[] = []
+interface SpacerItem { kind: 'spacer', row: number, cell: number }
+const sequence = computed<(PlateItem | NoteItem | SpacerItem)[]>(() => {
+  const out: (PlateItem | NoteItem | SpacerItem)[] = []
   let n = 0
   for (let ri = 0; ri < props.album.rows.length; ri++) {
     for (let ci = 0; ci < props.album.rows[ri]!.cells.length; ci++) {
@@ -30,6 +31,8 @@ const sequence = computed<(PlateItem | NoteItem)[]>(() => {
         out.push({ kind: 'image', src: cell.src ?? '', caption: cell.caption, span: cell.span, n: ++n, row: ri, cell: ci })
       } else if (cell.type === 'text' && cell.content?.trim()) {
         out.push({ kind: 'text', content: cell.content, row: ri, cell: ci })
+      } else if (cell.type === 'pad') {
+        out.push({ kind: 'spacer', row: ri, cell: ci })
       }
     }
   }
@@ -102,7 +105,7 @@ function plateSizes(span: number) {
         </figure>
 
         <div
-          v-else
+          v-else-if="item.kind === 'text'"
           class="dk-note"
           :data-row-n="item.row"
           :data-cell-n="item.cell"
@@ -110,6 +113,14 @@ function plateSizes(span: number) {
         >
           <p :lang="textLang(item.content)">{{ item.content }}</p>
         </div>
+
+        <div
+          v-else
+          class="dk-spacer"
+          :data-row-n="item.row"
+          :data-cell-n="item.cell"
+          :class="{ 'is-admin-selected': selectedRow === item.row && (selectedCell === item.cell || selectedCell === undefined) }"
+        />
 
       </template>
     </section>
@@ -267,6 +278,10 @@ function plateSizes(span: number) {
   white-space: pre-line;
 }
 
+/* Extra pause on top of .dk-flow's own 7rem gap — a deliberate breath in the
+   hanging-prints sequence. */
+.dk-spacer { width: 100%; height: 4rem; }
+
 /* Admin preview selection */
 .is-admin-selected { outline: 2px solid var(--accent); outline-offset: 4px; }
 
@@ -291,6 +306,7 @@ function plateSizes(span: number) {
   .dk-head { padding: 7rem 1.25rem 3.5rem; }
   .dk-head__back { left: 1.5rem; top: 5.5rem; }
   .dk-flow { gap: 4.5rem; padding: 3.5rem 1.25rem 6rem; }
+  .dk-spacer { height: 2.5rem; }
   /* Keep each hanging print scannable — 84svh means a portrait image fills the
      screen and demands a full swipe per photo. */
   .dk-plate__print :deep(img) { max-height: 72svh; }

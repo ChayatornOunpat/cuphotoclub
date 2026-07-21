@@ -22,13 +22,16 @@ const { coverOrientation } = useCoverOrientation(() => cover.value)
 // untitled chapter (plain justified flow). The first photo of a titled chapter
 // with enough frames runs full-width as its opening plate.
 interface ChapterImage { src: string, caption?: string, n: number, row: number, cell: number }
+interface GridImage extends ChapterImage { kind: 'image' }
+interface GridBreak { kind: 'break', row: number, cell: number }
+type GridItem = GridImage | GridBreak
 interface Chapter {
   title?: string
   row?: number
   cell?: number
   images: ChapterImage[]
   plate?: ChapterImage
-  grid: ChapterImage[]
+  grid: GridItem[]
   start: number
   end: number
 }
@@ -50,7 +53,13 @@ const chapters = computed<Chapter[]>(() => {
         flush()
         current = { title: cell.content.trim(), row: ri, cell: ci, images: [], grid: [], start: n + 1, end: n }
       } else if (cell.type === 'image') {
-        current.images.push({ src: cell.src ?? '', caption: cell.caption, n: ++n, row: ri, cell: ci })
+        const img: ChapterImage = { src: cell.src ?? '', caption: cell.caption, n: ++n, row: ri, cell: ci }
+        current.images.push(img)
+        current.grid.push({ kind: 'image', ...img })
+      } else if (cell.type === 'pad') {
+        // Spacer: full-row break in the justified grid — the row before it
+        // cuts short and the next image starts fresh on a new line.
+        current.grid.push({ kind: 'break', row: ri, cell: ci })
       }
     }
   }
@@ -61,7 +70,7 @@ const chapters = computed<Chapter[]>(() => {
     ch.end = ch.images[ch.images.length - 1]?.n ?? 0
     const withPlate = !!ch.title && ch.images.length >= 4
     ch.plate = withPlate ? ch.images[0] : undefined
-    ch.grid = withPlate ? ch.images.slice(1) : ch.images
+    ch.grid = withPlate ? ch.grid.filter(item => !(item.kind === 'image' && item.n === ch.plate!.n)) : ch.grid
   }
   return out
 })
@@ -225,21 +234,29 @@ onUnmounted(() => {
              to edge (slight cover-crop absorbs the stretch). The ::after spacer
              keeps the final row from ballooning. -->
         <div class="jgrid">
-          <button
-            v-for="img in ch.grid"
-            :key="img.n"
-            type="button"
-            class="jcell"
-            :data-frame-n="img.n"
-            :data-row-n="img.row"
-            :data-cell-n="img.cell"
-            :class="{ 'is-admin-selected': selectedRow === img.row && (selectedCell === img.cell || selectedCell === undefined) }"
-            @click="show(img.n - 1)"
-          >
-            <AppImg :src="img.src" :alt="img.caption || album.title" sizes="360px" />
-            <span class="jcell__n">{{ pad(img.n) }}</span>
-            <span v-if="img.caption" class="jcell__cap" :lang="textLang(img.caption)">{{ img.caption }}</span>
-          </button>
+          <template v-for="item in ch.grid" :key="`${item.row}-${item.cell}`">
+            <button
+              v-if="item.kind === 'image'"
+              type="button"
+              class="jcell"
+              :data-frame-n="item.n"
+              :data-row-n="item.row"
+              :data-cell-n="item.cell"
+              :class="{ 'is-admin-selected': selectedRow === item.row && (selectedCell === item.cell || selectedCell === undefined) }"
+              @click="show(item.n - 1)"
+            >
+              <AppImg :src="item.src" :alt="item.caption || album.title" sizes="360px" />
+              <span class="jcell__n">{{ pad(item.n) }}</span>
+              <span v-if="item.caption" class="jcell__cap" :lang="textLang(item.caption)">{{ item.caption }}</span>
+            </button>
+            <div
+              v-else
+              class="jcell jcell--break"
+              :data-row-n="item.row"
+              :data-cell-n="item.cell"
+              :class="{ 'is-admin-selected': selectedRow === item.row && (selectedCell === item.cell || selectedCell === undefined) }"
+            />
+          </template>
         </div>
       </section>
 
@@ -450,6 +467,9 @@ onUnmounted(() => {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .jcell:hover .jcell__cap { opacity: 1; }
+/* spacer/text cut: full-width flex item with no height forces the justified
+   row to wrap here, leaving the row before it short instead of edge-to-edge. */
+.jcell--break { flex-basis: 100%; flex-grow: 0; height: 0; min-width: 100%; background: none; }
 
 /* Admin preview selection */
 .is-admin-selected { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -648,6 +668,7 @@ onUnmounted(() => {
   .chapter__head { padding: 0 0.65rem; flex-wrap: wrap; gap: 0.5rem 1rem; }
   .chapter__rule { margin-left: 0.65rem; margin-right: 0.65rem; }
   .jcell { height: 150px; }
+  .jcell--break { height: 0; }
   .exit { margin-left: 0.65rem; margin-right: 0.65rem; }
 
   .lb__top { align-items: flex-start; padding: 0.85rem; }
