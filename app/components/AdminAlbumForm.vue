@@ -73,6 +73,7 @@ const coverPickerOpen = ref(false)
 const cellPickerOpen = ref(false)
 const bulkPickerOpen = ref(false)
 const clearPlacedOpen = ref(false)
+const recalcLayoutOpen = ref(false)
 const smartFrameAutofill = ref(true)
 
 // Editing state
@@ -332,6 +333,15 @@ const mediaItems = computed(() => {
 const hasMedia = computed(() => mediaItems.value.length > 0)
 const placedImageCount = computed(() => {
   let count = form.coverSrc ? 1 : 0
+  for (const row of form.rows) {
+    for (const cell of row.cells) {
+      if (cell.type === 'image' && cell.src) count++
+    }
+  }
+  return count
+})
+const framedImageCount = computed(() => {
+  let count = 0
   for (const row of form.rows) {
     for (const cell of row.cells) {
       if (cell.type === 'image' && cell.src) count++
@@ -612,6 +622,54 @@ function clearPlacedImages() {
   clearCellSelection()
   dockHidden.value = true
   clearPlacedOpen.value = false
+}
+
+function collectPlacedImageCells() {
+  const placed: { src: string, caption: string }[] = []
+  for (const row of form.rows) {
+    for (const cell of row.cells) {
+      if (cell.type === 'image' && cell.src) placed.push({ src: cell.src, caption: cell.caption ?? '' })
+    }
+  }
+  return placed
+}
+
+async function recalculateSmartLayout() {
+  const placed = collectPlacedImageCells()
+  if (!placed.length) {
+    recalcLayoutOpen.value = false
+    return
+  }
+
+  const pending = smartFrameAutofill.value
+    ? await mapLimited(placed, 6, async item => {
+        const aspect = await imageAspect(item.src)
+        return { ...item, key: srcToKey(item.src) ?? item.src, aspect, orientation: classifyAspect(aspect) }
+      })
+    : placed.map(item => ({ ...item, key: srcToKey(item.src) ?? item.src, aspect: null, orientation: 'unknown' as const }))
+
+  const plannedRows = smartFrameAutofill.value ? planEssayRows(pending) : planSequentialEssayRows(pending)
+
+  const newRows: AlbumRow[] = []
+  let cursor = 0
+  for (const pattern of plannedRows) {
+    const cells: AlbumCell[] = []
+    for (const span of pattern) {
+      const item = pending[cursor]
+      if (!item) break
+      const cell = makeImageCell(item.src, span)
+      cell.caption = item.caption
+      cells.push(cell)
+      cursor++
+    }
+    newRows.push({ cells })
+  }
+
+  form.rows = newRows
+  clearCellSelection()
+  dockHidden.value = true
+  recalcLayoutOpen.value = false
+  scrollPreviewToRow(0, 0)
 }
 
 onMounted(loadMediaKeys)
@@ -1408,6 +1466,16 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
             <small>{{ t('adminForm.smartLayoutHint') }}</small>
           </span>
         </label>
+        <button
+          v-if="isEssay"
+          type="button"
+          class="recalc-layout-btn"
+          :disabled="framedImageCount === 0"
+          @click="recalcLayoutOpen = true"
+        >
+          <Icon name="heroicons:arrow-path" class="recalc-layout-btn__icon" />
+          <span>{{ t('adminForm.recalcLayout') }}</span>
+        </button>
         <p class="media-empty media-empty--hint">{{ t('adminForm.autofillHint') }}</p>
       </div>
 
@@ -1774,6 +1842,19 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       <div class="row-delete-confirm__actions">
         <UiButton variant="secondary" @click="clearPlacedOpen = false">{{ t('admin.cancel') }}</UiButton>
         <UiButton variant="danger" :disabled="placedImageCount === 0" @click="clearPlacedImages">{{ t('adminForm.clearPlacedImagesConfirm') }}</UiButton>
+      </div>
+    </UiModal>
+
+    <UiModal
+      v-model="recalcLayoutOpen"
+      :title="t('adminForm.recalcLayoutTitle')"
+    >
+      <p class="row-delete-confirm__body">
+        {{ t('adminForm.recalcLayoutBody', { count: framedImageCount }) }}
+      </p>
+      <div class="row-delete-confirm__actions">
+        <UiButton variant="secondary" @click="recalcLayoutOpen = false">{{ t('admin.cancel') }}</UiButton>
+        <UiButton variant="primary" :disabled="framedImageCount === 0" @click="recalculateSmartLayout">{{ t('adminForm.recalcLayoutConfirm') }}</UiButton>
       </div>
     </UiModal>
 
@@ -2260,6 +2341,35 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   opacity: 0.42;
 }
 .clear-placed-btn__icon { width: 0.78rem; height: 0.78rem; flex-shrink: 0; }
+
+.recalc-layout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+  padding: 0.48rem 0.75rem;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.44rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, opacity 0.15s;
+}
+.recalc-layout-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.recalc-layout-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+.recalc-layout-btn__icon { width: 0.78rem; height: 0.78rem; flex-shrink: 0; }
 
 .smart-fill-toggle {
   display: grid;

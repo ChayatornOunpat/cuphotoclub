@@ -72,8 +72,6 @@ const hiddenCount = computed(() => memberList.value.filter(m => !m.active).lengt
 const orderedMembers = computed(() => [...memberList.value].sort((a, b) => {
   if (a.active !== b.active) return a.active ? -1 : 1
   if (!!a.position !== !!b.position) return a.position ? -1 : 1
-  const positionCompare = (a.position ?? '').localeCompare(b.position ?? '', 'th')
-  if (positionCompare !== 0) return positionCompare
   if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
   return a.nickname.localeCompare(b.nickname, 'th')
 }))

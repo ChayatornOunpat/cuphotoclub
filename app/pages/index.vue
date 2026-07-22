@@ -114,6 +114,28 @@ const progress = ref(0)
 const constructionNoticeOpen = ref(false)
 const constructionNoticeKey = 'cu-photo-construction-notice-dismissed'
 
+// ── Landing gate: hold a loading screen until the hero image is on screen so
+//    visitors never see the page assemble behind a blank hero. A safety timeout
+//    guarantees the page is revealed even if the image errors or never fires
+//    its load event.
+const heroReady = ref(false)
+let heroReadyTimer: ReturnType<typeof setTimeout> | null = null
+
+function onHeroReady() {
+  heroReady.value = true
+  if (heroReadyTimer) {
+    clearTimeout(heroReadyTimer)
+    heroReadyTimer = null
+  }
+}
+
+// While the loading screen is up, freeze background scrolling.
+watch(heroReady, (ready) => {
+  if (import.meta.client) {
+    document.documentElement.style.overflow = ready ? '' : 'hidden'
+  }
+}, { immediate: true })
+
 function onScroll() {
   const total = document.body.scrollHeight - window.innerHeight
   progress.value = total > 0 ? (window.scrollY / total) * 100 : 0
@@ -140,8 +162,14 @@ onMounted(() => {
   prewarmPhotoGridWhenIdle()
   constructionNoticeOpen.value = sessionStorage.getItem(constructionNoticeKey) !== '1'
   window.addEventListener('scroll', onScroll, { passive: true })
+  // Fallback: never trap the visitor behind the loading screen.
+  heroReadyTimer = setTimeout(onHeroReady, 6000)
 })
-onUnmounted(() => window.removeEventListener('scroll', onScroll))
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
+  if (heroReadyTimer) clearTimeout(heroReadyTimer)
+  if (import.meta.client) document.documentElement.style.overflow = ''
+})
 
 // The homepage sets its own full title, so opt out of app.vue's titleTemplate
 // (which would append a second "· CU Photo Club").
@@ -177,11 +205,20 @@ useSeoMeta({
 
 <template>
   <div v-if="localizedSite">
+    <Teleport to="body">
+      <Transition name="hero-gate">
+        <div v-if="!heroReady" class="hero-gate" aria-hidden="true">
+          <div class="hero-gate__mark">CU PHOTOCLUB</div>
+          <div class="hero-gate__bar"><span /></div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <div id="progress" :style="{ width: progress + '%' }" />
 
     <SiteNav :links="localizedSite.nav.links" :light="navLight" />
 
-    <SiteHero :hero="heroWithImage ?? localizedSite.hero" />
+    <SiteHero :hero="heroWithImage ?? localizedSite.hero" @ready="onHeroReady" />
 
     <!-- Signature pink line: dark → light transition -->
     <div class="cut-line" />
@@ -244,6 +281,55 @@ useSeoMeta({
 </template>
 
 <style scoped>
+/* ── Landing loading screen: sits above everything until the hero image is
+   ready, then fades away to reveal the fully-assembled page. */
+.hero-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.75rem;
+  background: var(--hero-bg);
+}
+.hero-gate__mark {
+  font-family: var(--font-latin-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: rgba(245, 244, 240, 0.65);
+  padding-left: 0.42em;
+}
+.hero-gate__bar {
+  position: relative;
+  width: 120px;
+  height: 1px;
+  background: rgba(245, 244, 240, 0.14);
+  overflow: hidden;
+}
+.hero-gate__bar span {
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: var(--accent);
+  animation: hero-gate-slide 1.1s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes hero-gate-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+.hero-gate-leave-active {
+  transition: opacity 0.6s ease;
+}
+.hero-gate-leave-to {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-gate__bar span { animation: none; width: 100%; opacity: 0.5; }
+}
+
 .intro-photos { background: var(--body-bg); padding: 4rem 3rem; }
 .intro-photos__inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 3.5rem; }
 .intro-photos__pile { display: flex; flex-shrink: 0; }

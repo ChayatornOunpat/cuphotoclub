@@ -91,18 +91,24 @@ function handleKeydown(e: KeyboardEvent) {
 // Focus the dialog on open, lock body scroll, and restore focus on close.
 watch(() => props.open, (open) => {
   if (import.meta.server) return
+  const root = document.documentElement
   if (open) {
     lastFocused = document.activeElement as HTMLElement | null
     // Compensate for the vanishing scrollbar — otherwise the whole page
     // (photo wall included) reflows sideways right as the enter transition
     // starts, which reads as click lag on Windows.
-    const scrollbar = window.innerWidth - document.documentElement.clientWidth
-    document.body.style.overflow = 'hidden'
-    if (scrollbar > 0) document.body.style.paddingRight = `${scrollbar}px`
+    // Locking/measuring must target <html>, not <body>: main.css sets an
+    // explicit `overflow-x: hidden` on html, which suppresses the usual
+    // body-to-viewport overflow propagation — html stays the real scrolling
+    // element, so a body-only lock is a no-op and the padding-right
+    // compensation over-corrects, shifting content left instead of holding it.
+    const scrollbar = window.innerWidth - root.clientWidth
+    root.style.overflow = 'hidden'
+    if (scrollbar > 0) root.style.paddingRight = `${scrollbar}px`
     nextTick(() => dialogRef.value?.focus())
   } else {
-    document.body.style.overflow = ''
-    document.body.style.paddingRight = ''
+    root.style.overflow = ''
+    root.style.paddingRight = ''
     lastFocused?.focus?.()
     lastFocused = null
   }
@@ -113,8 +119,8 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeydown)
-  document.body.style.overflow = ''
-  document.body.style.paddingRight = ''
+  document.documentElement.style.overflow = ''
+  document.documentElement.style.paddingRight = ''
 })
 </script>
 

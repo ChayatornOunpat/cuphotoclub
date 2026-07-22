@@ -13,8 +13,6 @@ interface Member {
   featuredLinks: { label: string, url: string }[]
 }
 
-type PublicMemberFilter = 'all' | 'staff' | 'members' | `position:${string}`
-
 const { t, locale } = useI18n()
 const [{ data: members }, { data: pageData }] = await Promise.all([
   useFetch<Member[]>('/api/members'),
@@ -35,25 +33,10 @@ useSeoMeta({
   description: () => lead.value
 })
 
-const activeFilter = ref<PublicMemberFilter>('all')
 const memberList = computed(() => members.value ?? [])
-const positions = computed(() => [...new Set(memberList.value.map(m => m.position?.trim()).filter((position): position is string => !!position))].sort((a, b) => a.localeCompare(b, locale.value)))
-const filterOptions = computed<{ value: PublicMemberFilter, label: string }[]>(() => [
-  { value: 'all', label: t('members.filterAll') },
-  { value: 'staff', label: t('members.filterStaff') },
-  { value: 'members', label: t('members.filterMembers') },
-  ...positions.value.map(position => ({ value: `position:${position}` as const, label: position }))
-])
 
-const visibleMembers = computed(() => memberList.value.filter((member) => {
-  if (activeFilter.value === 'staff') return !!member.position
-  if (activeFilter.value === 'members') return !member.position
-  if (activeFilter.value.startsWith('position:')) return member.position?.trim() === activeFilter.value.slice(9)
-  return true
-}))
-
-const staff = computed(() => [...visibleMembers.value.filter(m => m.position)].sort((a, b) => (a.position ?? '').localeCompare(b.position ?? '', locale.value)))
-const regularMembers = computed(() => visibleMembers.value.filter(m => !m.position))
+const staff = computed(() => [...memberList.value.filter(m => m.position)].sort((a, b) => (a.position ?? '').localeCompare(b.position ?? '', locale.value)))
+const regularMembers = computed(() => memberList.value.filter(m => !m.position))
 
 const selectedMember = ref<Member | null>(null)
 const memberModalOpen = computed({
@@ -95,20 +78,6 @@ function isExternalLink(url: string) {
     </header>
 
     <div class="members-body">
-      <nav class="member-filters" :aria-label="t('members.filtersLabel')">
-        <button
-          v-for="option in filterOptions"
-          :key="option.value"
-          type="button"
-          class="member-filter"
-          :class="{ active: activeFilter === option.value }"
-          :aria-pressed="activeFilter === option.value"
-          @click="activeFilter = option.value"
-        >
-          {{ option.label }}
-        </button>
-      </nav>
-
       <!-- Staff -->
       <template v-if="staff.length">
         <div class="eyebrow"><span class="num">01</span> {{ t('members.staff') }}</div>
@@ -268,40 +237,6 @@ function isExternalLink(url: string) {
   max-width: 1380px;
   margin: 0 auto;
   padding: 4rem 3rem 8rem;
-}
-
-.member-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-bottom: 4rem;
-}
-
-.member-filter {
-  border: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font-family: var(--font-sans);
-  font-size: 0.54rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  padding: 0.58rem 0.78rem;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-.member-filter:hover,
-.member-filter:focus-visible {
-  border-color: var(--dark);
-  color: var(--dark);
-}
-.member-filter:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: 3px;
-}
-.member-filter.active {
-  background: var(--dark);
-  border-color: var(--dark);
-  color: var(--body-bg);
 }
 
 /* ── Staff grid ── */

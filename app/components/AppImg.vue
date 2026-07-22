@@ -38,23 +38,35 @@ const useTransforms = computed(() =>
   && !transformFailed.value
 )
 
+// Fires once the underlying <img> has finished loading. Parents (e.g. the hero)
+// listen to this to hold a loading screen until the image is on screen.
+const emit = defineEmits<{ load: [] }>()
+
 const loaded = ref(false)
 const imgEl = ref<HTMLImageElement | null>(null)
+// NuxtImg renders a single <img> as its root element, so `$el` is that <img>.
+const nuxtImgEl = ref<{ $el?: HTMLImageElement } | null>(null)
 const isEager = computed(() => props.eager === true)
 const done = computed(() => loaded.value || isEager.value)
 
 function markLoaded() {
+  if (loaded.value) return
   loaded.value = true
+  emit('load')
 }
 
 onMounted(() => {
-  if (imgEl.value?.complete) markLoaded()
+  // Images restored from cache during SSR may already be complete before the
+  // @load listener is attached, so the event never fires — check explicitly.
+  const el = imgEl.value ?? nuxtImgEl.value?.$el
+  if (el?.complete) markLoaded()
 })
 </script>
 
 <template>
   <NuxtImg
     v-if="useTransforms"
+    ref="nuxtImgEl"
     provider="cloudflare"
     format="auto"
     :src="props.src"
@@ -86,6 +98,7 @@ onMounted(() => {
   >
   <NuxtImg
     v-else
+    ref="nuxtImgEl"
     :src="props.src"
     :alt="props.alt ?? ''"
     :sizes="props.sizes"
