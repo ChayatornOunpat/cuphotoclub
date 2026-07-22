@@ -35,14 +35,21 @@ function albumPath(a: { slug: string }) {
 }
 
 // ── Hero background: randomise from the admin-managed image pool.
-//    useState pins the seed on the server so client hydration matches.
-const heroImageSeed = useState('hero-image-seed', () => Math.floor(Math.random() * 2147483647))
+//    The homepage HTML+payload is edge-cached (`swr` route rule in nuxt.config,
+//    persisted in KV via hub.cache). A server-generated random seed would be
+//    baked into that cached payload — frozen for the whole cache window and
+//    identical for every visitor. So we render a deterministic image on the
+//    server (index 0, so SSR + hydration match with no mismatch) and re-roll
+//    on the client after mount, giving a fresh image on every page load.
+//    The loading gate hides the swap (it re-arms whenever heroIndex changes).
+const heroImages = computed(() => heroImagesData.value?.images ?? [])
+const heroIndex = ref(0)
 const heroWithImage = computed(() => {
   const base = localizedSite.value?.hero
   if (!base) return base
-  const imgs = heroImagesData.value?.images ?? []
+  const imgs = heroImages.value
   if (!imgs.length) return base
-  return { ...base, image: `/images/${imgs[heroImageSeed.value % imgs.length]}` }
+  return { ...base, image: `/images/${imgs[heroIndex.value % imgs.length]}` }
 })
 
 // ── Featured Work: FeaturedWork.vue lays out a randomised, rectangle-guaranteed
@@ -136,6 +143,15 @@ watch(heroReady, (ready) => {
   }
 }, { immediate: true })
 
+// Client re-roll changes the hero src → hold the gate until the new image is
+// actually on screen (SiteHero re-emits `ready` on load). Running inside the
+// synchronous mount flush means heroReady never visibly flips, so no flicker.
+watch(heroIndex, () => {
+  heroReady.value = false
+  if (heroReadyTimer) clearTimeout(heroReadyTimer)
+  heroReadyTimer = setTimeout(onHeroReady, 6000)
+})
+
 function onScroll() {
   const total = document.body.scrollHeight - window.innerHeight
   progress.value = total > 0 ? (window.scrollY / total) * 100 : 0
@@ -160,6 +176,11 @@ function prewarmPhotoGridWhenIdle() {
 onMounted(() => {
   onScroll()
   prewarmPhotoGridWhenIdle()
+  // Re-roll the hero image on the client so the edge-cached SSR payload doesn't
+  // freeze it to a single image for every visitor (see heroWithImage above).
+  if (heroImages.value.length > 1) {
+    heroIndex.value = Math.floor(Math.random() * heroImages.value.length)
+  }
   constructionNoticeOpen.value = sessionStorage.getItem(constructionNoticeKey) !== '1'
   window.addEventListener('scroll', onScroll, { passive: true })
   // Fallback: never trap the visitor behind the loading screen.

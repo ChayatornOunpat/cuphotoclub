@@ -55,6 +55,12 @@ function markLoaded() {
   emit('load')
 }
 
+// If the src changes (e.g. the hero re-rolls to a new random image), reset so
+// the new image's load fires `load` again and the blur-in transition replays.
+watch(() => props.src, () => {
+  loaded.value = false
+})
+
 onMounted(() => {
   // Images restored from cache during SSR may already be complete before the
   // @load listener is attached, so the event never fires — check explicitly.
