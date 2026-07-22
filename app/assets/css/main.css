@@ -332,6 +332,10 @@ html:lang(th) :where(.hero__title em, .about__heading em, .history__quote) {
   z-index: 200;
   width: 100%;
   height: 2px;
+  background: transparent;
+  transition: background 0.4s ease;
+}
+#progress-track.is-light {
   background: var(--subtle);
 }
 #progress {
