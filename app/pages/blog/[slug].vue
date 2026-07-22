@@ -60,7 +60,7 @@ useHead(() => ({
 
 <template>
   <div v-if="post">
-    <div class="mx-auto max-w-3xl px-4 pt-8">
+    <div class="mx-auto max-w-3xl px-4 pt-12 sm:pt-16">
       <NuxtLink to="/blog" class="inline-flex items-center gap-1 text-sm text-ink-soft hover:text-ink">
         <Icon name="heroicons:arrow-left" class="size-4" /> {{ t('blog.backToPosts') }}
       </NuxtLink>

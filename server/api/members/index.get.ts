@@ -16,5 +16,5 @@ export default defineEventHandler(async () => {
     })
     .from(schema.members)
     .where(eq(schema.members.active, true))
-    .orderBy(asc(schema.members.position), asc(schema.members.sortOrder), asc(schema.members.createdAt))
+    .orderBy(asc(schema.members.sortOrder), asc(schema.members.createdAt))
 })

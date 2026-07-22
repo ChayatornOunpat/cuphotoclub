@@ -35,7 +35,7 @@ useSeoMeta({
 
 const memberList = computed(() => members.value ?? [])
 
-const staff = computed(() => [...memberList.value.filter(m => m.position)].sort((a, b) => (a.position ?? '').localeCompare(b.position ?? '', locale.value)))
+const staff = computed(() => memberList.value.filter(m => m.position))
 const regularMembers = computed(() => memberList.value.filter(m => !m.position))
 
 const selectedMember = ref<Member | null>(null)
