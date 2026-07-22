@@ -59,7 +59,7 @@ const form = reactive({
   interests: '',
   featuredLinks: '',
   photoR2Key: null as string | null,
-  sortOrder: '0',
+  sortOrder: '',
   active: true
 })
 
@@ -69,11 +69,13 @@ const staffCount = computed(() => memberList.value.filter(m => !!m.position).len
 const regularCount = computed(() => memberList.value.filter(m => !m.position).length)
 const hiddenCount = computed(() => memberList.value.filter(m => !m.active).length)
 
+// Tiebreak by id — must stay in sync with server/api/members/index.get.ts so
+// the public page and this list agree whenever sortOrder values collide.
 const orderedMembers = computed(() => [...memberList.value].sort((a, b) => {
   if (a.active !== b.active) return a.active ? -1 : 1
   if (!!a.position !== !!b.position) return a.position ? -1 : 1
   if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
-  return a.nickname.localeCompare(b.nickname, 'th')
+  return a.id - b.id
 }))
 
 const visibleMembers = computed(() => orderedMembers.value.filter((m) => {
@@ -100,7 +102,7 @@ function resetForm() {
     interests: '',
     featuredLinks: '',
     photoR2Key: null,
-    sortOrder: '0',
+    sortOrder: '',
     active: true
   })
 }
@@ -149,7 +151,9 @@ function bodyFromForm() {
       .slice(0, 12),
     featuredLinks: textToLinks(form.featuredLinks),
     photoR2Key: form.photoR2Key,
-    sortOrder: form.sortOrder ? Number(form.sortOrder) : 0,
+    // Empty field → omit: on create the server appends to the end, on edit the
+    // stored value stays untouched.
+    sortOrder: form.sortOrder.trim() === '' ? undefined : Number(form.sortOrder),
     active: form.active
   }
 }
@@ -515,7 +519,7 @@ function textToLinks(value: string) {
 
             <label class="form-field" for="m-order">
               <span>{{ t('adminMembers.colOrder') }}</span>
-              <input id="m-order" v-model="form.sortOrder" type="number" inputmode="numeric">
+              <input id="m-order" v-model="form.sortOrder" type="number" inputmode="numeric" :placeholder="t('adminMembers.orderAuto')">
             </label>
 
             <label class="check-field">

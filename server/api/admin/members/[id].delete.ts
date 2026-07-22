@@ -8,8 +8,16 @@ export default defineEventHandler(async (event) => {
   const [row] = await db.select().from(schema.members).where(eq(schema.members.id, id)).limit(1)
   if (!row) throw createError({ statusCode: 404, message: 'ไม่พบสมาชิก' })
 
-  if (row.photoR2Key) await blob.delete(row.photoR2Key).catch(() => {})
   await db.delete(schema.members).where(eq(schema.members.id, id))
+
+  // Upload keys are content-hash dedup'd, so another member (or a hero image,
+  // post cover, …) may still use this blob — only delete it when the row's
+  // removal left it unreferenced.
+  if (row.photoR2Key) {
+    const references = await getR2DeleteReferences([row.photoR2Key])
+    const stillReferenced = [...references.values()].some(isR2DeleteReferenced)
+    if (!stillReferenced) await blob.delete(row.photoR2Key).catch(() => {})
+  }
   await recordAdminAudit(actor, {
     action: 'delete',
     entityType: 'member',

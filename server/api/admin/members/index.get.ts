@@ -5,5 +5,5 @@ export default defineEventHandler(async (event) => {
   return db
     .select()
     .from(schema.members)
-    .orderBy(asc(schema.members.position), asc(schema.members.sortOrder), asc(schema.members.createdAt))
+    .orderBy(asc(schema.members.sortOrder), asc(schema.members.id))
 })

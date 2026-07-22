@@ -16,5 +16,7 @@ export default defineEventHandler(async () => {
     })
     .from(schema.members)
     .where(eq(schema.members.active, true))
-    .orderBy(asc(schema.members.sortOrder), asc(schema.members.createdAt))
+    // Tiebreak by id — must stay in sync with orderedMembers in
+    // app/pages/admin/members/index.vue so both surfaces agree on ties.
+    .orderBy(asc(schema.members.sortOrder), asc(schema.members.id))
 })

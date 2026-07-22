@@ -813,6 +813,7 @@
     "colType": "ประเภท",
     "colYear": "ชั้นปี",
     "colOrder": "เรียง",
+    "orderAuto": "อัตโนมัติ (ต่อท้ายรายการ)",
     "colStatus": "สถานะ",
     "yearN": "ปี {n}",
     "unspecified": "ไม่ระบุ",

@@ -813,6 +813,7 @@
     "colType": "Type",
     "colYear": "Year",
     "colOrder": "Order",
+    "orderAuto": "Auto (adds to end)",
     "colStatus": "Status",
     "yearN": "Year {n}",
     "unspecified": "Unspecified",

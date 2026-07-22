@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -23,6 +24,17 @@ export default defineEventHandler(async (event) => {
   if (!result.success) throw createError({ statusCode: 400, message: 'ข้อมูลไม่ถูกต้อง' })
   const d = result.data
 
+  // No explicit sortOrder → append after the current last member. Defaulting
+  // to 0 would tie with existing rows and make the public order diverge from
+  // the admin list.
+  let sortOrder = d.sortOrder
+  if (sortOrder === undefined) {
+    const [maxRow] = await db
+      .select({ max: sql<number | null>`max(${schema.members.sortOrder})` })
+      .from(schema.members)
+    sortOrder = (maxRow?.max ?? -1) + 1
+  }
+
   const [created] = await db
     .insert(schema.members)
     .values({
@@ -35,7 +47,7 @@ export default defineEventHandler(async (event) => {
       featuredLinks: d.featuredLinks ?? [],
       photoR2Key: d.photoR2Key ?? null,
       active:     d.active ?? true,
-      sortOrder:  d.sortOrder ?? 0
+      sortOrder
     })
     .returning()
   if (!created) throw createError({ statusCode: 500, message: 'สร้างสมาชิกไม่สำเร็จ' })

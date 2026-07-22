@@ -39,14 +39,25 @@ export default defineEventHandler(async (event) => {
   if (d.featuredLinks !== undefined) updates.featuredLinks = d.featuredLinks
   if (d.active     !== undefined) updates.active     = d.active
   if (d.sortOrder  !== undefined) updates.sortOrder  = d.sortOrder
+  let replacedPhotoKey: string | null = null
   if (d.photoR2Key !== undefined) {
     updates.photoR2Key = d.photoR2Key
     if (row.photoR2Key && row.photoR2Key !== d.photoR2Key) {
-      await blob.delete(row.photoR2Key).catch(() => {})
+      replacedPhotoKey = row.photoR2Key
     }
   }
 
   await db.update(schema.members).set(updates).where(eq(schema.members.id, id))
+
+  // Upload keys are content-hash dedup'd, so the same blob can back several
+  // members (or a hero image, post cover, …). Only delete it once nothing
+  // references it anymore — checked after the update above so this row's old
+  // key no longer counts.
+  if (replacedPhotoKey) {
+    const references = await getR2DeleteReferences([replacedPhotoKey])
+    const stillReferenced = [...references.values()].some(isR2DeleteReferenced)
+    if (!stillReferenced) await blob.delete(replacedPhotoKey).catch(() => {})
+  }
   if (Object.keys(updates).length) {
     await recordAdminAudit(actor, {
       action: 'update',

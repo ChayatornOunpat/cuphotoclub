@@ -212,6 +212,7 @@ useSeoMeta({
   transform-style: preserve-3d;
   transition: transform 420ms cubic-bezier(0.19, 1, 0.22, 1);
   will-change: transform;
+  isolation: isolate;
 }
 
 .dev-card-shell::before {
@@ -223,11 +224,10 @@ useSeoMeta({
   background:
     radial-gradient(
       circle at var(--glare-x, 50%) var(--glare-y, 50%),
-      color-mix(in srgb, white 34%, transparent) 0,
+      color-mix(in srgb, white 22%, transparent) 0,
       transparent 36%
     );
   opacity: var(--glare-opacity, 0);
-  mix-blend-mode: soft-light;
   transition: opacity 220ms ease;
 }
 
@@ -265,11 +265,10 @@ useSeoMeta({
   box-shadow: 10px 10px 0 var(--dark);
   backface-visibility: hidden;
   overflow: hidden;
-  transform: translateZ(0.02px);
 }
 
 .dev-card__face--back {
-  transform: rotateY(180deg) translateZ(0.02px);
+  transform: rotateY(180deg);
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--accent) 9%, transparent) 0 7.5rem, transparent 7.5rem),
     repeating-linear-gradient(0deg, transparent 0 2.65rem, color-mix(in srgb, var(--dark) 6%, transparent) 2.65rem calc(2.65rem + 1px)),
