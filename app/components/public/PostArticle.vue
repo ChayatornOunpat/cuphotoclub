@@ -1,100 +1,108 @@
 <script setup lang="ts">
 import type { Post } from '~~/shared/types'
 
-defineProps<{ post: Post }>()
+// `editable`, `selectedBlockId` and `draggableBlocks` are admin-only hooks used
+// by AdminPostForm to reuse this component as a live "direct-write" canvas.
+// They default off, so the public blog page renders exactly as before.
+defineProps<{
+  post: Post
+  editable?: boolean
+  selectedBlockId?: string
+  draggableBlocks?: boolean
+}>()
 </script>
 
 <template>
-  <div class="preview-shell" :style="post.heroStyle === 'minimal-dark' ? 'background:#0C0C0A;color:#F5F4F0' : ''">
-    <article :class="['post', `post--${post.heroStyle ?? 'standard'}`]">
+  <div class="preview-shell" :class="{ 'preview-shell--editable': editable }" :style="post.heroStyle === 'minimal-dark' ? 'background:#0C0C0A;color:#F5F4F0' : ''">
+    <article :class="['post', `post--${post.heroStyle ?? 'standard'}`, { 'post--editable': editable }]">
 
       <!-- Standard hero -->
       <template v-if="(post.heroStyle ?? 'standard') === 'standard'">
         <header class="std-head">
-          <p class="std-head__eyebrow">{{ post.tag }} · {{ post.date }}</p>
-          <h1 class="std-head__title">{{ post.title }}</h1>
-          <p v-if="post.excerpt" class="std-head__excerpt">{{ post.excerpt }}</p>
-          <p v-if="post.author" class="std-head__author">{{ post.author }}</p>
+          <p class="std-head__eyebrow" data-edit="tag">{{ post.tag }} · {{ post.date }}</p>
+          <h1 class="std-head__title" data-edit="title">{{ post.title }}</h1>
+          <p v-if="post.excerpt" class="std-head__excerpt" data-edit="excerpt">{{ post.excerpt }}</p>
+          <p v-if="post.author" class="std-head__author" data-edit="author">{{ post.author }}</p>
         </header>
-        <div v-if="post.image" class="std-hero">
+        <div v-if="post.image" class="std-hero" data-edit="image">
           <img :src="post.image" :alt="post.title">
         </div>
       </template>
 
       <!-- Dark full-bleed hero -->
       <header v-else-if="post.heroStyle === 'dark-full'" class="df-head">
-        <div class="df-head__bg">
+        <div class="df-head__bg" data-edit="image">
           <img v-if="post.image" :src="post.image" :alt="post.title">
         </div>
         <div class="df-head__gradient" />
         <div class="df-head__inner">
-          <p class="df-head__tag">{{ post.tag }}</p>
-          <h1 class="df-head__title">{{ post.title }}</h1>
+          <p class="df-head__tag" data-edit="tag">{{ post.tag }}</p>
+          <h1 class="df-head__title" data-edit="title">{{ post.title }}</h1>
           <div class="df-head__meta">
-            <span v-if="post.author" class="df-head__author">{{ post.author }}</span>
+            <span v-if="post.author" class="df-head__author" data-edit="author">{{ post.author }}</span>
             <span v-if="post.author" class="df-head__sep" />
-            <span>{{ post.date }}</span>
+            <span data-edit="tag">{{ post.date }}</span>
           </div>
         </div>
       </header>
 
       <!-- Split hero -->
       <header v-else-if="post.heroStyle === 'split'" class="sp-head">
-        <div class="sp-head__img">
+        <div class="sp-head__img" data-edit="image">
           <img v-if="post.image" :src="post.image" :alt="post.title">
         </div>
         <div class="sp-head__content">
-          <p class="sp-head__tag">{{ post.tag }}</p>
-          <h1 class="sp-head__title">{{ post.title }}</h1>
-          <p v-if="post.excerpt" class="sp-head__excerpt">{{ post.excerpt }}</p>
+          <p class="sp-head__tag" data-edit="tag">{{ post.tag }}</p>
+          <h1 class="sp-head__title" data-edit="title">{{ post.title }}</h1>
+          <p v-if="post.excerpt" class="sp-head__excerpt" data-edit="excerpt">{{ post.excerpt }}</p>
           <div class="sp-head__meta">
-            <span v-if="post.author" class="sp-head__author">{{ post.author }}</span>
+            <span v-if="post.author" class="sp-head__author" data-edit="author">{{ post.author }}</span>
             <span v-if="post.author" class="sp-head__sep" />
-            <span>{{ post.date }}</span>
+            <span data-edit="tag">{{ post.date }}</span>
           </div>
         </div>
       </header>
 
       <!-- Minimal dark header -->
       <header v-else-if="post.heroStyle === 'minimal-dark'" class="md-head">
-        <p class="md-head__tag">{{ post.tag }}</p>
-        <h1 class="md-head__title">{{ post.title }}</h1>
-        <p v-if="post.excerpt" class="md-head__sub">{{ post.excerpt }}</p>
+        <p class="md-head__tag" data-edit="tag">{{ post.tag }}</p>
+        <h1 class="md-head__title" data-edit="title">{{ post.title }}</h1>
+        <p v-if="post.excerpt" class="md-head__sub" data-edit="excerpt">{{ post.excerpt }}</p>
         <div class="md-head__meta">
-          <span v-if="post.author" class="md-head__author">{{ post.author }}</span>
+          <span v-if="post.author" class="md-head__author" data-edit="author">{{ post.author }}</span>
           <span v-if="post.author" class="md-head__sep" />
-          <span>{{ post.date }}</span>
+          <span data-edit="tag">{{ post.date }}</span>
         </div>
       </header>
 
       <!-- Body -->
       <div class="post__body">
-        <template v-for="block in post.blocks" :key="block.id">
-          <p v-if="block.type === 'text'" class="pb-text">{{ (block as any).content }}</p>
-          <p v-else-if="block.type === 'lead'" class="pb-lead">{{ (block as any).content }}</p>
-          <h2 v-else-if="block.type === 'heading'" class="pb-heading">{{ (block as any).content }}</h2>
-          <h3 v-else-if="block.type === 'subheading'" class="pb-subheading">{{ (block as any).content }}</h3>
-          <div v-else-if="block.type === 'pullquote'" class="pb-pullquote">{{ (block as any).content }}</div>
-          <blockquote v-else-if="block.type === 'blockquote'" class="pb-blockquote">
+        <template v-for="(block, i) in post.blocks" :key="block.id">
+          <p v-if="block.type === 'text'" class="pb-text" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</p>
+          <p v-else-if="block.type === 'lead'" class="pb-lead" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</p>
+          <h2 v-else-if="block.type === 'heading'" class="pb-heading" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</h2>
+          <h3 v-else-if="block.type === 'subheading'" class="pb-subheading" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</h3>
+          <div v-else-if="block.type === 'pullquote'" class="pb-pullquote" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</div>
+          <blockquote v-else-if="block.type === 'blockquote'" class="pb-blockquote" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
             <span>{{ (block as any).content }}</span>
             <cite v-if="(block as any).cite">{{ (block as any).cite }}</cite>
           </blockquote>
-          <figure v-else-if="block.type === 'image'" class="pb-image" :class="{ 'pb-image--breakout': (block as any).breakout }">
+          <figure v-else-if="block.type === 'image'" class="pb-image" :class="{ 'pb-image--breakout': (block as any).breakout, 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
             <img :src="(block as any).src" :alt="(block as any).caption || ''">
             <figcaption v-if="(block as any).caption">{{ (block as any).caption }}</figcaption>
           </figure>
-          <figure v-else-if="block.type === 'photo-full'" class="pb-photo-full">
+          <figure v-else-if="block.type === 'photo-full'" class="pb-photo-full" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
             <img :src="(block as any).src" :alt="(block as any).caption || ''">
             <figcaption v-if="(block as any).caption">{{ (block as any).caption }}</figcaption>
           </figure>
-          <figure v-else-if="block.type === 'photo-pair'" class="pb-photo-pair">
+          <figure v-else-if="block.type === 'photo-pair'" class="pb-photo-pair" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
             <img :src="(block as any).src1" alt="">
             <img :src="(block as any).src2" alt="">
             <figcaption v-if="(block as any).caption" class="pb-photo-pair__cap">{{ (block as any).caption }}</figcaption>
           </figure>
-          <div v-else-if="block.type === 'divider'" class="pb-divider">· · ·</div>
-          <div v-else-if="block.type === 'inset'" class="pb-inset">{{ (block as any).content }}</div>
-          <div v-else-if="block.type === 'qanda'" class="pb-qanda">
+          <div v-else-if="block.type === 'divider'" class="pb-divider" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">· · ·</div>
+          <div v-else-if="block.type === 'inset'" class="pb-inset" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</div>
+          <div v-else-if="block.type === 'qanda'" class="pb-qanda" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
             <div class="pb-qanda__q">{{ (block as any).question }}</div>
             <div class="pb-qanda__a">{{ (block as any).answer }}</div>
           </div>
@@ -109,7 +117,7 @@ defineProps<{ post: Post }>()
       </div>
 
       <!-- Author bio -->
-      <div v-if="post.author" class="author-bio">
+      <div v-if="post.author" class="author-bio" data-edit="author">
         <div class="author-bio__inner">
           <div class="author-bio__avatar">
             <img v-if="post.authorAvatar" :src="post.authorAvatar" :alt="post.author">
@@ -129,6 +137,28 @@ defineProps<{ post: Post }>()
 <style scoped>
 /* ─── Preview shell ──────────────────────────────────────────────────────── */
 .preview-shell { overflow: visible; }
+
+/* ─── Editor "direct-write" affordances (admin only) ─────────────────────── */
+.post--editable [data-block-n],
+.post--editable [data-edit] {
+  cursor: pointer;
+  transition: outline-color 0.15s, background 0.15s;
+  outline: 2px solid transparent;
+  outline-offset: 4px;
+}
+.post--editable [data-block-n]:hover,
+.post--editable [data-edit]:hover {
+  outline-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.post--editable .is-admin-selected {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 4px;
+}
+.post--editable [draggable="true"] { cursor: grab; }
+.post--editable [draggable="true"]:active { cursor: grabbing; }
+/* Keep full-bleed blocks from letting their outline bleed off-screen */
+.post--editable .pb-photo-full,
+.post--editable .pb-photo-pair { outline-offset: -3px; }
 
 /* ─── Post shell ─────────────────────────────────────────────────────────── */
 .post { overflow: visible; }

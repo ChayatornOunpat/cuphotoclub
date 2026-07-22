@@ -745,7 +745,11 @@
     "previewSubheading": "Subsection heading",
     "previewPullquote": "\"A memorable phrase worth highlighting.\"",
     "untitled": "Untitled",
-    "share": "Share →"
+    "share": "Share →",
+    "blocks": "Blocks",
+    "blockN": "Block {n}",
+    "canvasHint": "Click any block or hero area in the preview to edit it. Drag blocks to reorder.",
+    "unsavedBody": "This post has changes that have not been saved yet. If you leave now, those edits will be lost."
   },
   "adminEditor": {
     "addCover": "Add or select a cover image",

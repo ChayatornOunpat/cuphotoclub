@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { PostInput, PostBlock, PostBlockType, ContentStatus, HeroStyle } from '~~/shared/types'
+import { onBeforeRouteLeave } from 'vue-router'
+import type { Post, PostInput, PostBlock, PostBlockType, ContentStatus, HeroStyle } from '~~/shared/types'
 
 const props = defineProps<{
   initial?: PostInput | null
@@ -10,6 +11,7 @@ const props = defineProps<{
 const emit = defineEmits<{ submit: [value: PostInput]; 'update:title': [value: string] }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
+const router = useRouter()
 const mediaPrefix = computed(() => props.mediaPrefix || 'content-posts/drafts')
 
 // ─── Block palette ───────────────────────────────────────────────────────────
@@ -81,9 +83,174 @@ const form = reactive<PostInput>(
 )
 
 form.visibility = form.visibility ?? 'public'
+form.heroStyle = form.heroStyle ?? 'standard'
 if (!form.blocks?.length) form.blocks = [makeBlock('text')]
 
 watch(() => form.title, val => emit('update:title', val), { immediate: true })
+
+// ─── Live preview shape ──────────────────────────────────────────────────────
+// A Post-shaped object fed to the real <PublicPostArticle> canvas. Placeholders
+// keep the hero legible while empty; the real (possibly empty) values stay in
+// `form` and are what get saved.
+const previewPost = computed<Post>(() => ({
+  id: 'preview',
+  title: form.title || t('adminPostForm.untitled'),
+  tag: form.tag || t('adminPostForm.tagPlaceholder'),
+  date: form.date,
+  published: form.published || '',
+  visibility: form.visibility,
+  image: form.image,
+  excerpt: form.excerpt,
+  heroStyle: form.heroStyle,
+  author: form.author,
+  authorBio: form.authorBio,
+  authorAvatar: form.authorAvatar,
+  blocks: form.blocks,
+}))
+
+// ─── Selection / docks ───────────────────────────────────────────────────────
+
+type ContentField = 'title' | 'tag' | 'excerpt' | 'author' | 'image'
+
+const selectedBlockId = ref<string | null>(null)
+const dockHidden = ref(true)
+const activeDock = ref<'content' | 'block'>('content')
+const activeField = ref<ContentField>('title')
+const canvasEl = ref<HTMLElement | null>(null)
+
+const titleInput = ref<HTMLTextAreaElement | null>(null)
+const tagInput = ref<HTMLInputElement | null>(null)
+const excerptInput = ref<HTMLTextAreaElement | null>(null)
+const authorInput = ref<HTMLInputElement | null>(null)
+
+const selectedBlock = computed<PostBlock | null>(() =>
+  form.blocks.find(b => b.id === selectedBlockId.value) ?? null
+)
+const selectedIndex = computed(() =>
+  form.blocks.findIndex(b => b.id === selectedBlockId.value)
+)
+
+function selectBlock(id: string) {
+  selectedBlockId.value = id
+  activeDock.value = 'block'
+  dockHidden.value = false
+  scrollCanvasToBlock(id)
+}
+
+function clearSelection() {
+  selectedBlockId.value = null
+  dockHidden.value = true
+}
+
+function scrollCanvasToBlock(id: string) {
+  nextTick(() => {
+    const el = canvasEl.value?.querySelector(`[data-block-id="${id}"]`) as HTMLElement | null
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+}
+
+async function focusField(field: { value: { focus: () => void } | null }) {
+  await nextTick()
+  field.value?.focus()
+}
+
+function editContent(field: ContentField) {
+  clearSelection()
+  activeDock.value = 'content'
+  activeField.value = field
+  dockHidden.value = false
+  if (field === 'title') void focusField(titleInput)
+  else if (field === 'tag') void focusField(tagInput)
+  else if (field === 'excerpt') void focusField(excerptInput)
+  else if (field === 'author') void focusField(authorInput)
+}
+
+// ─── Canvas interactions (direct write) ──────────────────────────────────────
+
+function onCanvasClick(event: MouseEvent) {
+  const target = event.target as HTMLElement
+
+  const blockEl = target.closest('[data-block-id]') as HTMLElement | null
+  if (blockEl) {
+    const id = blockEl.getAttribute('data-block-id')
+    if (id) selectBlock(id)
+    return
+  }
+
+  const editEl = target.closest('[data-edit]') as HTMLElement | null
+  if (editEl) {
+    editContent(editEl.getAttribute('data-edit') as ContentField)
+    return
+  }
+
+  clearSelection()
+}
+
+// Canvas drag-to-reorder blocks (mirrors the album editor's live-canvas drag)
+const dragFromIndex = ref<number | null>(null)
+const dragOverIndex = ref<number | null>(null)
+
+function blockIndexFromEvent(event: DragEvent): number | null {
+  const el = (event.target as HTMLElement).closest('[data-block-n]') as HTMLElement | null
+  if (!el) return null
+  const n = parseInt(el.getAttribute('data-block-n') || '', 10)
+  return Number.isNaN(n) ? null : n
+}
+
+function onCanvasDragStart(event: DragEvent) {
+  const idx = blockIndexFromEvent(event)
+  if (idx === null) { event.preventDefault(); return }
+  dragFromIndex.value = idx
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(idx))
+    const ghost = document.createElement('div')
+    ghost.style.cssText = 'position:fixed;top:-200px;width:1px;height:1px;opacity:0'
+    document.body.appendChild(ghost)
+    event.dataTransfer.setDragImage(ghost, 0, 0)
+    requestAnimationFrame(() => ghost.remove())
+  }
+}
+
+function onCanvasDragOver(event: DragEvent) {
+  if (dragFromIndex.value === null) return
+  event.preventDefault()
+  dragOverIndex.value = blockIndexFromEvent(event)
+}
+
+function onCanvasDrop(event: DragEvent) {
+  if (dragFromIndex.value === null) return
+  event.preventDefault()
+  const to = blockIndexFromEvent(event)
+  if (to !== null) moveBlock(dragFromIndex.value, to)
+  onCanvasDragEnd()
+}
+
+function onCanvasDragEnd() {
+  dragFromIndex.value = null
+  dragOverIndex.value = null
+}
+
+function moveBlock(from: number, to: number) {
+  if (from === to || from < 0 || to < 0) return
+  const next = [...form.blocks]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item!)
+  form.blocks = next
+}
+
+// ─── Tray block-list drag reorder ────────────────────────────────────────────
+
+const listDragFrom = ref<number | null>(null)
+const listDragOver = ref<number | null>(null)
+
+function onListDragStart(i: number) { listDragFrom.value = i }
+function onListDragOver(i: number) { listDragOver.value = i }
+function onListDragEnd() { listDragFrom.value = null; listDragOver.value = null }
+function onListDrop(to: number) {
+  if (listDragFrom.value !== null) moveBlock(listDragFrom.value, to)
+  onListDragEnd()
+}
 
 // ─── Block picker modal ──────────────────────────────────────────────────────
 
@@ -105,23 +272,33 @@ function addBlock(type: PostBlockType) {
   }
   paletteOpen.value = false
   insertAt.value = null
+  selectBlock(block.id)
 }
 
-function removeBlock(index: number) {
+function removeBlock(id: string) {
+  const index = form.blocks.findIndex(b => b.id === id)
+  if (index === -1) return
   form.blocks.splice(index, 1)
   if (!form.blocks.length) form.blocks.push(makeBlock('text'))
+  if (selectedBlockId.value === id) clearSelection()
 }
 
-// ─── Image picker — "Choose from library" for hero, avatar, and block images ───
-// Text inputs are kept alongside this (rather than replaced) because post
-// images can legitimately be external URLs (see TEMPLATES above), not just
-// uploads — the picker is a shortcut, not the only way in.
+function onPaletteKey(e: KeyboardEvent) {
+  if (e.key === 'Escape') paletteOpen.value = false
+}
+watch(paletteOpen, v => {
+  if (!import.meta.client) return
+  if (v) document.addEventListener('keydown', onPaletteKey)
+  else document.removeEventListener('keydown', onPaletteKey)
+})
+
+// ─── Image picker — hero, avatar, block images, and photo-story import ────────
 
 type ImageTarget =
   | { kind: 'hero' }
   | { kind: 'avatar' }
   | { kind: 'story' }
-  | { kind: 'block', index: number, field: 'src' | 'src1' | 'src2' }
+  | { kind: 'block', id: string, field: 'src' | 'src1' | 'src2' }
 
 const imagePickerOpen = ref(false)
 const imagePickerTarget = ref<ImageTarget | null>(null)
@@ -145,8 +322,8 @@ function onImagePick(keys: string[]) {
   if (target.kind === 'hero') form.image = path
   else if (target.kind === 'avatar') form.authorAvatar = path
   else {
-    const block = form.blocks[target.index] as Record<string, unknown>
-    block[target.field] = path
+    const block = form.blocks.find(b => b.id === target.id) as Record<string, unknown> | undefined
+    if (block) block[target.field] = path
   }
 }
 
@@ -174,7 +351,7 @@ function insertPhotoStory(keys: string[]) {
 
   const hasOnlyEmptyStarter = form.blocks.length === 1
     && form.blocks[0]?.type === 'text'
-    && !(form.blocks[0] as any).content?.trim()
+    && !(form.blocks[0] as { content?: string }).content?.trim()
 
   if (hasOnlyEmptyStarter) form.blocks = blocks
   else form.blocks.push(...blocks)
@@ -206,40 +383,103 @@ function clearArticleImages() {
       return block
     })
     .filter(block => !(
-      (block.type === 'image' || block.type === 'photo-full') && !(block as any).caption?.trim()
+      (block.type === 'image' || block.type === 'photo-full') && !(block as { caption?: string }).caption?.trim()
     ))
-    .filter(block => !(block.type === 'photo-pair' && !(block as any).caption?.trim()))
+    .filter(block => !(block.type === 'photo-pair' && !(block as { caption?: string }).caption?.trim()))
   if (!form.blocks.length) form.blocks = [makeBlock('text')]
   clearImagesOpen.value = false
 }
 
-function onPaletteKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') paletteOpen.value = false
-}
+// ─── Tray resize (mirrors album editor) ──────────────────────────────────────
 
-watch(paletteOpen, v => {
-  if (v) document.addEventListener('keydown', onPaletteKey)
-  else document.removeEventListener('keydown', onPaletteKey)
+const TRAY_MIN_WIDTH = 280
+const TRAY_MAX_WIDTH = 460
+const TRAY_DEFAULT_WIDTH = 360
+const trayWidth = ref(TRAY_DEFAULT_WIDTH)
+const isResizingTray = ref(false)
+
+function clampTrayWidth(width: number) {
+  if (typeof window === 'undefined') return Math.min(TRAY_MAX_WIDTH, Math.max(TRAY_MIN_WIDTH, width))
+  const viewportMax = Math.min(TRAY_MAX_WIDTH, Math.floor(window.innerWidth * 0.42))
+  return Math.min(viewportMax, Math.max(TRAY_MIN_WIDTH, width))
+}
+function onTrayResizeMove(e: PointerEvent) {
+  if (isResizingTray.value) trayWidth.value = clampTrayWidth(e.clientX)
+}
+function stopTrayResize() {
+  if (!isResizingTray.value) return
+  isResizingTray.value = false
+  window.removeEventListener('pointermove', onTrayResizeMove)
+  window.removeEventListener('pointerup', stopTrayResize)
+  window.removeEventListener('pointercancel', stopTrayResize)
+}
+function startTrayResize(e: PointerEvent) {
+  e.preventDefault()
+  isResizingTray.value = true
+  window.addEventListener('pointermove', onTrayResizeMove)
+  window.addEventListener('pointerup', stopTrayResize)
+  window.addEventListener('pointercancel', stopTrayResize)
+}
+function onTrayResizeKeydown(e: KeyboardEvent) {
+  const step = e.shiftKey ? 40 : 16
+  if (e.key === 'ArrowLeft') { e.preventDefault(); trayWidth.value = clampTrayWidth(trayWidth.value - step) }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); trayWidth.value = clampTrayWidth(trayWidth.value + step) }
+  else if (e.key === 'Home') { e.preventDefault(); trayWidth.value = clampTrayWidth(TRAY_MIN_WIDTH) }
+  else if (e.key === 'End') { e.preventDefault(); trayWidth.value = clampTrayWidth(TRAY_MAX_WIDTH) }
+}
+onMounted(() => { trayWidth.value = clampTrayWidth(Math.round(window.innerWidth * 0.26)) })
+onUnmounted(stopTrayResize)
+
+// ─── Editor hint ─────────────────────────────────────────────────────────────
+
+const hintDismissed = ref(
+  typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('cu-post-editor-hint-v1')
+)
+let hintTimer: ReturnType<typeof setTimeout>
+function dismissHint() {
+  hintDismissed.value = true
+  if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('cu-post-editor-hint-v1', '1')
+}
+onMounted(() => { if (!hintDismissed.value) hintTimer = setTimeout(dismissHint, 7000) })
+onUnmounted(() => clearTimeout(hintTimer))
+
+// ─── Dirty tracking + unsaved guard ──────────────────────────────────────────
+
+const dirty = ref(false)
+const initialized = ref(false)
+const unsavedLeaveOpen = ref(false)
+const pendingLeaveTo = ref<string | null>(null)
+const allowPendingLeave = ref(false)
+
+watch(form, () => { if (initialized.value) dirty.value = true }, { deep: true })
+onMounted(() => nextTick(() => { initialized.value = true }))
+
+onBeforeRouteLeave((to) => {
+  if (!dirty.value || allowPendingLeave.value) return true
+  pendingLeaveTo.value = to.fullPath
+  unsavedLeaveOpen.value = true
+  return false
 })
-
-// ─── Drag & drop ─────────────────────────────────────────────────────────────
-
-const dragFrom = ref<number | null>(null)
-const dragOver = ref<number | null>(null)
-
-function onDragStart(i: number) { dragFrom.value = i }
-function onDragOver(i: number)  { dragOver.value = i }
-function onDragEnd()            { dragFrom.value = null; dragOver.value = null }
-
-function onDrop(toIndex: number) {
-  const from = dragFrom.value
-  if (from === null || from === toIndex) { onDragEnd(); return }
-  const next = [...form.blocks]
-  const [item] = next.splice(from, 1)
-  next.splice(toIndex, 0, item!)
-  form.blocks = next
-  onDragEnd()
+function cancelPendingLeave() {
+  pendingLeaveTo.value = null
+  unsavedLeaveOpen.value = false
 }
+async function discardAndLeave() {
+  const target = pendingLeaveTo.value
+  if (!target) { cancelPendingLeave(); return }
+  allowPendingLeave.value = true
+  dirty.value = false
+  unsavedLeaveOpen.value = false
+  pendingLeaveTo.value = null
+  await router.push(target)
+}
+function handleBeforeUnload(e: BeforeUnloadEvent) {
+  if (!dirty.value) return
+  e.preventDefault()
+  e.returnValue = ''
+}
+onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload))
+onUnmounted(() => window.removeEventListener('beforeunload', handleBeforeUnload))
 
 // ─── Templates ───────────────────────────────────────────────────────────────
 
@@ -328,18 +568,14 @@ const showTemplates = ref(false)
 
 function loadTemplate(tpl: Template) {
   const hasContent = form.blocks.some(b => {
-    const a = b as any
+    const a = b as Record<string, string | undefined>
     return a.content || a.question || a.answer || a.src || a.src1
   })
   if (hasContent && !confirm(t('adminPostForm.tplReplaceConfirm', { name: t(tpl.nameKey) }))) return
   form.blocks = tpl.blocks()
   showTemplates.value = false
-  paletteOpen.value = false
+  clearSelection()
 }
-
-// ─── Preview ─────────────────────────────────────────────────────────────────
-
-const preview = ref(false)
 
 // ─── Submit ──────────────────────────────────────────────────────────────────
 
@@ -357,68 +593,53 @@ function onSubmit() {
   for (const block of payload.blocks) {
     const item = block as Record<string, unknown>
     for (const key of ['content', 'question', 'answer', 'src', 'src1', 'src2', 'caption', 'cite']) {
-      if (typeof item[key] === 'string') item[key] = item[key].trim()
+      if (typeof item[key] === 'string') item[key] = (item[key] as string).trim()
     }
   }
+  dirty.value = false
   emit('submit', payload)
 }
 </script>
 
+
 <template>
-  <form class="editor" @submit.prevent="onSubmit">
-
-    <!-- Save bar -->
-    <div class="editor__bar">
-      <NuxtLink :to="localePath('/admin/posts')" class="btn-ghost">{{ t('admin.cancel') }}</NuxtLink>
-      <button type="button" class="btn-tpl" :class="{ 'btn-tpl--active': showTemplates }" @click="showTemplates = !showTemplates; preview = false">
-        {{ t('adminPostForm.templates') }}
-      </button>
-      <button type="button" class="btn-toggle" :class="{ 'btn-toggle--active': preview }" @click="preview = !preview; showTemplates = false">
-        {{ preview ? t('adminPostForm.edit') : t('admin.preview') }}
-      </button>
-      <button type="submit" class="btn-solid" :disabled="busy">
-        {{ busy ? t('admin.saving') : (submitLabel || t('admin.save')) }}
-      </button>
-    </div>
-
-    <!-- Template picker -->
-    <div v-if="showTemplates" class="tpl-picker">
-      <p class="tpl-picker__hint">{{ t('adminPostForm.tplHint') }}</p>
-      <div class="tpl-grid">
-        <button
-          v-for="tpl in TEMPLATES"
-          :key="tpl.nameKey"
-          type="button"
-          class="tpl-card"
-          @click="loadTemplate(tpl)"
-        >
-          <span class="tpl-card__name">{{ t(tpl.nameKey) }}</span>
-          <span class="tpl-card__desc">{{ t(tpl.descKey) }}</span>
-          <span class="tpl-card__blocks">{{ t('adminPostForm.blockCount', { count: tpl.blocks().length }) }}</span>
+  <form
+    class="editor"
+    :class="{ 'is-resizing-tray': isResizingTray }"
+    :style="{ '--tray-width': `${trayWidth}px` }"
+    @submit.prevent="onSubmit"
+  >
+    <!-- LEFT TRAY -->
+    <aside class="tray">
+      <!-- Save / Cancel -->
+      <div class="tray__topbar">
+        <NuxtLink :to="localePath('/admin/posts')" class="btn-ghost">{{ t('admin.cancel') }}</NuxtLink>
+        <button type="submit" class="btn-solid" :disabled="busy">
+          {{ busy ? t('admin.saving') : (submitLabel || t('admin.save')) }}
         </button>
       </div>
-    </div>
 
-    <!-- Metadata dock -->
-    <div v-if="!preview" class="top-dock">
-      <div class="dock-fields">
-        <div class="field field--span2">
-          <label>{{ t('adminForm.title') }}</label>
-          <textarea v-model="form.title" rows="2" :placeholder="t('adminPostForm.titlePlaceholder')" />
-        </div>
+      <!-- Settings -->
+      <div class="tray__section">
+        <p class="tray__label">{{ t('adminEditor.layout') }}</p>
         <div class="field">
-          <label>{{ t('adminPostForm.tag') }}</label>
-          <input v-model="form.tag" type="text" :placeholder="t('adminPostForm.tagPlaceholder')">
-        </div>
-        <div class="field">
-          <label>{{ t('adminForm.dateDisplay') }}</label>
-          <UiDateInput v-model="form.date" />
+          <label>{{ t('adminPostForm.heroStyle') }}</label>
+          <div class="hero-style-grid">
+            <button
+              v-for="s in HERO_STYLES"
+              :key="s.value"
+              type="button"
+              class="hero-style-btn"
+              :class="{ active: (form.heroStyle ?? 'standard') === s.value }"
+              @click="form.heroStyle = s.value"
+            >{{ t(s.labelKey) }}</button>
+          </div>
         </div>
         <div class="field">
           <label>{{ t('adminForm.publishedSort') }}</label>
           <UiDateInput v-model="form.published" />
         </div>
-        <div class="field field--span3 field--visibility">
+        <div class="field field--visibility">
           <label>{{ t('adminForm.visibility') }}</label>
           <div class="visibility-toggle" role="radiogroup" :aria-label="t('adminPostForm.visibilityAria')">
             <button
@@ -436,328 +657,282 @@ function onSubmit() {
             </button>
           </div>
         </div>
-        <div class="field field--span3">
-          <label>{{ t('adminPostForm.excerptPlaceholder') }}</label>
-          <textarea v-model="form.excerpt" rows="4" :placeholder="t('adminPostForm.excerptPlaceholder')" />
-        </div>
-        <div class="field field--span3">
-          <label>{{ t('adminPostForm.image') }}</label>
-          <div class="field-img-row">
-            <img v-if="form.image" :src="form.image" alt="" class="field-img-preview">
-            <input v-model="form.image" type="text" :placeholder="t('adminPostForm.imagePlaceholder')">
-            <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'hero' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>{{ t('adminPostForm.heroStyle') }}</label>
-          <select v-model="form.heroStyle">
-            <option v-for="s in HERO_STYLES" :key="s.value" :value="s.value">{{ t(s.labelKey) }}</option>
-          </select>
-        </div>
-        <div class="field field--span2">
-          <label>{{ t('adminPostForm.author') }}</label>
-          <input v-model="form.author" type="text" :placeholder="t('adminPostForm.authorPlaceholder')">
-        </div>
-        <div class="field field--span2">
-          <label>{{ t('adminPostForm.authorBio') }}</label>
-          <textarea v-model="form.authorBio" rows="2" :placeholder="t('adminPostForm.authorBioPlaceholder')" />
-        </div>
-        <div class="field">
-          <label>{{ t('adminPostForm.authorAvatar') }}</label>
-          <div class="field-img-row">
-            <img v-if="form.authorAvatar" :src="form.authorAvatar" alt="" class="field-img-preview field-img-preview--round">
-            <input v-model="form.authorAvatar" type="text" placeholder="https://...">
-            <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'avatar' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
-          </div>
-        </div>
-        <div class="field field--span3">
-          <label>{{ t('adminPostForm.photoLibrary') }}</label>
-          <div class="photo-tools">
-            <AdminR2ImageUploader
-              v-model="uploadedPhotoKeys"
-              :prefix="mediaPrefix"
-              dropzone-class="photo-tools__dropzone"
-              @uploaded="onPhotosUploaded"
-            />
-            <div class="photo-tools__actions">
-              <button type="button" class="photo-tools__btn" @click="openImagePicker({ kind: 'story' })">
-                <Icon name="heroicons:photo" class="photo-tools__icon" />
-                <span>{{ t('adminPostForm.insertPhotoStory') }}</span>
-              </button>
-              <button
-                type="button"
-                class="photo-tools__btn photo-tools__btn--danger"
-                :disabled="articleImageCount === 0"
-                @click="clearImagesOpen = true"
-              >
-                <Icon name="heroicons:x-mark" class="photo-tools__icon" />
-                <span>{{ t('adminPostForm.clearArticleImages') }}</span>
-              </button>
-              <p class="photo-tools__hint">{{ t('adminPostForm.photoLibraryHint') }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Block canvas -->
-    <div v-if="!preview" class="block-canvas">
-
-      <div
-        v-for="(block, i) in form.blocks"
-        :key="block.id"
-        class="block-row"
-        :class="{ 'block-row--dragging': dragFrom === i, 'block-row--over': dragOver === i && dragFrom !== i }"
-        draggable="true"
-        @dragstart="onDragStart(i)"
-        @dragover.prevent="onDragOver(i)"
-        @drop.prevent="onDrop(i)"
-        @dragend="onDragEnd"
-      >
-        <div class="block-row__handle" :title="t('adminPostForm.dragReorder')">⠿</div>
-        <div class="block-row__badge">{{ t(BLOCK_LABEL[block.type]) }}</div>
-
-        <div class="block-row__fields">
-
-          <!-- text, lead, pullquote, inset -->
-          <textarea
-            v-if="block.type === 'text' || block.type === 'lead' || block.type === 'pullquote' || block.type === 'inset'"
-            :value="(block as any).content"
-            rows="3"
-            :class="['field-ta', `field-ta--${block.type}`]"
-            :placeholder="block.type === 'lead' ? t('adminPostForm.phLead') : block.type === 'pullquote' ? t('adminPostForm.phPullquote') : block.type === 'inset' ? t('adminPostForm.phInset') : t('adminPostForm.phText')"
-            @input="(block as any).content = ($event.target as HTMLTextAreaElement).value"
-          />
-
-          <!-- heading, subheading -->
-          <input
-            v-else-if="block.type === 'heading' || block.type === 'subheading'"
-            :value="(block as any).content"
-            type="text"
-            :class="['field-in', `field-in--${block.type}`]"
-            :placeholder="block.type === 'heading' ? t('adminPostForm.phHeading') : t('adminPostForm.phSubheading')"
-            @input="(block as any).content = ($event.target as HTMLInputElement).value"
-          />
-
-          <!-- blockquote -->
-          <template v-else-if="block.type === 'blockquote'">
-            <textarea
-              :value="(block as any).content"
-              rows="3"
-              class="field-ta field-ta--blockquote"
-              :placeholder="t('adminPostForm.phQuote')"
-              @input="(block as any).content = ($event.target as HTMLTextAreaElement).value"
-            />
-            <input
-              :value="(block as any).cite"
-              type="text"
-              class="field-in field-in--cite"
-              :placeholder="t('adminPostForm.phAttribution')"
-              @input="(block as any).cite = ($event.target as HTMLInputElement).value"
-            />
-          </template>
-
-          <!-- image -->
-          <template v-else-if="block.type === 'image'">
-            <div class="field-img-row">
-              <img v-if="(block as any).src" :src="(block as any).src" alt="" class="field-img-preview">
-              <input :value="(block as any).src" type="text" class="field-in field-in--url" :placeholder="t('adminPostForm.phImageUrl')" @input="(block as any).src = ($event.target as HTMLInputElement).value" />
-              <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
-            </div>
-            <input :value="(block as any).caption" type="text" class="field-in field-in--cap" :placeholder="t('adminPostForm.phCaption')" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
-            <label class="field-check">
-              <input type="checkbox" :checked="(block as any).breakout" @change="(block as any).breakout = ($event.target as HTMLInputElement).checked" />
-              {{ t('adminPostForm.breakout') }}
-            </label>
-          </template>
-
-          <!-- photo-full -->
-          <template v-else-if="block.type === 'photo-full'">
-            <div class="field-img-row">
-              <img v-if="(block as any).src" :src="(block as any).src" alt="" class="field-img-preview">
-              <input :value="(block as any).src" type="text" class="field-in field-in--url" :placeholder="t('adminPostForm.phPhotoUrl')" @input="(block as any).src = ($event.target as HTMLInputElement).value" />
-              <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
-            </div>
-            <input :value="(block as any).caption" type="text" class="field-in field-in--cap" :placeholder="t('adminPostForm.phCaption')" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
-          </template>
-
-          <!-- photo-pair -->
-          <template v-else-if="block.type === 'photo-pair'">
-            <div class="field-pair">
-              <div class="field-img-row">
-                <img v-if="(block as any).src1" :src="(block as any).src1" alt="" class="field-img-preview">
-                <input :value="(block as any).src1" type="text" class="field-in field-in--url" :placeholder="t('adminPostForm.phLeftPhotoUrl')" @input="(block as any).src1 = ($event.target as HTMLInputElement).value" />
-                <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src1' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
-              </div>
-              <div class="field-img-row">
-                <img v-if="(block as any).src2" :src="(block as any).src2" alt="" class="field-img-preview">
-                <input :value="(block as any).src2" type="text" class="field-in field-in--url" :placeholder="t('adminPostForm.phRightPhotoUrl')" @input="(block as any).src2 = ($event.target as HTMLInputElement).value" />
-                <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'block', index: i, field: 'src2' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
-              </div>
-            </div>
-            <input :value="(block as any).caption" type="text" class="field-in field-in--cap" :placeholder="t('adminPostForm.phSharedCaption')" @input="(block as any).caption = ($event.target as HTMLInputElement).value" />
-          </template>
-
-          <!-- divider -->
-          <div v-else-if="block.type === 'divider'" class="field-divider">· · ·</div>
-
-          <!-- qanda -->
-          <template v-else-if="block.type === 'qanda'">
-            <textarea :value="(block as any).question" rows="2" class="field-ta field-ta--q" :placeholder="t('adminPostForm.phQuestion')" @input="(block as any).question = ($event.target as HTMLTextAreaElement).value" />
-            <textarea :value="(block as any).answer"   rows="3" class="field-ta field-ta--a" :placeholder="t('adminPostForm.phAnswer')"   @input="(block as any).answer   = ($event.target as HTMLTextAreaElement).value" />
-          </template>
-
-        </div>
-
-        <!-- Ops -->
-        <div class="block-row__ops">
-          <button type="button" class="op-btn" :title="t('adminPostForm.insertAfter')" @click.stop="openPalette(i)">+</button>
-          <button type="button" class="op-btn op-btn--del" :title="t('adminPostForm.removeBlock')" @click="removeBlock(i)">×</button>
-        </div>
-
       </div>
 
-      <!-- Add block zone -->
-      <div class="add-zone">
-        <button type="button" class="add-btn" @click.stop="openPalette(null)">
-          {{ t('adminPostForm.addBlock') }}
+      <!-- Photo library -->
+      <div class="tray__section">
+        <p class="tray__label">{{ t('adminPostForm.photoLibrary') }}</p>
+        <AdminR2ImageUploader
+          v-model="uploadedPhotoKeys"
+          :prefix="mediaPrefix"
+          dropzone-class="tray-dropzone"
+          @uploaded="onPhotosUploaded"
+        />
+        <button type="button" class="tray-action" @click="openImagePicker({ kind: 'story' })">
+          <Icon name="heroicons:photo" class="tray-action__icon" />
+          <span>{{ t('adminPostForm.insertPhotoStory') }}</span>
         </button>
+        <button
+          type="button"
+          class="tray-action tray-action--danger"
+          :disabled="articleImageCount === 0"
+          @click="clearImagesOpen = true"
+        >
+          <Icon name="heroicons:x-mark" class="tray-action__icon" />
+          <span>{{ t('adminPostForm.clearArticleImages') }}</span>
+        </button>
+        <p class="tray-hint">{{ t('adminPostForm.photoLibraryHint') }}</p>
       </div>
 
-    </div>
+      <!-- Palette -->
+      <div class="tray__section">
+        <p class="tray__label">{{ t('adminPostForm.addBlock') }}</p>
+        <div class="palette-actions">
+          <button type="button" class="palette-action" @click="openPalette(selectedIndex >= 0 ? selectedIndex : null)">
+            <Icon name="heroicons:plus" class="palette-action__icon" />
+            <span>{{ t('adminPostForm.addBlockTitle') }}</span>
+          </button>
+          <button type="button" class="palette-action palette-action--ghost" @click="showTemplates = true">
+            <Icon name="heroicons:sparkles" class="palette-action__icon" />
+            <span>{{ t('adminPostForm.templates') }}</span>
+          </button>
+        </div>
+      </div>
 
-    <!-- Preview pane — 1:1 reproduction of /posts/[slug] -->
-    <div v-if="preview" class="preview-shell" :style="form.heroStyle === 'minimal-dark' ? 'background:#0C0C0A;color:#F5F4F0' : ''">
-      <article :class="['post', `post--${form.heroStyle ?? 'standard'}`]">
-
-        <!-- Standard hero -->
-        <template v-if="(form.heroStyle ?? 'standard') === 'standard'">
-          <header class="std-head">
-            <p class="std-head__eyebrow">{{ form.tag }} · {{ form.date }}</p>
-            <h1 class="std-head__title">{{ form.title || t('adminPostForm.untitled') }}</h1>
-            <p v-if="form.excerpt" class="std-head__excerpt">{{ form.excerpt }}</p>
-            <p v-if="form.author" class="std-head__author">{{ form.author }}</p>
-          </header>
-          <div v-if="form.image" class="std-hero">
-            <img :src="form.image" :alt="form.title">
+      <!-- Block list -->
+      <div class="tray__section tray__section--grow">
+        <p class="tray__label">
+          {{ t('adminPostForm.blocks') }}
+          <span class="tray__count">{{ form.blocks.length }}</span>
+        </p>
+        <div class="block-list">
+          <div
+            v-for="(block, i) in form.blocks"
+            :key="block.id"
+            class="block-item"
+            :class="{
+              'is-selected': selectedBlockId === block.id,
+              'is-dragging': listDragFrom === i,
+              'drop-target': listDragOver === i && listDragFrom !== i
+            }"
+            draggable="true"
+            @click="selectBlock(block.id)"
+            @dragstart="onListDragStart(i)"
+            @dragover.prevent="onListDragOver(i)"
+            @drop.prevent="onListDrop(i)"
+            @dragend="onListDragEnd"
+          >
+            <span class="block-item__drag">⠿</span>
+            <span class="block-item__label">{{ t(BLOCK_LABEL[block.type]) }}</span>
+            <button
+              type="button"
+              class="block-item__del"
+              :aria-label="t('adminPostForm.removeBlock')"
+              @click.stop="removeBlock(block.id)"
+            >×</button>
           </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RESIZE HANDLE -->
+    <button
+      type="button"
+      class="tray-resize-handle"
+      role="separator"
+      aria-orientation="vertical"
+      :aria-label="t('adminForm.resizeTray')"
+      :aria-valuemin="TRAY_MIN_WIDTH"
+      :aria-valuemax="TRAY_MAX_WIDTH"
+      :aria-valuenow="trayWidth"
+      :title="t('adminForm.resizeTray')"
+      @pointerdown="startTrayResize"
+      @keydown="onTrayResizeKeydown"
+    >
+      <span aria-hidden="true" />
+    </button>
+
+    <!-- RIGHT CANVAS -->
+    <section
+      ref="canvasEl"
+      class="canvas"
+      @click.capture="onCanvasClick"
+      @dragstart.capture="onCanvasDragStart"
+      @dragover="onCanvasDragOver"
+      @drop.prevent="onCanvasDrop"
+      @dragend.capture="onCanvasDragEnd"
+    >
+      <Transition name="hint">
+        <div v-if="!hintDismissed" class="canvas-hint" role="status">
+          <span>{{ t('adminPostForm.canvasHint') }}</span>
+          <button type="button" class="canvas-hint__dismiss" @click="dismissHint">{{ t('adminEditor.canvasHintDismiss') }}</button>
+        </div>
+      </Transition>
+
+      <PublicPostArticle
+        :post="previewPost"
+        editable
+        :selected-block-id="selectedBlockId ?? undefined"
+        :draggable-blocks="true"
+      />
+    </section>
+
+    <!-- FLOATING DOCK — Content (hero + metadata) -->
+    <section v-show="!dockHidden && activeDock === 'content'" class="context-dock content-dock" aria-live="polite">
+      <div class="dock-grid">
+        <!-- Hero image anchor -->
+        <div class="cover-anchor">
+          <div class="cover-anchor__frame" :class="{ 'is-empty': !form.image }">
+            <img v-if="form.image" :src="form.image" alt="">
+            <span v-else class="cover-anchor__empty">{{ t('adminForm.noImageSelected') }}</span>
+            <button
+              v-if="form.image"
+              type="button"
+              class="cover-anchor__clear"
+              @click="form.image = ''"
+            >{{ t('adminForm.clear') }}</button>
+          </div>
+          <button type="button" class="cover-pick" @click="openImagePicker({ kind: 'hero' })">
+            {{ form.image ? t('adminForm.coverChange') : t('adminPicker.chooseFromLibrary') }}
+          </button>
+        </div>
+
+        <div class="dock-fields">
+          <div class="field field--span2" :class="{ active: activeField === 'title' }">
+            <label>{{ t('adminForm.title') }}</label>
+            <textarea ref="titleInput" v-model="form.title" rows="2" :placeholder="t('adminPostForm.titlePlaceholder')" @focus="activeField = 'title'" />
+          </div>
+          <div class="field" :class="{ active: activeField === 'tag' }">
+            <label>{{ t('adminPostForm.tag') }}</label>
+            <input ref="tagInput" v-model="form.tag" type="text" :placeholder="t('adminPostForm.tagPlaceholder')" @focus="activeField = 'tag'">
+          </div>
+          <div class="field">
+            <label>{{ t('adminForm.dateDisplay') }}</label>
+            <UiDateInput v-model="form.date" />
+          </div>
+          <div class="field field--span2" :class="{ active: activeField === 'excerpt' }">
+            <label>{{ t('adminPostForm.excerptPlaceholder') }}</label>
+            <textarea ref="excerptInput" v-model="form.excerpt" rows="3" :placeholder="t('adminPostForm.excerptPlaceholder')" @focus="activeField = 'excerpt'" />
+          </div>
+          <div class="field" :class="{ active: activeField === 'author' }">
+            <label>{{ t('adminPostForm.author') }}</label>
+            <input ref="authorInput" v-model="form.author" type="text" :placeholder="t('adminPostForm.authorPlaceholder')" @focus="activeField = 'author'">
+          </div>
+          <div class="field field--span2">
+            <label>{{ t('adminPostForm.authorBio') }}</label>
+            <textarea v-model="form.authorBio" rows="2" :placeholder="t('adminPostForm.authorBioPlaceholder')" />
+          </div>
+          <div class="field">
+            <label>{{ t('adminPostForm.authorAvatar') }}</label>
+            <div class="field-img-row">
+              <img v-if="form.authorAvatar" :src="form.authorAvatar" alt="" class="field-img-preview field-img-preview--round">
+              <button type="button" class="field-img-pick" @click="openImagePicker({ kind: 'avatar' })">{{ t('adminPicker.chooseFromLibrary') }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FLOATING DOCK — Selected block -->
+    <section v-show="!dockHidden && activeDock === 'block' && selectedBlock" class="context-dock block-dock" aria-live="polite">
+      <div class="block-dock__head">
+        <div class="block-dock__identity">
+          <p class="block-dock__eyebrow">{{ selectedBlock ? t(BLOCK_LABEL[selectedBlock.type]) : '' }}</p>
+          <h2>{{ t('adminPostForm.blockN', { n: selectedIndex + 1 }) }}</h2>
+        </div>
+        <div class="block-dock__ops">
+          <button type="button" class="btn-ghost" @click="openPalette(selectedIndex)">{{ t('adminPostForm.insertAfter') }}</button>
+          <button type="button" class="btn-ghost danger" @click="selectedBlock && removeBlock(selectedBlock.id)">{{ t('admin.delete') }}</button>
+        </div>
+      </div>
+
+      <div v-if="selectedBlock" class="block-dock__body">
+        <!-- text, lead, pullquote, inset -->
+        <textarea
+          v-if="selectedBlock.type === 'text' || selectedBlock.type === 'lead' || selectedBlock.type === 'pullquote' || selectedBlock.type === 'inset'"
+          v-model="(selectedBlock as any).content"
+          rows="4"
+          class="prop-textarea"
+          :placeholder="selectedBlock.type === 'lead' ? t('adminPostForm.phLead') : selectedBlock.type === 'pullquote' ? t('adminPostForm.phPullquote') : selectedBlock.type === 'inset' ? t('adminPostForm.phInset') : t('adminPostForm.phText')"
+        />
+
+        <!-- heading, subheading -->
+        <input
+          v-else-if="selectedBlock.type === 'heading' || selectedBlock.type === 'subheading'"
+          v-model="(selectedBlock as any).content"
+          type="text"
+          class="prop-input"
+          :placeholder="selectedBlock.type === 'heading' ? t('adminPostForm.phHeading') : t('adminPostForm.phSubheading')"
+        >
+
+        <!-- blockquote -->
+        <template v-else-if="selectedBlock.type === 'blockquote'">
+          <textarea v-model="(selectedBlock as any).content" rows="3" class="prop-textarea" :placeholder="t('adminPostForm.phQuote')" />
+          <input v-model="(selectedBlock as any).cite" type="text" class="prop-input" :placeholder="t('adminPostForm.phAttribution')">
         </template>
 
-        <!-- Dark full-bleed hero -->
-        <header v-else-if="form.heroStyle === 'dark-full'" class="df-head">
-          <div class="df-head__bg">
-            <img v-if="form.image" :src="form.image" :alt="form.title">
+        <!-- image -->
+        <template v-else-if="selectedBlock.type === 'image'">
+          <div class="prop-photo">
+            <img v-if="(selectedBlock as any).src" :src="(selectedBlock as any).src" alt="" class="prop-thumb">
+            <button type="button" class="prop-pick-btn" @click="selectedBlock && openImagePicker({ kind: 'block', id: selectedBlock.id, field: 'src' })">
+              {{ (selectedBlock as any).src ? t('adminForm.coverChange') : t('adminPicker.chooseFromLibrary') }}
+            </button>
           </div>
-          <div class="df-head__gradient" />
-          <div class="df-head__inner">
-            <p class="df-head__tag">{{ form.tag }}</p>
-            <h1 class="df-head__title">{{ form.title || t('adminPostForm.untitled') }}</h1>
-            <div class="df-head__meta">
-              <span v-if="form.author" class="df-head__author">{{ form.author }}</span>
-              <span v-if="form.author" class="df-head__sep" />
-              <span>{{ form.date }}</span>
+          <input v-model="(selectedBlock as any).src" type="text" class="prop-input prop-input--url" :placeholder="t('adminPostForm.phImageUrl')">
+          <input v-model="(selectedBlock as any).caption" type="text" class="prop-input" :placeholder="t('adminPostForm.phCaption')">
+          <label class="prop-check">
+            <input v-model="(selectedBlock as any).breakout" type="checkbox">
+            {{ t('adminPostForm.breakout') }}
+          </label>
+        </template>
+
+        <!-- photo-full -->
+        <template v-else-if="selectedBlock.type === 'photo-full'">
+          <div class="prop-photo">
+            <img v-if="(selectedBlock as any).src" :src="(selectedBlock as any).src" alt="" class="prop-thumb">
+            <button type="button" class="prop-pick-btn" @click="selectedBlock && openImagePicker({ kind: 'block', id: selectedBlock.id, field: 'src' })">
+              {{ (selectedBlock as any).src ? t('adminForm.coverChange') : t('adminPicker.chooseFromLibrary') }}
+            </button>
+          </div>
+          <input v-model="(selectedBlock as any).src" type="text" class="prop-input prop-input--url" :placeholder="t('adminPostForm.phPhotoUrl')">
+          <input v-model="(selectedBlock as any).caption" type="text" class="prop-input" :placeholder="t('adminPostForm.phCaption')">
+        </template>
+
+        <!-- photo-pair -->
+        <template v-else-if="selectedBlock.type === 'photo-pair'">
+          <div class="prop-pair">
+            <div class="prop-photo">
+              <img v-if="(selectedBlock as any).src1" :src="(selectedBlock as any).src1" alt="" class="prop-thumb">
+              <button type="button" class="prop-pick-btn" @click="selectedBlock && openImagePicker({ kind: 'block', id: selectedBlock.id, field: 'src1' })">{{ t('adminPostForm.phLeftPhotoUrl') }}</button>
+            </div>
+            <div class="prop-photo">
+              <img v-if="(selectedBlock as any).src2" :src="(selectedBlock as any).src2" alt="" class="prop-thumb">
+              <button type="button" class="prop-pick-btn" @click="selectedBlock && openImagePicker({ kind: 'block', id: selectedBlock.id, field: 'src2' })">{{ t('adminPostForm.phRightPhotoUrl') }}</button>
             </div>
           </div>
-        </header>
+          <input v-model="(selectedBlock as any).caption" type="text" class="prop-input" :placeholder="t('adminPostForm.phSharedCaption')">
+        </template>
 
-        <!-- Split hero -->
-        <header v-else-if="form.heroStyle === 'split'" class="sp-head">
-          <div class="sp-head__img">
-            <img v-if="form.image" :src="form.image" :alt="form.title">
-          </div>
-          <div class="sp-head__content">
-            <p class="sp-head__tag">{{ form.tag }}</p>
-            <h1 class="sp-head__title">{{ form.title || t('adminPostForm.untitled') }}</h1>
-            <p v-if="form.excerpt" class="sp-head__excerpt">{{ form.excerpt }}</p>
-            <div class="sp-head__meta">
-              <span v-if="form.author" class="sp-head__author">{{ form.author }}</span>
-              <span v-if="form.author" class="sp-head__sep" />
-              <span>{{ form.date }}</span>
-            </div>
-          </div>
-        </header>
+        <!-- qanda -->
+        <template v-else-if="selectedBlock.type === 'qanda'">
+          <textarea v-model="(selectedBlock as any).question" rows="2" class="prop-textarea" :placeholder="t('adminPostForm.phQuestion')" />
+          <textarea v-model="(selectedBlock as any).answer" rows="3" class="prop-textarea" :placeholder="t('adminPostForm.phAnswer')" />
+        </template>
 
-        <!-- Minimal dark header -->
-        <header v-else-if="form.heroStyle === 'minimal-dark'" class="md-head">
-          <p class="md-head__tag">{{ form.tag }}</p>
-          <h1 class="md-head__title">{{ form.title || t('adminPostForm.untitled') }}</h1>
-          <p v-if="form.excerpt" class="md-head__sub">{{ form.excerpt }}</p>
-          <div class="md-head__meta">
-            <span v-if="form.author" class="md-head__author">{{ form.author }}</span>
-            <span v-if="form.author" class="md-head__sep" />
-            <span>{{ form.date }}</span>
-          </div>
-        </header>
-
-        <!-- Body -->
-        <div class="post__body">
-          <template v-for="block in form.blocks" :key="block.id">
-            <p v-if="block.type === 'text'" class="pb-text">{{ (block as any).content }}</p>
-            <p v-else-if="block.type === 'lead'" class="pb-lead">{{ (block as any).content }}</p>
-            <h2 v-else-if="block.type === 'heading'" class="pb-heading">{{ (block as any).content }}</h2>
-            <h3 v-else-if="block.type === 'subheading'" class="pb-subheading">{{ (block as any).content }}</h3>
-            <div v-else-if="block.type === 'pullquote'" class="pb-pullquote">{{ (block as any).content }}</div>
-            <blockquote v-else-if="block.type === 'blockquote'" class="pb-blockquote">
-              <span>{{ (block as any).content }}</span>
-              <cite v-if="(block as any).cite">{{ (block as any).cite }}</cite>
-            </blockquote>
-            <figure v-else-if="block.type === 'image'" class="pb-image" :class="{ 'pb-image--breakout': (block as any).breakout }">
-              <img :src="(block as any).src" :alt="(block as any).caption || ''">
-              <figcaption v-if="(block as any).caption">{{ (block as any).caption }}</figcaption>
-            </figure>
-            <figure v-else-if="block.type === 'photo-full'" class="pb-photo-full">
-              <img :src="(block as any).src" :alt="(block as any).caption || ''">
-              <figcaption v-if="(block as any).caption">{{ (block as any).caption }}</figcaption>
-            </figure>
-            <figure v-else-if="block.type === 'photo-pair'" class="pb-photo-pair">
-              <img :src="(block as any).src1" alt="">
-              <img :src="(block as any).src2" alt="">
-              <figcaption v-if="(block as any).caption" class="pb-photo-pair__cap">{{ (block as any).caption }}</figcaption>
-            </figure>
-            <div v-else-if="block.type === 'divider'" class="pb-divider">· · ·</div>
-            <div v-else-if="block.type === 'inset'" class="pb-inset">{{ (block as any).content }}</div>
-            <div v-else-if="block.type === 'qanda'" class="pb-qanda">
-              <div class="pb-qanda__q">{{ (block as any).question }}</div>
-              <div class="pb-qanda__a">{{ (block as any).answer }}</div>
-            </div>
-          </template>
-
-          <!-- Article footer -->
-          <div class="post__footer">
-            <div class="post__tags">
-              <span class="post__tag-pill">{{ form.tag }}</span>
-            </div>
-            <button type="button" class="post__share">{{ t('adminPostForm.share') }}</button>
-          </div>
-        </div>
-
-        <!-- Author bio -->
-        <div v-if="form.author" class="author-bio">
-          <div class="author-bio__inner">
-            <div class="author-bio__avatar">
-              <img v-if="form.authorAvatar" :src="form.authorAvatar" :alt="form.author">
-              <span v-else class="author-bio__initials">{{ form.author.charAt(0) }}</span>
-            </div>
-            <div>
-              <p class="author-bio__name">{{ form.author }}</p>
-              <p v-if="form.authorBio" class="author-bio__text">{{ form.authorBio }}</p>
-            </div>
-          </div>
-        </div>
-
-      </article>
-    </div>
+        <!-- divider -->
+        <p v-else-if="selectedBlock.type === 'divider'" class="prop-note">{{ t('adminPostForm.blockDividerDesc') }}</p>
+      </div>
+    </section>
 
     <!-- Block picker modal -->
     <Teleport to="body">
       <div v-if="paletteOpen" class="bpm-overlay" @click.self="paletteOpen = false">
         <div class="bpm-panel" role="dialog" aria-modal="true" :aria-label="t('adminPostForm.addBlockTitle')">
-
           <div class="bpm-header">
             <span class="bpm-title">{{ t('adminPostForm.addBlockTitle') }}</span>
             <button type="button" class="bpm-close" @click="paletteOpen = false">✕</button>
           </div>
-
           <div class="bpm-body">
             <div v-for="group in ['Text', 'Visual']" :key="group" class="bpm-group">
               <div class="bpm-group-label">{{ group === 'Text' ? t('adminPostForm.groupText') : t('adminPostForm.groupVisual') }}</div>
@@ -769,80 +944,6 @@ function onSubmit() {
                   class="bpm-card"
                   @click="addBlock(item.type)"
                 >
-                  <div class="bpm-preview">
-
-                    <template v-if="item.type === 'text'">
-                      <div class="bpv-lines">
-                        <div class="bpv-l l-full" /><div class="bpv-l l-3q" />
-                        <div class="bpv-l l-full" /><div class="bpv-l l-half" />
-                      </div>
-                    </template>
-
-                    <template v-else-if="item.type === 'lead'">
-                      <div class="bpv-lead-wrap">
-                        <div class="bpv-l l-full" /><div class="bpv-l l-3q" /><div class="bpv-l l-half" />
-                      </div>
-                    </template>
-
-                    <template v-else-if="item.type === 'heading'">
-                      <div class="bpv-heading">{{ t('adminPostForm.previewHeading') }}</div>
-                    </template>
-
-                    <template v-else-if="item.type === 'subheading'">
-                      <div class="bpv-subheading">{{ t('adminPostForm.previewSubheading') }}</div>
-                      <div class="bpv-lines" style="margin-top:8px">
-                        <div class="bpv-l l-full" /><div class="bpv-l l-3q" />
-                      </div>
-                    </template>
-
-                    <template v-else-if="item.type === 'pullquote'">
-                      <div class="bpv-pullquote">{{ t('adminPostForm.previewPullquote') }}</div>
-                    </template>
-
-                    <template v-else-if="item.type === 'blockquote'">
-                      <div class="bpv-blockquote">
-                        <div class="bpv-l l-full bpv-bq-line" />
-                        <div class="bpv-l l-3q bpv-bq-line" />
-                        <div class="bpv-l l-quarter bpv-bq-cite" />
-                      </div>
-                    </template>
-
-                    <template v-else-if="item.type === 'inset'">
-                      <div class="bpv-inset">
-                        <div class="bpv-l l-full" /><div class="bpv-l l-3q" /><div class="bpv-l l-half" />
-                      </div>
-                    </template>
-
-                    <template v-else-if="item.type === 'qanda'">
-                      <div class="bpv-qanda">
-                        <div class="bpv-qa-row"><span class="bpv-qa-badge bpv-qa-q">Q</span><div class="bpv-l l-3q" /></div>
-                        <div class="bpv-qa-row"><span class="bpv-qa-badge bpv-qa-a">A</span><div class="bpv-l l-full" /></div>
-                        <div class="bpv-qa-row"><span class="bpv-qa-badge bpv-qa-a" style="opacity:0" /><div class="bpv-l l-half" /></div>
-                      </div>
-                    </template>
-
-                    <template v-else-if="item.type === 'image'">
-                      <div class="bpv-image">
-                        <div class="bpv-img-rect" />
-                        <div class="bpv-l l-3q bpv-cap" />
-                      </div>
-                    </template>
-
-                    <template v-else-if="item.type === 'photo-full'">
-                      <div class="bpv-photo-full" />
-                    </template>
-
-                    <template v-else-if="item.type === 'photo-pair'">
-                      <div class="bpv-photo-pair">
-                        <div class="bpv-img-rect" /><div class="bpv-img-rect" />
-                      </div>
-                    </template>
-
-                    <template v-else-if="item.type === 'divider'">
-                      <div class="bpv-divider">· · ·</div>
-                    </template>
-
-                  </div>
                   <div class="bpm-card-info">
                     <span class="bpm-card-name">{{ t(item.labelKey) }}</span>
                     <span class="bpm-card-desc">{{ t(item.descKey) }}</span>
@@ -851,10 +952,27 @@ function onSubmit() {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </Teleport>
+
+    <!-- Templates modal -->
+    <UiModal v-model="showTemplates" :title="t('adminPostForm.templates')" size="xl">
+      <p class="tpl-hint">{{ t('adminPostForm.tplHint') }}</p>
+      <div class="tpl-grid">
+        <button
+          v-for="tpl in TEMPLATES"
+          :key="tpl.nameKey"
+          type="button"
+          class="tpl-card"
+          @click="loadTemplate(tpl)"
+        >
+          <span class="tpl-card__name">{{ t(tpl.nameKey) }}</span>
+          <span class="tpl-card__desc">{{ t(tpl.descKey) }}</span>
+          <span class="tpl-card__blocks">{{ t('adminPostForm.blockCount', { count: tpl.blocks().length }) }}</span>
+        </button>
+      </div>
+    </UiModal>
 
     <AdminImagePickerModal
       v-model="imagePickerOpen"
@@ -864,11 +982,7 @@ function onSubmit() {
       @select="onImagePick"
     />
 
-    <UiModal
-      v-model="clearImagesOpen"
-      :title="t('adminPostForm.clearArticleImagesTitle')"
-      size="md"
-    >
+    <UiModal v-model="clearImagesOpen" :title="t('adminPostForm.clearArticleImagesTitle')" size="md">
       <div class="confirm-modal">
         <p>{{ t('adminPostForm.clearArticleImagesBody', { count: articleImageCount }) }}</p>
         <div class="confirm-modal__actions">
@@ -878,721 +992,352 @@ function onSubmit() {
       </div>
     </UiModal>
 
+    <UiModal
+      v-model="unsavedLeaveOpen"
+      :title="t('adminEditor.unsavedTitle')"
+      @update:model-value="v => { if (!v) cancelPendingLeave() }"
+    >
+      <p class="confirm-modal__body">{{ t('adminPostForm.unsavedBody') }}</p>
+      <div class="confirm-modal__actions">
+        <UiButton variant="secondary" @click="cancelPendingLeave">{{ t('adminEditor.unsavedStay') }}</UiButton>
+        <UiButton variant="danger" @click="discardAndLeave">{{ t('adminEditor.unsavedDiscard') }}</UiButton>
+      </div>
+    </UiModal>
   </form>
 </template>
 
+
 <style scoped>
-/* ─── Layout ─────────────────────────────────────────────────────────────── */
-.editor { display: flex; flex-direction: column; gap: 0; }
-.editor__bar {
-  display: flex; justify-content: flex-end; gap: 0.75rem;
-  padding: 0.85rem 0; border-bottom: 1px solid var(--subtle); margin-bottom: 1.75rem;
+/* ─── Root layout ────────────────────────────────────────────────────────── */
+.editor {
+  --tray-width: clamp(280px, 26vw, 380px);
+  display: flex;
+  align-items: flex-start;
+  min-height: calc(100vh - 3.5rem);
+  background: var(--body-bg);
+}
+.editor.is-resizing-tray { cursor: ew-resize; user-select: none; }
+.editor.is-resizing-tray :deep(*) { cursor: ew-resize !important; }
+
+/* ─── Left tray ──────────────────────────────────────────────────────────── */
+.tray {
+  width: var(--tray-width);
+  min-width: 280px;
+  max-width: min(460px, 42vw);
+  flex-shrink: 0;
+  position: sticky;
+  top: 3.5rem;
+  height: calc(100vh - 3.5rem);
+  overflow: auto;
+  scrollbar-width: none;
+  border-right: 1px solid var(--subtle);
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--body-bg) 96%, white);
+}
+.tray::-webkit-scrollbar { display: none; }
+
+.tray__topbar {
+  display: flex; gap: 0.5rem; align-items: center; justify-content: flex-end;
+  padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--subtle);
+  background: var(--body-bg); position: sticky; top: 0; z-index: 2;
+}
+.tray__topbar .btn-ghost, .tray__topbar .btn-solid {
+  flex: 0 0 7.8rem; display: inline-flex; align-items: center; justify-content: center;
+  min-height: 2.1rem; text-align: center;
 }
 
-/* ─── Metadata dock ──────────────────────────────────────────────────────── */
-.top-dock {
-  border: 1px solid var(--subtle); background: var(--body-bg);
-  padding: 1.25rem 1.5rem; margin-bottom: 2rem;
+.tray__section { padding: 0.85rem 0.85rem 0.7rem; border-bottom: 1px solid var(--subtle); }
+.tray__section--grow { flex: 1; border-bottom: none; display: flex; flex-direction: column; }
+.tray__label {
+  font-size: 0.46rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 0.55rem; display: flex; align-items: center; gap: 0.5rem;
 }
-.dock-fields {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.85rem;
-}
-.field { display: flex; flex-direction: column; gap: 0.3rem; }
-.field--span2 { grid-column: span 2; }
-.field--span3 { grid-column: span 3; }
+.tray__count { font-size: 0.46rem; background: var(--accent); color: #fff; padding: 0.1rem 0.4rem; letter-spacing: 0; }
+
+/* Fields */
+.field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.7rem; }
+.field:last-child { margin-bottom: 0; }
 .field label { font-size: 0.5rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
-.field input,
-.field select,
-.field textarea {
+.field input, .field select, .field textarea {
   border: 1px solid var(--subtle); background: #fff; color: var(--dark);
-  font-family: var(--font-sans); font-size: 0.82rem; padding: 0.52rem 0.65rem;
-  outline: none; width: 100%;
+  font-family: var(--font-sans); font-size: 0.82rem; padding: 0.5rem 0.6rem; outline: none; width: 100%;
 }
-.field textarea { resize: vertical; line-height: 1.65; }
-.field input:focus,
-.field select:focus,
-.field textarea:focus { border-color: var(--accent); }
+.field textarea { resize: vertical; line-height: 1.6; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
 .field :deep(.ui-date-input__text) {
-  border: 1px solid var(--subtle);
-  border-radius: 0;
-  background: #fff;
-  color: var(--dark);
-  font-family: var(--font-sans);
-  font-size: 0.82rem;
-  padding: 0.52rem 0.65rem;
-  outline: none;
+  border: 1px solid var(--subtle); border-radius: 0; background: #fff; color: var(--dark);
+  font-family: var(--font-sans); font-size: 0.82rem; padding: 0.5rem 0.6rem; outline: none;
 }
 .field :deep(.ui-date-input__text:focus) { border-color: var(--accent); }
 
-.field-img-row { display: flex; align-items: center; gap: 0.5rem; }
-.field-img-row input { flex: 1; min-width: 0; }
-.field-img-preview {
-  flex-shrink: 0; width: 2.4rem; height: 2.4rem; object-fit: cover;
-  border: 1px solid var(--subtle); background: var(--paper);
+/* Hero style grid */
+.hero-style-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.hero-style-btn {
+  border: 1px solid var(--subtle); background: #fff; color: var(--muted);
+  font-family: var(--font-sans); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.55rem 0.4rem; cursor: pointer; transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
+.hero-style-btn:hover { border-color: var(--accent); color: var(--accent); }
+.hero-style-btn.active { background: var(--dark); color: var(--accent); border-color: var(--dark); }
+
+/* Visibility toggle */
+.visibility-toggle { display: grid; grid-template-columns: 1fr; border: 1px solid var(--subtle); background: #fff; }
+.visibility-toggle__option {
+  min-width: 0; border: 0; border-top: 1px solid var(--subtle); background: transparent; color: var(--muted);
+  padding: 0.6rem 0.7rem; text-align: left; cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.visibility-toggle__option:first-child { border-top: 0; }
+.visibility-toggle__option span {
+  display: block; margin-bottom: 0.25rem; color: var(--dark);
+  font-family: var(--font-sans); font-size: 0.52rem; letter-spacing: 0.14em; line-height: 1.2; text-transform: uppercase;
+}
+.visibility-toggle__option small { display: block; color: inherit; font-family: var(--font-sans); font-size: 0.56rem; line-height: 1.45; }
+.visibility-toggle__option.active { background: var(--dark); color: rgba(245, 244, 240, 0.68); }
+.visibility-toggle__option.active span { color: var(--accent); }
+
+/* Tray actions (photo library + palette) */
+.tray-action, .palette-action {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; width: 100%;
+  min-height: 2.35rem; margin-top: 0.5rem; border: 1px solid var(--subtle); background: transparent; color: var(--dark);
+  font-family: var(--font-sans); font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase;
+  cursor: pointer; transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.tray-action:hover:not(:disabled), .palette-action:hover { border-color: var(--accent); color: var(--accent); }
+.tray-action:disabled { opacity: 0.45; cursor: default; }
+.tray-action--danger:hover:not(:disabled) { border-color: #b0243c; color: #b0243c; background: color-mix(in srgb, #b0243c 4%, transparent); }
+.tray-action__icon, .palette-action__icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+.tray-hint { margin: 0.55rem 0 0; color: var(--muted); font-size: 0.58rem; line-height: 1.55; }
+.palette-actions { display: flex; flex-direction: column; }
+.palette-action { margin-top: 0; }
+.palette-action + .palette-action { margin-top: 0.4rem; }
+.palette-action:first-child {
+  border-style: dashed; border-color: color-mix(in srgb, var(--accent) 45%, var(--subtle));
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--body-bg));
+}
+.palette-action--ghost { color: var(--muted); }
+.tray :deep(.tray-dropzone) { font-size: 0.6rem; }
+
+/* Block list */
+.block-list { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.7rem; }
+.block-item {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.55rem;
+  border: 1px solid var(--subtle); background: #fff; cursor: pointer; transition: border-color 0.12s, background 0.12s;
+}
+.block-item:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--subtle)); }
+.block-item.is-selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, #fff); }
+.block-item.is-dragging { opacity: 0.4; }
+.block-item.drop-target { border-color: var(--accent); border-style: dashed; }
+.block-item__drag { color: var(--subtle); cursor: grab; user-select: none; font-size: 0.9rem; }
+.block-item:hover .block-item__drag { color: var(--muted); }
+.block-item__label { flex: 1; min-width: 0; font-family: var(--font-sans); font-size: 0.7rem; letter-spacing: 0.04em; color: var(--dark); }
+.block-item__del {
+  width: 20px; height: 20px; border: 1px solid transparent; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.block-item__del:hover { color: #c0392b; border-color: #c0392b; }
+
+/* ─── Resize handle ──────────────────────────────────────────────────────── */
+.tray-resize-handle {
+  align-self: flex-start; position: sticky; top: calc(50vh + 1.75rem); z-index: 45;
+  width: 1rem; height: 3.75rem; margin-left: -0.5rem; margin-right: -0.5rem; padding: 0; border: 0;
+  background: transparent; cursor: ew-resize; flex: 0 0 1rem; touch-action: none;
+}
+.tray-resize-handle::before {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 0.72rem; height: 2.65rem;
+  transform: translate(-50%, -50%); background: color-mix(in srgb, var(--body-bg) 90%, white);
+  border: 1px solid color-mix(in srgb, var(--muted) 38%, transparent); border-radius: 999px;
+  box-shadow: 0 0.25rem 0.8rem rgba(26, 25, 24, 0.08); transition: border-color 0.16s, box-shadow 0.16s, transform 0.16s;
+}
+.tray-resize-handle span {
+  position: absolute; top: 50%; left: 50%; width: 0.24rem; height: 1.35rem; transform: translate(-50%, -50%); z-index: 1;
+  background: linear-gradient(var(--muted), var(--muted)) left center / 1px 100% no-repeat,
+    linear-gradient(var(--muted), var(--muted)) right center / 1px 100% no-repeat;
+}
+.tray-resize-handle:hover::before, .tray-resize-handle:focus-visible::before, .editor.is-resizing-tray .tray-resize-handle::before {
+  border-color: var(--accent); background: color-mix(in srgb, var(--body-bg) 84%, white);
+  box-shadow: 0 0.35rem 1rem color-mix(in srgb, var(--accent) 16%, transparent); transform: translate(-50%, -50%) scale(1.04);
+}
+.tray-resize-handle:hover span, .tray-resize-handle:focus-visible span, .editor.is-resizing-tray .tray-resize-handle span {
+  background: linear-gradient(var(--accent), var(--accent)) left center / 1px 100% no-repeat,
+    linear-gradient(var(--accent), var(--accent)) right center / 1px 100% no-repeat;
+}
+.tray-resize-handle:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 72%, white); outline-offset: 3px; }
+
+/* ─── Canvas ─────────────────────────────────────────────────────────────── */
+.canvas {
+  flex: 1; min-width: 0; position: relative;
+  min-height: calc(100vh - 3.5rem);
+  padding-bottom: 22rem; /* room so the floating dock never covers the article tail */
+}
+/* Empty text-ish blocks stay clickable in the live canvas */
+.canvas :deep(.post--editable [data-block-n]:empty) {
+  min-height: 2.2rem;
+  border: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 3px;
+}
+
+.canvas-hint {
+  position: sticky; top: 4.5rem; z-index: 20; margin: 1rem auto 0; width: max-content; max-width: 90%;
+  display: flex; align-items: center; gap: 1rem; padding: 0.6rem 0.6rem 0.6rem 1rem;
+  background: var(--dark); color: rgba(245, 244, 240, 0.85);
+  font-family: var(--font-sans); font-size: 0.62rem; letter-spacing: 0.04em;
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.25);
+}
+.canvas-hint__dismiss {
+  border: 1px solid rgba(245, 244, 240, 0.25); background: transparent; color: rgba(245, 244, 240, 0.85);
+  font-family: var(--font-sans); font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 0.35rem 0.7rem; cursor: pointer; white-space: nowrap;
+}
+.canvas-hint__dismiss:hover { border-color: var(--accent); color: var(--accent); }
+.hint-enter-active, .hint-leave-active { transition: opacity 0.3s; }
+.hint-enter-from, .hint-leave-to { opacity: 0; }
+
+/* ─── Floating context docks ─────────────────────────────────────────────── */
+.context-dock {
+  position: fixed; bottom: 1rem; right: 1rem; z-index: 60;
+  width: min(560px, calc(100vw - var(--tray-width) - 3rem));
+  max-height: min(58vh, 620px); overflow: auto;
+  background: color-mix(in srgb, var(--body-bg) 96%, white);
+  border: 1px solid var(--subtle); box-shadow: 0 1.5rem 3.5rem rgba(26, 25, 24, 0.22);
+  padding: 1.1rem 1.2rem;
+}
+
+/* Content dock */
+.dock-grid { display: grid; grid-template-columns: 140px 1fr; gap: 1rem; align-items: start; }
+.cover-anchor { display: flex; flex-direction: column; gap: 0.5rem; }
+.cover-anchor__frame {
+  position: relative; aspect-ratio: 4 / 3; border: 1px solid var(--subtle); background: var(--paper);
+  overflow: hidden; display: flex; align-items: center; justify-content: center;
+}
+.cover-anchor__frame.is-empty { border-style: dashed; }
+.cover-anchor__frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cover-anchor__empty { font-size: 0.54rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-align: center; padding: 0.5rem; }
+.cover-anchor__clear {
+  position: absolute; top: 0.35rem; right: 0.35rem; border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(12, 12, 10, 0.55); color: #fff; font-size: 0.5rem; letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 0.2rem 0.45rem; cursor: pointer;
+}
+.cover-pick {
+  border: 1px solid var(--subtle); background: none; color: var(--dark); padding: 0.5rem; cursor: pointer;
+  font-family: var(--font-sans); font-size: 0.54rem; letter-spacing: 0.1em; text-transform: uppercase; transition: border-color 0.15s, color 0.15s;
+}
+.cover-pick:hover { border-color: var(--accent); color: var(--accent); }
+
+.dock-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+.dock-fields .field--span2 { grid-column: span 2; }
+.dock-fields .field.active input, .dock-fields .field.active textarea { border-color: var(--accent); }
+.field-img-row { display: flex; align-items: center; gap: 0.5rem; }
+.field-img-preview { flex-shrink: 0; width: 2.4rem; height: 2.4rem; object-fit: cover; border: 1px solid var(--subtle); background: var(--paper); }
 .field-img-preview--round { border-radius: 50%; }
 .field-img-pick {
-  flex-shrink: 0; border: 1px solid var(--subtle); background: none; color: var(--dark);
-  padding: 0.5rem 0.7rem; font-family: var(--font-sans); font-size: 0.56rem;
-  letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; cursor: pointer;
-  transition: border-color 0.2s, color 0.2s;
+  flex-shrink: 0; border: 1px solid var(--subtle); background: none; color: var(--dark); padding: 0.5rem 0.6rem;
+  font-family: var(--font-sans); font-size: 0.52rem; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
 }
 .field-img-pick:hover { border-color: var(--accent); color: var(--accent); }
 
-.photo-tools {
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(15rem, 0.55fr);
-  gap: 1rem;
-  align-items: start;
-  border: 1px solid var(--subtle);
-  background: #fff;
-  padding: 0.85rem;
+/* Block dock */
+.block-dock__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; }
+.block-dock__eyebrow { font-size: 0.46rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.2rem; }
+.block-dock__identity h2 { font-family: var(--font-serif); font-size: 1.05rem; font-weight: 300; }
+.block-dock__ops { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.block-dock__body { display: flex; flex-direction: column; gap: 0.6rem; }
+.prop-input, .prop-textarea {
+  width: 100%; border: 1px solid var(--subtle); background: #fff; color: var(--dark);
+  font-family: var(--font-sans); font-size: 0.85rem; padding: 0.55rem 0.65rem; outline: none;
 }
-.photo-tools__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  min-width: 0;
+.prop-textarea { resize: vertical; line-height: 1.7; }
+.prop-input:focus, .prop-textarea:focus { border-color: var(--accent); }
+.prop-input--url { font-family: monospace; font-size: 0.72rem; color: var(--muted); }
+.prop-photo { display: flex; align-items: center; gap: 0.6rem; }
+.prop-thumb { width: 3.2rem; height: 3.2rem; object-fit: cover; border: 1px solid var(--subtle); flex-shrink: 0; }
+.prop-pick-btn {
+  flex: 1; border: 1px solid var(--subtle); background: none; color: var(--dark); padding: 0.55rem 0.65rem; cursor: pointer;
+  font-family: var(--font-sans); font-size: 0.54rem; letter-spacing: 0.1em; text-transform: uppercase; transition: border-color 0.15s, color 0.15s;
 }
-.photo-tools__btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  width: 100%;
-  min-height: 2.45rem;
-  border: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--dark);
-  font-family: var(--font-sans);
-  font-size: 0.54rem;
-  letter-spacing: 0.14em;
-  line-height: 1.25;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-.photo-tools__btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.photo-tools__btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.photo-tools__btn--danger:hover:not(:disabled) {
-  border-color: #b0243c;
-  color: #b0243c;
-  background: color-mix(in srgb, #b0243c 4%, transparent);
-}
-.photo-tools__icon {
-  width: 0.82rem;
-  height: 0.82rem;
-  flex-shrink: 0;
-}
-.photo-tools__hint {
-  margin: 0.2rem 0 0;
-  color: var(--muted);
-  font-size: 0.58rem;
-  line-height: 1.55;
-}
-
-.visibility-toggle {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid var(--subtle);
-  background: #fff;
-}
-.visibility-toggle__option {
-  min-width: 0;
-  border: 0;
-  border-left: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--muted);
-  padding: 0.72rem 0.75rem;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.visibility-toggle__option:first-child { border-left: 0; }
-.visibility-toggle__option span {
-  display: block;
-  margin-bottom: 0.3rem;
-  color: var(--dark);
-  font-family: var(--font-sans);
-  font-size: 0.52rem;
-  letter-spacing: 0.14em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-.visibility-toggle__option small {
-  display: block;
-  color: inherit;
-  font-family: var(--font-sans);
-  font-size: 0.56rem;
-  line-height: 1.45;
-}
-.visibility-toggle__option.active {
-  background: var(--dark);
-  color: rgba(245, 244, 240, 0.68);
-}
-.visibility-toggle__option.active span { color: var(--accent); }
-
-/* ─── Block canvas ───────────────────────────────────────────────────────── */
-.block-canvas { display: flex; flex-direction: column; }
-
-/* ─── Block row ──────────────────────────────────────────────────────────── */
-.block-row {
-  display: grid;
-  grid-template-columns: 22px 88px 1fr auto;
-  grid-template-rows: auto auto;
-  column-gap: 0.9rem;
-  padding: 1rem 0;
-  border-top: 1px solid var(--subtle);
-  position: relative;
-  transition: background 0.12s;
-}
-.block-row--dragging { opacity: 0.35; cursor: grabbing; }
-.block-row--over { background: var(--paper); }
-
-.block-row__handle {
-  font-size: 1.05rem; color: var(--subtle); cursor: grab;
-  user-select: none; padding-top: 0.3rem; text-align: center;
-  transition: color 0.15s;
-}
-.block-row:hover .block-row__handle { color: var(--muted); }
-.block-row__handle:active { cursor: grabbing; }
-
-.block-row__badge {
-  font-size: 0.48rem; letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--accent); padding-top: 0.42rem; white-space: nowrap;
-}
-
-.block-row__fields { display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
-
-
-/* ─── Field inputs inside block rows ────────────────────────────────────── */
-.field-ta,
-.field-in {
-  width: 100%;
-  border: 0;
-  border-bottom: 1px solid var(--subtle);
-  background: transparent;
-  color: var(--dark);
-  font-family: var(--font-sans);
-  font-size: 0.88rem;
-  line-height: 1.8;
-  padding: 0.25rem 0;
-  outline: none;
-}
-.field-ta { resize: vertical; }
-.field-ta:focus,
-.field-in:focus { border-bottom-color: var(--accent); }
-
-/* Type-specific aesthetics */
-.field-ta--lead    { font-family: var(--font-serif); font-size: 1rem; }
-.field-ta--pullquote { font-family: var(--font-serif); font-style: italic; color: var(--accent); }
-.field-ta--blockquote { font-style: italic; }
-.field-ta--q       { font-weight: 500; }
-.field-in--heading    { font-family: var(--font-serif); font-size: 1.25rem; font-weight: 300; }
-.field-in--subheading { font-family: var(--font-serif); font-size: 1.05rem; }
-.field-in--cite    { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; }
-.field-in--url     { font-family: monospace; font-size: 0.75rem; color: var(--muted); }
-.field-in--cap     { font-size: 0.78rem; color: var(--muted); }
-
-.field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-
-.field-check {
-  display: flex; align-items: center; gap: 0.45rem;
-  font-size: 0.7rem; color: var(--muted); cursor: pointer; padding-top: 0.1rem;
-}
-.field-check input { cursor: pointer; accent-color: var(--accent); }
-
-.field-divider {
-  text-align: center; font-size: 0.85rem; color: var(--muted);
-  letter-spacing: 0.5em; padding: 0.5rem 0;
-}
-
-/* ─── Block ops ──────────────────────────────────────────────────────────── */
-.block-row__ops { display: flex; flex-direction: column; gap: 0.35rem; padding-top: 0.3rem; }
-.op-btn {
-  width: 22px; height: 22px;
-  border: 1px solid var(--subtle); background: transparent;
-  color: var(--muted); cursor: pointer; font-size: 0.85rem;
-  display: flex; align-items: center; justify-content: center;
-  transition: border-color 0.15s, color 0.15s;
-}
-.op-btn:hover { border-color: var(--accent); color: var(--accent); }
-.op-btn--del:hover { border-color: #c0392b; color: #c0392b; }
-
-/* ─── Add block zone ─────────────────────────────────────────────────────── */
-.add-zone {
-  border-top: 1px solid var(--subtle);
-  padding-top: 1rem;
-  display: flex; flex-direction: column; gap: 0;
-}
-.add-btn {
-  background: transparent; border: 1px dashed var(--subtle);
-  color: var(--muted); font-family: var(--font-sans);
-  font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase;
-  padding: 0.8rem; cursor: pointer; width: 100%;
-  transition: border-color 0.2s, color 0.2s;
-}
-.add-btn:hover { border-color: var(--accent); color: var(--accent); }
+.prop-pick-btn:hover { border-color: var(--accent); color: var(--accent); }
+.prop-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.prop-check { display: flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; color: var(--muted); cursor: pointer; }
+.prop-check input { accent-color: var(--accent); }
+.prop-note { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
 
 /* ─── Buttons ────────────────────────────────────────────────────────────── */
-.btn-ghost, .btn-solid, .btn-toggle, .btn-tpl {
-  font-family: var(--font-sans); font-size: 0.6rem; letter-spacing: 0.18em;
-  text-transform: uppercase; padding: 0.7rem 1.1rem; cursor: pointer; text-decoration: none;
+.btn-ghost, .btn-solid {
+  font-family: var(--font-sans); font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 0.6rem 0.9rem; cursor: pointer; text-decoration: none;
 }
 .btn-ghost { border: 1px solid var(--subtle); background: none; color: var(--dark); }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-ghost.danger { color: #b0243c; }
+.btn-ghost.danger:hover { border-color: #b0243c; color: #b0243c; }
 .btn-solid { background: var(--dark); color: #F5F4F0; border: none; }
 .btn-solid:hover:not(:disabled) { background: var(--accent); }
 .btn-solid:disabled { opacity: 0.6; cursor: default; }
-.btn-toggle { border: 1px solid var(--subtle); background: none; color: var(--muted); margin-right: auto; }
-.btn-toggle:hover { border-color: var(--accent); color: var(--accent); }
-.btn-toggle--active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
-.btn-tpl { border: 1px solid var(--subtle); background: none; color: var(--muted); }
-.btn-tpl:hover { border-color: var(--accent); color: var(--accent); }
-.btn-tpl--active { border-color: var(--accent); color: var(--accent); }
 
-/* ─── Template picker ────────────────────────────────────────────────────── */
-.tpl-picker {
-  background: var(--dark); padding: 1.5rem 1.75rem; margin-bottom: 1.75rem;
-}
-.tpl-picker__hint {
-  font-family: var(--font-sans); font-size: 0.72rem;
-  color: rgba(245,244,240,0.35); margin-bottom: 1rem;
-}
-.tpl-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.6rem;
-}
+/* ─── Templates modal ────────────────────────────────────────────────────── */
+.tpl-hint { font-size: 0.78rem; color: var(--muted); margin-bottom: 1rem; }
+.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.65rem; }
 .tpl-card {
   display: flex; flex-direction: column; gap: 0.35rem; text-align: left;
-  font-family: var(--font-sans); font-size: 1rem;
-  border: 1px solid rgba(245,244,240,0.12); background: transparent;
-  padding: 0.9rem 1rem; cursor: pointer;
+  border: 1px solid var(--subtle); background: transparent; padding: 0.9rem 1rem; cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.tpl-card:hover { border-color: var(--accent); background: rgba(245,244,240,0.04); }
-.tpl-card__name {
-  font-family: var(--font-serif); font-size: 0.95rem; font-weight: 300;
-  color: rgba(245,244,240,0.9); line-height: 1.2;
-}
-.tpl-card__desc {
-  font-size: 0.75rem; color: rgba(245,244,240,0.45); line-height: 1.55;
-}
-.tpl-card__blocks {
-  font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--accent); margin-top: 0.2rem;
-}
+.tpl-card:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.tpl-card__name { font-family: var(--font-serif); font-size: 1rem; font-weight: 300; }
+.tpl-card__desc { font-size: 0.75rem; color: var(--muted); line-height: 1.55; }
+.tpl-card__blocks { font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-top: 0.2rem; }
 
-/* ─── Preview shell ──────────────────────────────────────────────────────── */
-.preview-shell { margin: 0 -2rem; overflow: visible; }
-
-.confirm-modal {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-.confirm-modal p {
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.65;
-  margin: 0;
-}
-.confirm-modal__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.65rem;
-}
-
-/* ─── Post shell ─────────────────────────────────────────────────────────── */
-.post { overflow: visible; }
-
-/* ─── Standard hero ──────────────────────────────────────────────────────── */
-.std-head {
-  max-width: 760px; margin: 0 auto; padding: 4rem 3rem 2rem;
-}
-.std-head__eyebrow {
-  font-size: 0.56rem; letter-spacing: 0.28em; text-transform: uppercase;
-  color: var(--accent); margin-bottom: 1.25rem;
-}
-.std-head__title {
-  font-family: var(--font-serif); font-size: clamp(2.2rem, 4.5vw, 3.8rem);
-  font-weight: 200; line-height: 1.05; letter-spacing: -0.025em; margin-bottom: 1.5rem; white-space: pre-line;
-}
-.std-head__excerpt { font-size: 0.95rem; color: var(--muted); line-height: 1.8; margin-bottom: 1rem; }
-.std-head__author {
-  font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent);
-}
-.std-hero { max-width: 760px; margin: 0 auto; padding: 0 3rem 3rem; }
-.std-hero img { width: 100%; height: auto; display: block; max-height: 560px; object-fit: cover; }
-
-/* ─── Dark full-bleed hero ───────────────────────────────────────────────── */
-.df-head {
-  position: relative; height: 72svh; background: #0C0C0A;
-  display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
-}
-.df-head__bg { position: absolute; inset: 0; }
-.df-head__bg img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.4; }
-.df-head__gradient {
-  position: absolute; inset: 0;
-  background: linear-gradient(to bottom, rgba(12,12,10,0.4) 0%, rgba(12,12,10,0.05) 35%, rgba(12,12,10,0.92) 100%);
-}
-.df-head__inner { position: relative; z-index: 2; max-width: 900px; margin: 0 auto; width: 100%; padding: 0 3rem 3.5rem; }
-.df-head__tag { font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.25rem; }
-.df-head__title {
-  font-family: var(--font-serif); font-size: clamp(3rem, 6.5vw, 5.5rem);
-  font-weight: 200; line-height: 0.93; letter-spacing: -0.03em; color: #F5F4F0; margin-bottom: 2rem; max-width: 800px; white-space: pre-line;
-}
-.df-head__meta { display: flex; align-items: center; gap: 0.75rem; font-size: 0.58rem; letter-spacing: 0.12em; color: rgba(245,244,240,0.45); }
-.df-head__author { color: var(--accent); letter-spacing: 0.16em; text-transform: uppercase; }
-.df-head__sep { width: 2px; height: 2px; border-radius: 50%; background: rgba(245,244,240,0.3); }
-
-/* ─── Split hero ─────────────────────────────────────────────────────────── */
-.sp-head { display: grid; grid-template-columns: 1fr 1fr; height: 100svh; background: #0C0C0A; }
-.sp-head__img { position: relative; overflow: hidden; }
-.sp-head__img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-.sp-head__img::after {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(12,12,10,0.5), transparent 55%);
-}
-.sp-head__content { padding: 8rem 4rem 4rem; display: flex; flex-direction: column; justify-content: flex-end; color: #F5F4F0; }
-.sp-head__tag { font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1rem; }
-.sp-head__title { font-family: var(--font-serif); font-size: clamp(2.5rem, 5vw, 4.5rem); font-weight: 200; line-height: 0.95; letter-spacing: -0.03em; margin-bottom: 1.5rem; white-space: pre-line; }
-.sp-head__excerpt { font-size: 0.85rem; line-height: 1.85; color: rgba(245,244,240,0.55); max-width: 440px; margin-bottom: 2rem; white-space: pre-line; }
-.sp-head__meta { display: flex; align-items: center; gap: 0.75rem; font-size: 0.56rem; letter-spacing: 0.12em; color: rgba(245,244,240,0.4); }
-.sp-head__author { color: var(--accent); letter-spacing: 0.16em; text-transform: uppercase; }
-.sp-head__sep { width: 2px; height: 2px; border-radius: 50%; background: rgba(245,244,240,0.25); }
-
-/* ─── Minimal dark header ────────────────────────────────────────────────── */
-.md-head { text-align: center; padding: 10rem 3rem 6rem; max-width: 720px; margin: 0 auto; }
-.md-head__tag { font-size: 0.52rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.25rem; }
-.md-head__title {
-  font-family: var(--font-serif); font-size: clamp(3rem, 6vw, 5rem);
-  font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; margin-bottom: 1.25rem; white-space: pre-line;
-}
-.md-head__sub { font-size: 0.95rem; color: rgba(245,244,240,0.45); line-height: 1.8; max-width: 520px; margin: 0 auto 2rem; white-space: pre-line; }
-.md-head__meta { display: flex; align-items: center; justify-content: center; gap: 0.75rem; font-size: 0.56rem; letter-spacing: 0.12em; color: rgba(245,244,240,0.35); }
-.md-head__author { color: var(--accent); letter-spacing: 0.16em; text-transform: uppercase; }
-.md-head__sep { width: 2px; height: 2px; border-radius: 50%; background: rgba(245,244,240,0.2); }
-
-/* ─── Body ───────────────────────────────────────────────────────────────── */
-.post__body { max-width: 760px; margin: 0 auto; padding: 3rem 3rem 4rem; display: flex; flex-direction: column; overflow: visible; }
-
-/* ─── Block: Paragraph ───────────────────────────────────────────────────── */
-.pb-text { font-size: 1rem; line-height: 1.95; color: var(--dark); margin-bottom: 1.5rem; }
-
-/* ─── Block: Lead ────────────────────────────────────────────────────────── */
-.pb-lead { font-family: var(--font-serif); font-size: 1.15rem; font-weight: 400; line-height: 1.7; color: var(--dark); margin-bottom: 2.5rem; padding-left: 1.5rem; border-left: 2px solid var(--accent); }
-
-/* ─── Block: Heading ─────────────────────────────────────────────────────── */
-.pb-heading { font-family: var(--font-serif); font-size: 1.8rem; font-weight: 300; line-height: 1.15; letter-spacing: -0.02em; margin: 3.5rem 0 1.25rem; }
-
-/* ─── Block: Subheading ──────────────────────────────────────────────────── */
-.pb-subheading { font-family: var(--font-serif); font-size: 1.3rem; font-weight: 400; line-height: 1.2; margin: 2.5rem 0 1rem; }
-
-/* ─── Block: Pull quote ──────────────────────────────────────────────────── */
-.pb-pullquote { font-family: var(--font-serif); font-size: 1.9rem; font-weight: 200; font-style: italic; line-height: 1.25; color: var(--accent); margin: 3rem 0; padding: 0 0 0 2.5rem; border-left: 2px solid var(--accent); }
-.post--minimal-dark .pb-pullquote { border-left: none; padding-left: 0; text-align: center; }
-
-/* ─── Block: Blockquote ──────────────────────────────────────────────────── */
-.pb-blockquote { font-family: var(--font-serif); font-size: 1.4rem; font-weight: 200; font-style: italic; line-height: 1.45; margin: 2.5rem 0; padding: 1.5rem 2rem; border-left: 2px solid var(--accent); background: var(--paper); display: flex; flex-direction: column; gap: 0.75rem; }
-.pb-blockquote cite { font-size: 0.7rem; font-style: normal; letter-spacing: 0.12em; color: var(--muted); }
-
-/* ─── Block: Image ───────────────────────────────────────────────────────── */
-.pb-image { margin: 3rem 0; }
-.pb-image--breakout { margin: 3rem -4rem; }
-.pb-image img { width: 100%; display: block; }
-.pb-image figcaption { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.08em; padding: 0.75rem 0 0; text-align: right; }
-
-/* ─── Block: Full-bleed photo ────────────────────────────────────────────── */
-.pb-photo-full { margin: 5rem calc(-50vw + 50%); width: 100vw; }
-.pb-photo-full img { width: 100%; height: 90vh; object-fit: cover; display: block; }
-.pb-photo-full figcaption { font-size: 0.58rem; color: var(--muted); letter-spacing: 0.08em; padding: 0.75rem 3rem 0; text-align: right; }
-
-/* ─── Block: Photo pair ──────────────────────────────────────────────────── */
-.pb-photo-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 5rem calc(-50vw + 50%); width: 100vw; padding: 0 3rem; }
-.pb-photo-pair img { width: 100%; height: 70vh; object-fit: cover; display: block; }
-.pb-photo-pair__cap { grid-column: 1 / -1; font-size: 0.58rem; color: var(--muted); letter-spacing: 0.08em; padding-top: 0.65rem; text-align: right; }
-
-/* ─── Block: Divider ─────────────────────────────────────────────────────── */
-.pb-divider { text-align: center; font-size: 0.82rem; color: var(--muted); margin: 3rem 0; letter-spacing: 0.5em; }
-
-/* ─── Block: Inset / callout ─────────────────────────────────────────────── */
-.pb-inset { font-size: 0.88rem; line-height: 1.85; color: var(--muted); background: var(--paper); padding: 1.5rem 2rem; margin: 2rem 0; border-left: 2px solid var(--accent); }
-
-/* ─── Block: Q & A ───────────────────────────────────────────────────────── */
-.pb-qanda { margin-bottom: 2.5rem; }
-.pb-qanda__q { font-family: var(--font-serif); font-size: 1.05rem; font-weight: 500; line-height: 1.3; margin-bottom: 1rem; display: flex; align-items: flex-start; gap: 1rem; }
-.pb-qanda__q::before { content: 'Q'; flex-shrink: 0; font-family: var(--font-sans); font-size: 0.58rem; font-weight: 500; letter-spacing: 0.1em; color: var(--accent); background: var(--paper); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--subtle); margin-top: 0.05rem; }
-.pb-qanda__a { font-size: 0.92rem; line-height: 1.85; color: var(--dark); display: flex; align-items: flex-start; gap: 1rem; }
-.pb-qanda__a::before { content: 'A'; flex-shrink: 0; font-family: var(--font-sans); font-size: 0.58rem; font-weight: 500; background: var(--dark); color: #F5F4F0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; margin-top: 0.05rem; }
-
-/* ─── Minimal dark body overrides ────────────────────────────────────────── */
-.post--minimal-dark .pb-text     { color: rgba(245,244,240,0.65); }
-.post--minimal-dark .pb-lead     { color: rgba(245,244,240,0.8); border-left-color: var(--accent); }
-.post--minimal-dark .pb-heading  { color: #F5F4F0; }
-.post--minimal-dark .pb-subheading { color: #F5F4F0; }
-.post--minimal-dark .pb-blockquote { background: rgba(245,244,240,0.05); }
-.post--minimal-dark .pb-blockquote cite { color: rgba(245,244,240,0.35); }
-.post--minimal-dark .pb-divider  { color: rgba(245,244,240,0.15); }
-.post--minimal-dark .pb-inset    { background: rgba(245,244,240,0.05); color: rgba(245,244,240,0.5); }
-.post--minimal-dark .pb-qanda__q { color: rgba(245,244,240,0.9); }
-.post--minimal-dark .pb-qanda__q::before { background: rgba(245,244,240,0.06); border-color: rgba(245,244,240,0.12); }
-.post--minimal-dark .pb-qanda__a { color: rgba(245,244,240,0.65); }
-.post--minimal-dark .pb-photo-full figcaption { color: rgba(245,244,240,0.25); }
-.post--minimal-dark .pb-photo-pair__cap { color: rgba(245,244,240,0.25); }
-.post--minimal-dark .pb-image figcaption { color: rgba(245,244,240,0.25); }
-
-/* ─── Article footer ─────────────────────────────────────────────────────── */
-.post__footer { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--subtle); display: flex; justify-content: space-between; align-items: center; }
-.post--minimal-dark .post__footer { border-top-color: rgba(245,244,240,0.08); }
-.post__tag-pill { font-size: 0.54rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); padding: 0.35rem 0.75rem; border: 1px solid var(--subtle); display: inline-block; }
-.post--minimal-dark .post__tag-pill { color: rgba(245,244,240,0.3); border-color: rgba(245,244,240,0.1); }
-.post__share { font-family: var(--font-sans); font-size: 0.54rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); background: none; border: none; cursor: default; }
-.post--minimal-dark .post__share { color: rgba(245,244,240,0.3); }
-
-/* ─── Author bio ─────────────────────────────────────────────────────────── */
-.author-bio { background: var(--paper); border-top: 1px solid var(--subtle); padding: 3rem; }
-.post--minimal-dark .author-bio { background: rgba(245,244,240,0.04); border-top-color: rgba(245,244,240,0.08); }
-.author-bio__inner { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: auto 1fr; gap: 1.5rem; align-items: start; }
-.author-bio__avatar { width: 56px; height: 56px; border-radius: 50%; overflow: hidden; background: var(--subtle); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.author-bio__avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.author-bio__initials { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 300; color: var(--muted); }
-.author-bio__name { font-family: var(--font-serif); font-size: 1.1rem; font-weight: 400; margin-bottom: 0.4rem; }
-.post--minimal-dark .author-bio__name { color: rgba(245,244,240,0.9); }
-.author-bio__text { font-size: 0.8rem; color: var(--muted); line-height: 1.7; }
-.post--minimal-dark .author-bio__text { color: rgba(245,244,240,0.4); }
+/* ─── Confirm modals ─────────────────────────────────────────────────────── */
+.confirm-modal { display: flex; flex-direction: column; gap: 1.2rem; }
+.confirm-modal p, .confirm-modal__body { color: var(--muted); font-size: 0.82rem; line-height: 1.65; margin: 0; }
+.confirm-modal__actions { display: flex; justify-content: flex-end; gap: 0.65rem; }
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
-  .dock-fields { grid-template-columns: 1fr 1fr; }
-  .field--span2, .field--span3 { grid-column: span 2; }
-  .photo-tools { grid-template-columns: 1fr; }
-  .block-row { grid-template-columns: 22px 72px 1fr auto; }
-  .sp-head { grid-template-columns: 1fr; min-height: auto; }
-  .sp-head__img { min-height: 50svh; }
-  .sp-head__content { padding: 6rem 2.5rem 3rem; }
-  .pb-image--breakout { margin: 2.5rem 0; }
-}
-@media (max-width: 620px) {
-  .dock-fields { grid-template-columns: 1fr; }
-  .field--span2, .field--span3 { grid-column: span 1; }
-  .visibility-toggle { grid-template-columns: 1fr; }
-  .visibility-toggle__option {
-    border-left: 0;
-    border-top: 1px solid var(--subtle);
+  .editor { flex-direction: column; }
+  .tray {
+    width: 100%; max-width: none; position: static; height: auto;
+    border-right: 0; border-bottom: 1px solid var(--subtle);
   }
-  .visibility-toggle__option:first-child { border-top: 0; }
-  .block-row { grid-template-columns: 22px 1fr auto; }
-  .block-row__badge { display: none; }
-  .field-pair { grid-template-columns: 1fr; }
-  .std-head, .post__body { padding-left: 1.5rem; padding-right: 1.5rem; }
-  .std-hero { padding-left: 1.5rem; padding-right: 1.5rem; }
-  .md-head { padding: 7rem 1.5rem 4rem; }
-  .df-head__inner { padding: 0 1.5rem 2.5rem; }
-  .pb-photo-full img { height: 60vh; }
-  .pb-photo-pair { padding: 0 1.5rem; }
-  .pb-photo-pair img { height: 50vh; }
-  .author-bio { padding: 2rem 1.5rem; }
-  .author-bio__inner { grid-template-columns: 1fr; }
-  .post__footer { flex-direction: column; align-items: flex-start; gap: 1rem; }
+  .tray-resize-handle { display: none; }
+  .canvas { padding-bottom: 24rem; }
+  .context-dock { width: calc(100vw - 2rem); right: 1rem; left: 1rem; }
+  .dock-grid { grid-template-columns: 1fr; }
 }
 </style>
 
 <style>
-/* ─── Block picker modal (global — inside Teleport) ─────────────────────────
-   All classes are prefixed .bpm- / .bpv- to avoid collisions.           */
-
+/* ─── Block picker modal (global — inside Teleport) ──────────────────────── */
 .bpm-overlay {
-  position: fixed; inset: 0; z-index: 9000;
-  background: rgba(12,12,10,0.72);
-  display: flex; align-items: center; justify-content: center;
-  padding: 1.5rem;
+  position: fixed; inset: 0; z-index: 9000; background: rgba(12, 12, 10, 0.72);
+  display: flex; align-items: center; justify-content: center; padding: 1.5rem;
 }
-
 .bpm-panel {
-  background: #1A1A18;
-  width: 100%; max-width: 900px; max-height: 88vh;
-  display: flex; flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+  background: #1A1A18; width: 100%; max-width: 720px; max-height: 88vh;
+  display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6);
 }
-
-/* ─── Header ─────────────────────────────────────────────────────────────── */
 .bpm-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 1.25rem 1.75rem;
-  border-bottom: 1px solid rgba(245,244,240,0.08);
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.75rem;
+  border-bottom: 1px solid rgba(245, 244, 240, 0.08); flex-shrink: 0;
 }
-.bpm-title {
-  font-family: var(--font-serif); font-size: 1.05rem; font-weight: 300;
-  color: rgba(245,244,240,0.9); letter-spacing: -0.01em;
-}
-.bpm-close {
-  background: none; border: none; cursor: pointer;
-  color: rgba(245,244,240,0.3); font-size: 0.85rem; line-height: 1;
-  padding: 0.25rem; transition: color 0.15s;
-}
-.bpm-close:hover { color: rgba(245,244,240,0.9); }
-
-/* ─── Body ───────────────────────────────────────────────────────────────── */
-.bpm-body {
-  overflow-y: auto; padding: 1.5rem 1.75rem 2rem;
-  display: flex; flex-direction: column; gap: 2rem;
-}
-
-/* ─── Group ──────────────────────────────────────────────────────────────── */
-.bpm-group-label {
-  font-size: 0.44rem; letter-spacing: 0.26em; text-transform: uppercase;
-  color: rgba(245,244,240,0.25); margin-bottom: 0.9rem;
-}
-.bpm-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-  gap: 0.65rem;
-}
-
-/* ─── Card ───────────────────────────────────────────────────────────────── */
+.bpm-title { font-family: var(--font-serif); font-size: 1.05rem; font-weight: 300; color: rgba(245, 244, 240, 0.9); }
+.bpm-close { background: none; border: none; cursor: pointer; color: rgba(245, 244, 240, 0.3); font-size: 0.85rem; padding: 0.25rem; transition: color 0.15s; }
+.bpm-close:hover { color: rgba(245, 244, 240, 0.9); }
+.bpm-body { overflow-y: auto; padding: 1.5rem 1.75rem 2rem; display: flex; flex-direction: column; gap: 2rem; }
+.bpm-group-label { font-size: 0.44rem; letter-spacing: 0.26em; text-transform: uppercase; color: rgba(245, 244, 240, 0.25); margin-bottom: 0.9rem; }
+.bpm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.65rem; }
 .bpm-card {
-  display: flex; flex-direction: column;
-  background: rgba(245,244,240,0.03);
-  border: 1px solid rgba(245,244,240,0.09);
-  cursor: pointer; text-align: left;
-  transition: border-color 0.15s, background 0.15s;
-  padding: 0;
-  font-family: var(--font-sans);
+  display: flex; flex-direction: column; background: rgba(245, 244, 240, 0.03);
+  border: 1px solid rgba(245, 244, 240, 0.09); cursor: pointer; text-align: left;
+  transition: border-color 0.15s, background 0.15s; padding: 0; font-family: var(--font-sans);
 }
-.bpm-card:hover {
-  border-color: var(--accent);
-  background: rgba(245,244,240,0.06);
-}
-
-/* ─── Preview area ───────────────────────────────────────────────────────── */
-.bpm-preview {
-  background: #F5F4F0;
-  height: 88px;
-  display: flex; align-items: center; justify-content: center;
-  padding: 14px 16px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-/* ─── Card info ──────────────────────────────────────────────────────────── */
-.bpm-card-info {
-  display: flex; flex-direction: column; gap: 0.3rem;
-  padding: 0.75rem 0.9rem 0.85rem;
-  border-top: 1px solid rgba(245,244,240,0.08);
-}
-.bpm-card-name {
-  font-size: 0.48rem; letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--accent); display: block;
-}
-.bpm-card-desc {
-  font-size: 0.72rem; color: rgba(245,244,240,0.45);
-  line-height: 1.55; display: block;
-}
-
-/* ─── Preview element helpers ────────────────────────────────────────────── */
-
-/* Generic text-bar lines */
-.bpv-lines { display: flex; flex-direction: column; gap: 5px; width: 100%; }
-.bpv-l { height: 4px; background: #C8C4BC; border-radius: 2px; }
-.bpv-l.l-full   { width: 100%; }
-.bpv-l.l-3q     { width: 75%; }
-.bpv-l.l-half   { width: 50%; }
-.bpv-l.l-quarter{ width: 28%; }
-
-/* Paragraph */
-/* (uses .bpv-lines directly) */
-
-/* Lead */
-.bpv-lead-wrap {
-  display: flex; flex-direction: column; gap: 5px; width: 100%;
-  border-left: 2.5px solid var(--accent); padding-left: 10px;
-}
-
-/* Heading */
-.bpv-heading {
-  font-family: var(--font-serif); font-size: 1.15rem; font-weight: 300;
-  color: #1A1A18; line-height: 1.1; letter-spacing: -0.02em;
-  width: 100%;
-}
-
-/* Subheading */
-.bpv-subheading {
-  font-family: var(--font-serif); font-size: 0.85rem; font-weight: 400;
-  color: #1A1A18; width: 100%;
-}
-
-/* Pull quote */
-.bpv-pullquote {
-  font-family: var(--font-serif); font-size: 0.68rem; font-weight: 200;
-  font-style: italic; line-height: 1.35; color: var(--accent);
-  border-left: 2.5px solid var(--accent); padding-left: 10px;
-  width: 100%;
-}
-
-/* Blockquote */
-.bpv-blockquote {
-  display: flex; flex-direction: column; gap: 5px; width: 100%;
-  border-left: 2.5px solid var(--accent); padding-left: 10px;
-  background: rgba(245,244,240,0.6); padding: 8px 10px;
-}
-.bpv-bq-line { background: #A8A49C; }
-.bpv-bq-cite { background: #C8C4BC; margin-top: 3px; }
-
-/* Callout / inset */
-.bpv-inset {
-  display: flex; flex-direction: column; gap: 5px; width: 100%;
-  border-left: 2.5px solid var(--accent); padding: 8px 10px;
-  background: rgba(200,196,188,0.35);
-}
-
-/* Q & A */
-.bpv-qanda { display: flex; flex-direction: column; gap: 6px; width: 100%; }
-.bpv-qa-row { display: flex; align-items: center; gap: 7px; }
-.bpv-qa-badge {
-  font-family: var(--font-sans); font-size: 0.44rem; font-weight: 600;
-  width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.bpv-qa-q {
-  color: var(--accent); border: 1px solid #C8C4BC; background: #F0EDE8;
-}
-.bpv-qa-a { color: #F5F4F0; background: #2A2A28; }
-
-/* Image */
-.bpv-image { display: flex; flex-direction: column; gap: 6px; width: 100%; }
-.bpv-img-rect { background: #C8C4BC; border-radius: 1px; flex: 1; min-height: 44px; }
-.bpv-cap { background: #D8D4CC !important; }
-
-/* Full bleed photo */
-.bpv-photo-full {
-  width: calc(100% + 32px); margin: -14px -16px;
-  height: 100%; background: #B8B4AC;
-}
-
-/* Photo pair */
-.bpv-photo-pair {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
-  width: 100%; height: 60px;
-}
-
-/* Divider */
-.bpv-divider {
-  font-family: var(--font-sans); font-size: 0.65rem; color: #A8A49C;
-  letter-spacing: 0.4em; text-align: center; width: 100%;
-}
-
+.bpm-card:hover { border-color: var(--accent); background: rgba(245, 244, 240, 0.06); }
+.bpm-card-info { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.85rem 0.95rem 0.95rem; }
+.bpm-card-name { font-size: 0.48rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
+.bpm-card-desc { font-size: 0.72rem; color: rgba(245, 244, 240, 0.45); line-height: 1.55; }
 @media (max-width: 640px) {
-  .bpm-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .bpm-grid { grid-template-columns: 1fr; }
   .bpm-panel { max-height: 92vh; }
 }
 </style>
