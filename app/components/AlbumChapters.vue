@@ -198,6 +198,7 @@ onUnmounted(() => {
         :key="i"
         class="chapter"
         :data-chapter-i="i"
+        :data-chapter="ch.title || undefined"
       >
         <template v-if="ch.title">
           <div

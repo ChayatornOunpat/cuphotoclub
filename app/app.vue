@@ -60,5 +60,6 @@ useSeoMeta({
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
+    <SiteScrollbar />
   </div>
 </template>

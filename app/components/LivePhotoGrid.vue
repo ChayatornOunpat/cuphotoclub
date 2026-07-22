@@ -754,7 +754,7 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(16, 1fr);
   grid-auto-rows: 70px;
   gap: 3px;
-  background: var(--body-bg, #0c0c0a);
+  background: var(--body-bg);
   /* Height is a pure function of rows/rowHeight (see gridHeight) — it never
      depends on which shapes happen to be in play, so merges/splits never
      move the container's footprint. overflow:hidden is a cushion in case a
@@ -767,7 +767,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   perspective: 800px;
   cursor: pointer;
-  background: var(--body-bg, #0c0c0a);
+  background: var(--body-bg);
 }
 .photogrid__cell:hover,
 .photogrid__cell:focus-visible {
@@ -848,7 +848,7 @@ onBeforeUnmount(() => {
      this transition never competes with rotateY. Composing scale after the
      face's own rotateY keeps backface-visibility working. */
   transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
-  background: var(--body-bg, #0c0c0a);
+  background: var(--body-bg);
   /* Invisible until the photo is fetched + decoded (is-loaded), so a face
      mid-download never paints as a blank tile. */
   opacity: 0;

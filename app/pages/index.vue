@@ -239,7 +239,7 @@ useSeoMeta({
 
     <SiteNav :links="localizedSite.nav.links" :light="navLight" />
 
-    <SiteHero :hero="heroWithImage ?? localizedSite.hero" @ready="onHeroReady" />
+    <SiteHero :hero="heroWithImage ?? localizedSite.hero" :data-chapter="t('nav.logo')" @ready="onHeroReady" />
 
     <!-- Signature pink line: dark → light transition -->
     <div class="cut-line" />
@@ -264,13 +264,13 @@ useSeoMeta({
       </div>
     </section>
 
-    <FeaturedWork :albums="featuredAlbums" :seed="featuredSeed" />
+    <FeaturedWork :albums="featuredAlbums" :seed="featuredSeed" :data-chapter="t('home.featuredWork')" />
 
-    <StoriesSection :lead="leadStory" :items="smallStories" />
+    <StoriesSection :lead="leadStory" :items="smallStories" :data-chapter="t('home.latest')" />
 
-    <HistorySection :history="localizedSite.history" />
+    <HistorySection :history="localizedSite.history" :data-chapter="t('nav.history')" />
 
-    <AboutSection :about="localizedSite.about" />
+    <AboutSection :about="localizedSite.about" :data-chapter="t('nav.about')" />
 
     <Teleport to="body">
       <div

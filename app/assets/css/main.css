@@ -33,6 +33,26 @@
 
 html { scroll-behavior: smooth; overflow-x: hidden; }
 
+/* ─── scroll handle ─────────────────────── */
+/* The page scrollbar is replaced by the bespoke <SiteScrollbar> overlay — a
+   sharp accent handle that auto-hides (see components/SiteScrollbar.vue). Hide
+   only the *root* scrollbar so nested scroll areas keep their own. */
+html { scrollbar-width: none; }
+html::-webkit-scrollbar { display: none; }
+
+/* Nested scroll areas (admin tables, modals): slim, sharp (no radius per the
+   shape language), muted ink that warms to accent on hover. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: rgba(26, 25, 24, 0.22);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--accent); }
+::-webkit-scrollbar-corner { background: transparent; }
+
 html:lang(th) {
   --font-serif: 'Noto Serif Thai', serif;
   --font-sans: 'Noto Serif Thai', serif;
