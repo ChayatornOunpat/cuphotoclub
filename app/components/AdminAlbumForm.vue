@@ -1267,6 +1267,30 @@ const isEssay = computed(() => form.style === 'essay')
 const isChapters = computed(() => form.style === 'chapters')
 const isSticky = computed(() => form.style === 'sticky')
 
+// Essay palette — compact "Add cell" popover: pick the type once, then the
+// width, instead of a 3×4 grid of pre-multiplied chips. Collapses to a single
+// button at rest so the tray gives more room to the row list below.
+const addCellOpen = ref(false)
+const addCellType = ref<CellType>('image')
+const addCellEl = ref<HTMLElement | null>(null)
+const CELL_TYPES: { value: CellType, labelKey: string, titleKey: string }[] = [
+  { value: 'image', labelKey: 'adminForm.cellTypeImage', titleKey: 'adminForm.paletteAddImage' },
+  { value: 'text', labelKey: 'adminForm.cellTypeText', titleKey: 'adminForm.paletteAddText' },
+  { value: 'pad', labelKey: 'adminForm.palettePad', titleKey: 'adminForm.paletteAddPad' }
+]
+const addCellTitleKey = computed(() => CELL_TYPES.find(c => c.value === addCellType.value)!.titleKey)
+function onAddCellOutside(e: PointerEvent) {
+  if (!addCellEl.value?.contains(e.target as Node)) addCellOpen.value = false
+}
+watch(addCellOpen, (open) => {
+  if (!import.meta.client) return
+  if (open) document.addEventListener('pointerdown', onAddCellOutside)
+  else document.removeEventListener('pointerdown', onAddCellOutside)
+})
+onUnmounted(() => {
+  if (import.meta.client) document.removeEventListener('pointerdown', onAddCellOutside)
+})
+
 // Style picker modal. Drop real screenshots into
 // public/admin/album-style-previews/{style}-{1,2,3}.webp and the picker will use them.
 const STYLE_OPTIONS = [
@@ -1481,55 +1505,58 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 
       <!-- Palette -->
       <div class="tray__section tray__section--palette">
-        <!-- Essay: full span palette -->
+        <!-- Essay: compact "Add cell" popover — pick the type once, then the
+             width. A single button at rest; the type toggle + width row unfold
+             on demand. Each width chip previews its proportion of the 6-col row. -->
         <template v-if="isEssay">
-          <p class="tray__label">{{ t('adminForm.cellTypeImage') }}</p>
-          <div class="palette">
+          <div ref="addCellEl" class="addcell" @keydown.escape="addCellOpen = false">
             <button
-              v-for="s in SPANS"
-              :key="s"
               type="button"
-              class="palette__chip palette__chip--image"
-              draggable="true"
-              :title="t('adminForm.paletteAddImage', { span: s })"
-              @click="addCellFromPalette('image', s)"
-              @dragstart.stop="onPaletteDragStart('image', s)"
-              @dragend.stop="onPaletteDragEnd"
+              class="addcell__trigger"
+              :class="{ 'is-open': addCellOpen }"
+              :aria-expanded="addCellOpen"
+              @click="addCellOpen = !addCellOpen"
             >
-              <span class="chip__type">img</span><span class="chip__span">{{ s }}</span>
+              <Icon name="heroicons:plus" class="addcell__icon" />
+              <span>{{ t('adminForm.paletteAdd') }}</span>
             </button>
-          </div>
-          <p class="tray__label tray__label--gap">{{ t('adminForm.cellTypeText') }}</p>
-          <div class="palette">
-            <button
-              v-for="s in SPANS"
-              :key="s"
-              type="button"
-              class="palette__chip palette__chip--text"
-              draggable="true"
-              :title="t('adminForm.paletteAddText', { span: s })"
-              @click="addCellFromPalette('text', s)"
-              @dragstart.stop="onPaletteDragStart('text', s)"
-              @dragend.stop="onPaletteDragEnd"
-            >
-              <span class="chip__type">txt</span><span class="chip__span">{{ s }}</span>
-            </button>
-          </div>
-          <p class="tray__label tray__label--gap">{{ t('adminForm.palettePad') }}</p>
-          <div class="palette">
-            <button
-              v-for="s in SPANS"
-              :key="s"
-              type="button"
-              class="palette__chip palette__chip--pad"
-              draggable="true"
-              :title="t('adminForm.paletteAddPad', { span: s })"
-              @click="addCellFromPalette('pad', s)"
-              @dragstart.stop="onPaletteDragStart('pad', s)"
-              @dragend.stop="onPaletteDragEnd"
-            >
-              <span class="chip__type">pad</span><span class="chip__span">{{ s }}</span>
-            </button>
+
+            <div v-if="addCellOpen" class="addcell__pop">
+              <div class="addcell__seg" role="tablist">
+                <button
+                  v-for="ct in CELL_TYPES"
+                  :key="ct.value"
+                  type="button"
+                  role="tab"
+                  :aria-selected="addCellType === ct.value"
+                  class="addcell__seg-btn"
+                  :class="[`addcell__seg-btn--${ct.value}`, { 'is-active': addCellType === ct.value }]"
+                  @click="addCellType = ct.value"
+                >
+                  <span class="addcell__dot" :class="`addcell__dot--${ct.value}`" />
+                  {{ t(ct.labelKey) }}
+                </button>
+              </div>
+
+              <div class="addcell__widths" :class="`addcell__widths--${addCellType}`">
+                <button
+                  v-for="s in SPANS"
+                  :key="s"
+                  type="button"
+                  class="addcell__wchip"
+                  draggable="true"
+                  :title="t(addCellTitleKey, { span: s })"
+                  @click="addCellFromPalette(addCellType, s)"
+                  @dragstart.stop="onPaletteDragStart(addCellType, s)"
+                  @dragend.stop="onPaletteDragEnd"
+                >
+                  <span class="addcell__wbar">
+                    <i v-for="c in 6" :key="c" class="addcell__wseg" :class="{ on: c <= s }" />
+                  </span>
+                  <span class="addcell__wn">{{ s }}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </template>
 
@@ -2205,35 +2232,96 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   letter-spacing: 0;
 }
 
-/* Palette */
-.palette {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.25rem;
-}
-.palette__chip {
+/* Palette — essay: compact "Add cell" popover (pick type once, then width) */
+.addcell__trigger {
+  width: 100%;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.15rem;
-  padding: 0.4rem 0.2rem;
-  border: 1px solid var(--subtle);
-  background: var(--body-bg);
-  cursor: grab;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--subtle));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--body-bg));
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.palette__chip--image { border-color: color-mix(in srgb, var(--accent) 30%, var(--subtle)); }
-.palette__chip--text  { border-color: color-mix(in srgb, #6b7fd4 30%, var(--subtle)); }
-.palette__chip--pad   { border-color: var(--subtle); border-style: dashed; }
-.palette__chip:hover { background: #fff; }
-.palette__chip--image:hover { border-color: var(--accent); }
-.palette__chip--text:hover  { border-color: #6b7fd4; }
-.palette__chip--pad:hover   { border-color: var(--muted); border-style: solid; }
-.chip__type { font-size: 0.38rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-.chip__span { font-size: 0.7rem; font-weight: 500; line-height: 1; color: var(--dark); }
-.palette__chip--image .chip__span { color: var(--accent); }
-.palette__chip--text  .chip__span { color: #6b7fd4; }
-.palette__chip--pad   .chip__span { color: var(--muted); }
+.addcell__trigger:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--body-bg)); }
+.addcell__trigger.is-open { border-style: solid; background: color-mix(in srgb, var(--accent) 9%, var(--body-bg)); }
+.addcell__icon { width: 0.85rem; height: 0.85rem; flex-shrink: 0; }
+
+.addcell__pop {
+  margin-top: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid var(--subtle);
+  border-radius: 8px;
+  background: var(--body-bg);
+}
+
+/* type toggle */
+.addcell__seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 3px;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  border-radius: 7px;
+  margin-bottom: 0.5rem;
+}
+.addcell__seg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.15rem;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.addcell__seg-btn.is-active { background: var(--body-bg); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.addcell__seg-btn--image.is-active { color: var(--accent); }
+.addcell__seg-btn--text.is-active  { color: #6b7fd4; }
+.addcell__seg-btn--pad.is-active   { color: var(--dark); }
+.addcell__dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.addcell__dot--image { background: var(--accent); }
+.addcell__dot--text  { background: #6b7fd4; }
+.addcell__dot--pad   { background: var(--muted); }
+
+/* width row — chip fill previews the span's share of the 6-col row */
+.addcell__widths { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.28rem; }
+.addcell__wchip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.4rem 0.35rem;
+  border: 1px solid var(--subtle);
+  border-radius: 6px;
+  background: var(--body-bg);
+  cursor: grab;
+  transition: border-color 0.12s, transform 0.1s;
+}
+.addcell__wchip:hover { transform: translateY(-1px); }
+.addcell__widths--image .addcell__wchip:hover { border-color: var(--accent); }
+.addcell__widths--text  .addcell__wchip:hover { border-color: #6b7fd4; }
+.addcell__widths--pad   .addcell__wchip { border-style: dashed; }
+.addcell__widths--pad   .addcell__wchip:hover { border-color: var(--muted); border-style: solid; }
+.addcell__wbar { display: flex; gap: 1.5px; height: 9px; }
+.addcell__wseg { flex: 1; border-radius: 1.5px; background: color-mix(in srgb, var(--muted) 20%, transparent); }
+.addcell__widths--image .addcell__wseg.on { background: var(--accent); }
+.addcell__widths--text  .addcell__wseg.on { background: #6b7fd4; }
+.addcell__widths--pad   .addcell__wseg.on { background: var(--muted); }
+.addcell__wn { font-size: 0.62rem; font-weight: 500; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* Palette — fixed styles (sticky/contact/darkroom/chapters): plain action
    list instead of essay's span-grid chips */

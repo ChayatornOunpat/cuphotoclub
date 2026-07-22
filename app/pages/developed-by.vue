@@ -4,6 +4,7 @@ definePageMeta({ layout: 'site' })
 const { t } = useI18n()
 
 const developerUrl = 'https://github.com/ILFforever'
+const siteRepoUrl = 'https://github.com/ChayatornOunpat/cuphotoclub'
 const developerEmail = 'hammymukura@gmail.com'
 const developerPhone = '097-921-7776'
 const isContactVisible = ref(false)
@@ -15,13 +16,21 @@ const isTilting = ref(false)
 const isTiltResetting = ref(false)
 let tiltResetTimer: ReturnType<typeof setTimeout> | undefined
 
-const cardTiltStyle = computed(() => ({
-  '--tilt-x': `${tiltX.value}deg`,
-  '--tilt-y': `${tiltY.value}deg`,
-  '--glare-x': `${glareX.value}%`,
-  '--glare-y': `${glareY.value}%`,
-  '--glare-opacity': isTilting.value ? '1' : '0'
-}))
+const cardTiltStyle = computed(() => {
+  const lift = Math.min(Math.hypot(tiltX.value, tiltY.value) / 7, 1)
+
+  return {
+    '--tilt-x': `${tiltX.value}deg`,
+    '--tilt-y': `${tiltY.value}deg`,
+    '--glare-x': `${glareX.value}%`,
+    '--glare-y': `${glareY.value}%`,
+    '--glare-opacity': isTilting.value ? '1' : '0',
+    '--shadow-x': `${(10 - tiltY.value * 1.7).toFixed(2)}px`,
+    '--shadow-y': `${(10 + tiltX.value * 1.7).toFixed(2)}px`,
+    '--shadow-blur': `${(1.5 + lift * 13).toFixed(1)}px`,
+    '--shadow-opacity': `${(0.92 - lift * 0.58).toFixed(2)}`
+  }
+})
 
 function handleCardPointerMove(event: PointerEvent) {
   if (event.pointerType === 'touch') {
@@ -37,8 +46,8 @@ function handleCardPointerMove(event: PointerEvent) {
   const x = Math.min(Math.max((event.clientX - rect.left) / rect.width, 0), 1)
   const y = Math.min(Math.max((event.clientY - rect.top) / rect.height, 0), 1)
 
-  tiltX.value = (0.5 - y) * 4.6
-  tiltY.value = (x - 0.5) * 5.8
+  tiltX.value = (0.5 - y) * 9
+  tiltY.value = (x - 0.5) * 11
   glareX.value = x * 100
   glareY.value = y * 100
   isTilting.value = true
@@ -117,7 +126,7 @@ useSeoMeta({
               <div class="dev-card__bottom">
                 <p>{{ t('developedBy.madeWithLove') }}</p>
                 <a
-                  :href="developerUrl"
+                  :href="siteRepoUrl"
                   target="_blank"
                   rel="noopener noreferrer"
                   :tabindex="isContactVisible ? -1 : undefined"
@@ -153,7 +162,7 @@ useSeoMeta({
               <div class="dev-card__bottom">
                 <p>{{ t('developedBy.contactNote') }}</p>
                 <a
-                  :href="developerUrl"
+                  :href="siteRepoUrl"
                   target="_blank"
                   rel="noopener noreferrer"
                   :tabindex="isContactVisible ? undefined : -1"
@@ -224,8 +233,8 @@ useSeoMeta({
   background:
     radial-gradient(
       circle at var(--glare-x, 50%) var(--glare-y, 50%),
-      color-mix(in srgb, white 22%, transparent) 0,
-      transparent 36%
+      color-mix(in srgb, white 34%, transparent) 0,
+      transparent 46%
     );
   opacity: var(--glare-opacity, 0);
   transition: opacity 220ms ease;
@@ -236,6 +245,31 @@ useSeoMeta({
 }
 
 .dev-card-shell--resetting .dev-card-tilt {
+  transition-duration: 260ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dev-card-shell::after {
+  position: absolute;
+  inset: var(--tilt-hit-padding, 0);
+  z-index: -1;
+  content: '';
+  background: var(--dark);
+  opacity: var(--shadow-opacity, 0.92);
+  filter: blur(var(--shadow-blur, 1.5px));
+  transform: translate(var(--shadow-x, 10px), var(--shadow-y, 10px));
+  transition:
+    transform 420ms cubic-bezier(0.19, 1, 0.22, 1),
+    opacity 420ms ease,
+    filter 420ms ease;
+  pointer-events: none;
+}
+
+.dev-card-shell--tilting::after {
+  transition-duration: 90ms;
+}
+
+.dev-card-shell--resetting::after {
   transition-duration: 260ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -261,8 +295,12 @@ useSeoMeta({
   background:
     linear-gradient(90deg, transparent 0, transparent calc(100% - 9.5rem), color-mix(in srgb, var(--accent) 8%, transparent) calc(100% - 9.5rem)),
     var(--paper);
+  --face-emboss:
+    inset 0 3px 0 color-mix(in srgb, white 78%, transparent),
+    inset 0 -6px 12px color-mix(in srgb, var(--dark) 16%, transparent),
+    inset 0 40px 60px -50px color-mix(in srgb, white 60%, transparent);
   border: 1px solid var(--dark);
-  box-shadow: 10px 10px 0 var(--dark);
+  box-shadow: var(--face-emboss);
   backface-visibility: hidden;
   overflow: hidden;
 }
@@ -288,7 +326,13 @@ useSeoMeta({
   inset: 1.2rem;
   pointer-events: none;
   content: '';
-  border: 1px solid color-mix(in srgb, var(--dark) 12%, transparent);
+  border-color: color-mix(in srgb, var(--dark) 22%, transparent)
+    color-mix(in srgb, var(--dark) 10%, transparent)
+    color-mix(in srgb, var(--dark) 10%, transparent)
+    color-mix(in srgb, var(--dark) 22%, transparent);
+  border-style: solid;
+  border-width: 1px;
+  box-shadow: 1px 1px 0 color-mix(in srgb, white 78%, transparent);
 }
 
 .dev-card__topline,
@@ -322,7 +366,6 @@ useSeoMeta({
   align-self: center;
   background: var(--body-bg);
   border: 1px solid var(--dark);
-  box-shadow: 5px 5px 0 color-mix(in srgb, var(--dark) 18%, transparent);
   overflow: hidden;
 }
 
@@ -530,7 +573,7 @@ useSeoMeta({
 
   .dev-card__face {
     padding: 1.2rem;
-    box-shadow: 6px 6px 0 var(--dark);
+    box-shadow: var(--face-emboss);
   }
 
   .dev-card__face::after {
