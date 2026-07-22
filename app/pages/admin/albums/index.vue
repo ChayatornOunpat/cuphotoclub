@@ -319,8 +319,10 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.9rem;
-  height: 1.9rem;
+  /* Match the visibility pill's height (and stay square) instead of a fixed
+     size, so the two never drift apart when the pill's padding/font changes. */
+  align-self: stretch;
+  aspect-ratio: 1;
   flex-shrink: 0;
   border: 1px solid var(--subtle);
   background: transparent;
@@ -368,7 +370,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
   padding: 0.38rem 0.52rem;
 }
 .card__facts .pill-row { border: 0; padding: 0; background: none; }
-.card__facts .icon-chip { width: 1.6rem; height: 1.6rem; }
+/* icon-chip auto-matches the card pill height via align-self: stretch above */
 .card__facts .icon-chip__icon { width: 0.72rem; height: 0.72rem; }
 .card__actions { display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.8rem; }
 .card__actions .link { margin-left: 0; }

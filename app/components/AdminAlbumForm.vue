@@ -2257,9 +2257,12 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .addcell__pop {
   margin-top: 0.4rem;
   padding: 0.5rem;
-  border: 1px solid var(--subtle);
+  border: 1px solid color-mix(in srgb, var(--subtle) 70%, transparent);
   border-radius: 8px;
-  background: var(--body-bg);
+  /* Elevated near-white surface + soft shadow so the popover reads as a layer
+     that opened over the tray, rather than sharing the tray's own colour. */
+  background: #fff;
+  box-shadow: 0 0.5rem 1.4rem color-mix(in srgb, var(--dark) 12%, transparent);
 }
 
 /* type toggle */
@@ -2289,7 +2292,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
-.addcell__seg-btn.is-active { background: var(--body-bg); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.addcell__seg-btn.is-active { background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14); }
 .addcell__seg-btn--image.is-active { color: var(--accent); }
 .addcell__seg-btn--text.is-active  { color: #6b7fd4; }
 .addcell__seg-btn--pad.is-active   { color: var(--dark); }
