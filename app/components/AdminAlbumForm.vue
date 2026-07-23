@@ -66,6 +66,52 @@ function blank(): AlbumInput {
 
 const form = reactive<AlbumInput>(props.initial ? normalizeInitialAlbum(props.initial) : blank())
 const publishedMatchesEvent = ref(!!form.date && form.published === form.date)
+
+// On-device EXIF date detection. Reads capture dates from the original photos
+// (before upload/compression strips EXIF) and fills the event date range.
+const { scanning: exifScanning, detect: detectExifRange } = useExifDateRange()
+const exifDateInput = ref<HTMLInputElement | null>(null)
+const exifDetectStatus = ref('')
+// Detected range awaiting confirmation because the date field is already set.
+const exifPending = ref<{ start: string, end: string, withDate: number } | null>(null)
+
+function chooseExifPhotos() {
+  if (exifScanning.value) return
+  exifDetectStatus.value = ''
+  exifDateInput.value?.click()
+}
+
+function applyExifRange(range: { start: string, end: string, withDate: number }) {
+  form.date = range.start
+  form.dateEnd = range.end && range.end !== range.start ? range.end : ''
+  exifDetectStatus.value = t('adminForm.exifDetectResult', { count: range.withDate })
+}
+
+async function onExifPhotosPicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = input.files
+  if (!files?.length) return
+  const result = await detectExifRange(files)
+  input.value = '' // allow re-selecting the same files
+  if (!result.start) {
+    exifDetectStatus.value = t('adminForm.exifDetectNone')
+    return
+  }
+  // Only overwrite an existing date after the user confirms.
+  if (form.date) exifPending.value = { start: result.start, end: result.end, withDate: result.withDate }
+  else applyExifRange(result)
+}
+
+function confirmExifOverwrite() {
+  if (exifPending.value) applyExifRange(exifPending.value)
+  exifPending.value = null
+}
+
+const exifPendingRangeLabel = computed(() => {
+  const p = exifPending.value
+  if (!p) return ''
+  return p.end && p.end !== p.start ? `${p.start} → ${p.end}` : p.start
+})
 const uploadedMediaKeys = ref<string[]>([])
 const mediaLoading = ref(false)
 const photoManagerOpen = ref(false)
@@ -1804,6 +1850,25 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               <span class="date-range__sep" aria-hidden="true">→</span>
               <UiDateInput ref="dateEndInput" v-model="form.dateEnd" :disabled="!form.date" @focus="activeField = 'dateEnd'" />
             </div>
+            <button
+              type="button"
+              class="exif-detect-btn"
+              :disabled="exifScanning"
+              @click="chooseExifPhotos"
+            >
+              <Icon :name="exifScanning ? 'heroicons:arrow-path' : 'heroicons:sparkles'" class="exif-detect-btn__icon" :class="{ 'is-spinning': exifScanning }" />
+              <span>{{ exifScanning ? t('adminForm.exifDetecting') : t('adminForm.exifDetect') }}</span>
+            </button>
+            <p class="exif-detect-hint">{{ exifDetectStatus || t('adminForm.exifDetectHint') }}</p>
+            <input
+              ref="exifDateInput"
+              type="file"
+              accept="image/*,.heic,.heif"
+              multiple
+              class="sr-only"
+              tabindex="-1"
+              @change="onExifPhotosPicked"
+            >
           </div>
           <div class="field field--location" :class="{ active: activeField === 'location' }">
             <label>{{ t('adminForm.location') }} <span class="opt">{{ t('adminForm.locationOptional') }}</span></label>
@@ -1869,6 +1934,20 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
       <div class="row-delete-confirm__actions">
         <UiButton variant="secondary" @click="clearPlacedOpen = false">{{ t('admin.cancel') }}</UiButton>
         <UiButton variant="danger" :disabled="placedImageCount === 0" @click="clearPlacedImages">{{ t('adminForm.clearPlacedImagesConfirm') }}</UiButton>
+      </div>
+    </UiModal>
+
+    <UiModal
+      :model-value="exifPending !== null"
+      :title="t('adminForm.exifOverwriteTitle')"
+      @update:model-value="v => { if (!v) exifPending = null }"
+    >
+      <p class="row-delete-confirm__body">
+        {{ t('adminForm.exifOverwriteBody', { range: exifPendingRangeLabel }) }}
+      </p>
+      <div class="row-delete-confirm__actions">
+        <UiButton variant="secondary" @click="exifPending = null">{{ t('admin.cancel') }}</UiButton>
+        <UiButton variant="primary" @click="confirmExifOverwrite">{{ t('adminForm.exifOverwriteConfirm') }}</UiButton>
       </div>
     </UiModal>
 
@@ -3025,6 +3104,34 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .date-range { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
 .date-range > :deep(.ui-date-input) { flex: 1; min-width: 0; }
 .date-range__sep { flex: 0 0 auto; color: var(--muted); font-size: 0.72rem; }
+
+.exif-detect-btn {
+  margin-top: 0.5rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--subtle);
+  background: transparent;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.46rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.exif-detect-btn:hover:not(:disabled) {
+  border-color: var(--dark);
+  background: color-mix(in srgb, var(--dark) 4%, transparent);
+}
+.exif-detect-btn:disabled { opacity: 0.6; cursor: default; }
+.exif-detect-btn__icon { width: 0.8rem; height: 0.8rem; flex-shrink: 0; }
+.exif-detect-btn__icon.is-spinning { animation: exif-spin 0.9s linear infinite; }
+.exif-detect-hint { margin-top: 0.3rem; color: var(--muted); font-size: 0.66rem; line-height: 1.3; }
+@keyframes exif-spin { to { transform: rotate(360deg); } }
 
 .content-dock .field.active label { color: var(--accent); }
 .content-dock .field.active textarea { resize: none; }
