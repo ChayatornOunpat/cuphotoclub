@@ -6,19 +6,23 @@ const props = withDefaults(defineProps<{
   maxFiles?: number
   dropzoneClass?: string
   showPreviews?: boolean
+  detectDates?: boolean
 }>(), {
   prefix: 'uploads',
   multiple: true,
   maxFiles: 0,
   dropzoneClass: '',
-  showPreviews: true
+  showPreviews: true,
+  detectDates: false
 })
 
 const model = defineModel<string[]>({ default: () => [] })
 const emit = defineEmits<{
   uploaded: [keys: string[]]
+  datesDetected: [range: { start: string, end: string, count: number }]
 }>()
 
+const { detect: detectExifRange } = useExifDateRange()
 const task = useUploadTask()
 
 const fileInput = ref<HTMLInputElement>()
@@ -544,6 +548,16 @@ async function upload(files: File[], retry = false) {
   rejectedCount.value = files.length - photos.length
   const images = uniqueUncompleted(photos)
   if (!images.length) return
+
+  // Read EXIF capture dates from the originals (before compression strips them)
+  // and report the detected range. Runs alongside the upload; never blocks it.
+  if (props.detectDates && !retry) {
+    detectExifRange(photos)
+      .then((range) => {
+        if (range.start) emit('datesDetected', { start: range.start, end: range.end, count: range.withDate })
+      })
+      .catch(() => {})
+  }
 
   uploading.value = true
   shouldStopCurrentUpload = false

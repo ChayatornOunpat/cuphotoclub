@@ -304,6 +304,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
   align-items: center;
   justify-content: center;
   min-width: 5.8rem;
+  min-height: var(--chip-size);
   border: 1px solid currentColor;
   font-size: 0.58rem;
   font-weight: 600;
@@ -314,15 +315,16 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
   white-space: nowrap;
   flex-shrink: 0;
 }
-.pill-row { display: inline-flex; align-items: center; gap: 0.4rem; }
+/* --chip-size is the single source of truth for both boxes' height, so the
+   pill (via min-height) and the icon-chip (via width/height) can't drift
+   apart the way two independently-guessed fixed sizes did before. */
+.pill-row { --chip-size: 1.7rem; display: inline-flex; align-items: center; gap: 0.4rem; }
 .icon-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* Match the visibility pill's height (and stay square) instead of a fixed
-     size, so the two never drift apart when the pill's padding/font changes. */
-  align-self: stretch;
-  aspect-ratio: 1;
+  width: var(--chip-size);
+  height: var(--chip-size);
   flex-shrink: 0;
   border: 1px solid var(--subtle);
   background: transparent;
@@ -369,8 +371,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
   font-size: 0.56rem;
   padding: 0.38rem 0.52rem;
 }
-.card__facts .pill-row { border: 0; padding: 0; background: none; }
-/* icon-chip auto-matches the card pill height via align-self: stretch above */
+.card__facts .pill-row { --chip-size: 1.5rem; border: 0; padding: 0; background: none; }
 .card__facts .icon-chip__icon { width: 0.72rem; height: 0.72rem; }
 .card__actions { display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.8rem; }
 .card__actions .link { margin-left: 0; }

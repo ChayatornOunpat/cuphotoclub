@@ -7,7 +7,10 @@ const props = withDefaults(defineProps<{
 })
 
 const open = defineModel<boolean>({ required: true })
-const emit = defineEmits<{ updated: [keys: string[]] }>()
+const emit = defineEmits<{
+  updated: [keys: string[]]
+  datesDetected: [range: { start: string, end: string, count: number }]
+}>()
 
 const { t } = useI18n()
 const modalTitle = computed(() => props.title || t('adminPhotoManager.title'))
@@ -53,7 +56,9 @@ function onUploaded(keys: string[]) {
           v-model="uploadQueue"
           :prefix="prefix"
           :show-previews="false"
+          detect-dates
           @uploaded="onUploaded"
+          @dates-detected="range => emit('datesDetected', range)"
         />
       </div>
 
