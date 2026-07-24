@@ -17,6 +17,7 @@ interface Album {
   location?: string
   excerpt: string
   coverSrc: string
+  dark?: boolean
   rows: AlbumRow[]
   textDefaults?: { align?: 'left' | 'center' | 'right', font?: 'serif' | 'sans' }
 }
@@ -69,9 +70,14 @@ const excerptStyle = computed(() => {
 </script>
 
 <template>
-  <article>
+  <!-- data-chrome-header normally lives on just the cover (dark), since the
+       rest of the essay is light and the nav should hand off once it's
+       scrolled past. When `dark`, the whole page stays dark, so the marker
+       moves to the root article instead — same handoff mechanism darkroom
+       uses (see AlbumDarkroom.vue) so the nav never flips to its light mode. -->
+  <article :class="{ 'is-dark': album.dark }" :data-chrome-header="album.dark ? true : undefined">
     <!-- COVER -->
-    <header class="cover" :class="`cover--${coverOrientation}`" data-chrome-header>
+    <header class="cover" :class="`cover--${coverOrientation}`" :data-chrome-header="album.dark ? undefined : true">
       <div class="cover__bg" data-parallax data-hero-dim>
         <AppImg :src="album.coverSrc" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="cover__img" eager optimize />
       </div>
@@ -262,6 +268,22 @@ figcaption .n { color: var(--accent); font-weight: 500; flex-shrink: 0; }
 .albnav__inner { max-width: 1380px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 2rem; flex-wrap: wrap; }
 .albnav__back { font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.2s; }
 .albnav__back:hover { color: var(--accent); }
+
+/* ── Dark variant — same Lego grid, Darkroom's black-wall palette ──
+   Locally-scoped vars (not the global theme), so only this article's
+   subtree goes dark; the rest of the site stays on its normal light theme. */
+.is-dark {
+  --dk-bg: #0C0C0A;
+  --dk-ink: #F5F4F0;
+  --dk-dim: rgba(245, 244, 240, 0.55);
+  --dk-line: rgba(245, 244, 240, 0.14);
+  background: var(--dk-bg);
+  color: var(--dk-ink);
+}
+.is-dark .text-block { color: var(--dk-dim); }
+.is-dark figcaption { color: var(--dk-dim); }
+.is-dark .albnav { background: var(--dk-bg); border-color: var(--dk-line); }
+.is-dark .albnav__back { color: var(--dk-dim); }
 
 @media (max-width: 1000px) {
   /* Collapse the 6-col Lego grid to 3 columns so span-1/2 images don't render

@@ -22,6 +22,11 @@ export default defineEventHandler(async (event) => {
     if (referencedKeys.length) await scrubR2DeleteReferences(referencedKeys)
   }
 
+  // The SigV4 signing key is identical for every key in this batch, so derive it
+  // once and reuse it per key — signing 250 keys otherwise re-derives the whole
+  // key chain 250 times and blows the Worker CPU limit (Error 1102).
+  const signer = await createR2DeleteSigner(directConfig)
+
   const signedDeletes = await mapUploadSessionItems(keys, 16, async (key) => {
     const referenced = isR2DeleteReferenced(references.get(key) ?? emptyR2DeleteReferenceInfo())
     if (referenced && !force) {
@@ -37,11 +42,7 @@ export default defineEventHandler(async (event) => {
       key,
       status: 'ready' as const,
       referenced,
-      delete: await createR2PresignedDeleteUrl({
-        ...directConfig,
-        key,
-        expiresSeconds: 900
-      })
+      delete: await signR2PresignedDeleteUrl(signer, key, 900)
     }
   })
 

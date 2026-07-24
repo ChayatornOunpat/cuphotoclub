@@ -1,0 +1,1 @@
+ALTER TABLE `content_albums` ADD `dark` integer DEFAULT false NOT NULL;

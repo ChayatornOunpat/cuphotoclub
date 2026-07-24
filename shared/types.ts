@@ -45,6 +45,7 @@ export interface Album {
   location?: string
   excerpt: string
   style: AlbumStyle
+  dark?: boolean       // essay style only: renders on a black wall like darkroom, same grid
   placement: Placement
   coverSrc: string       // URL of the cover/hero image
   rows: AlbumRow[]       // ordered content rows

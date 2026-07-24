@@ -92,6 +92,13 @@
       "when": 1784678400000,
       "tag": "0012_member_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1784892770984,
+      "tag": "0013_thin_jackpot",
+      "breakpoints": true
     }
   ]
 }

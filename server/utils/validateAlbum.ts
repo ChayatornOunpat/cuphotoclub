@@ -36,6 +36,7 @@ export function validateAlbum(b: Record<string, unknown>): string | null {
   if (b.published !== undefined && b.published !== '' && !validISODate(b.published)) return 'Published date must use YYYY-MM-DD'
   if (b.visibility !== undefined && !VISIBILITY.includes(String(b.visibility))) return 'Invalid visibility'
   if (!STYLES.includes(String(b.style))) return 'Invalid style'
+  if (b.dark !== undefined && typeof b.dark !== 'boolean') return 'Invalid dark flag'
   if (b.placement !== undefined && b.placement !== 'gallery') return 'Albums can only use gallery placement'
   if (b.rows !== undefined && !rowsSchema.safeParse(b.rows).success) return 'Invalid rows structure'
   return null

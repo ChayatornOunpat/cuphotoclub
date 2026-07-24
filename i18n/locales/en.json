@@ -556,6 +556,8 @@
     "styleContactDesc": "Dense grid · filmstrip",
     "styleDarkroomDesc": "Black wall · one print at a time",
     "styleChaptersDesc": "Justified rows · chaptered — built for 100+ frames",
+    "essayDark": "Dark background",
+    "essayDarkHint": "Renders this essay on a black wall like Darkroom, with the same flexible grid.",
     "cellLabel": "Row {row}, Cell {cell}",
     "cellName": "Name",
     "cellNameOptional": "optional, internal only",

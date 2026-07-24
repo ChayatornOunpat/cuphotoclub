@@ -35,6 +35,7 @@ function normalizeInitialAlbum(input: AlbumInput): AlbumInput {
   if (!isISODate(album.dateEnd)) album.dateEnd = ''
   if (!isISODate(album.published)) album.published = album.date || todayISO()
   album.visibility = album.visibility ?? 'public'
+  album.dark = album.dark ?? false
   album.placement = 'gallery'
   album.textDefaults = { align: 'left', font: 'serif', ...album.textDefaults }
   return album
@@ -57,6 +58,7 @@ function blank(): AlbumInput {
     location: '',
     excerpt: '',
     style: 'essay',
+    dark: false,
     placement: 'gallery',
     coverSrc: '',
     rows: [],
@@ -740,6 +742,7 @@ const previewAlbum = computed(() => ({
   location: form.location,
   excerpt: form.excerpt || t('adminForm.excerptPlaceholder'),
   coverSrc: form.coverSrc || form.rows.flatMap(r => r.cells).find(c => c.type === 'image' && c.src)?.src || PLACEHOLDER_IMG,
+  dark: form.dark,
   textDefaults: form.textDefaults,
   rows: form.rows.map((row, ri) => ({
     cells: row.cells.map((cell, ci) => {
@@ -883,8 +886,15 @@ function isChapterRow(row: AlbumRow) {
   return isChapters.value && row.cells.length === 1 && row.cells[0]?.type === 'text'
 }
 
+// Fixed styles enforce one cell per row, so a pad cell always fills the whole
+// row — label it "Spacer" instead of "Frame N" rather than doubling up both.
+function isPadRow(row: AlbumRow) {
+  return !isEssay.value && row.cells.length === 1 && row.cells[0]?.type === 'pad'
+}
+
 function rowListLabel(row: AlbumRow, index: number) {
   if (isChapterRow(row)) return row.cells[0]?.content?.trim() || t('adminForm.chapterSeparator')
+  if (isPadRow(row)) return t('adminForm.cellTypePad')
   return isEssay.value ? t('adminForm.rowN', { n: index + 1 }) : t('adminForm.frameN', { n: index + 1 })
 }
 
@@ -1395,6 +1405,13 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
             <Icon name="heroicons:squares-2x2" class="style-trigger__icon" />
           </button>
           <p v-if="form.style === 'chapters'" class="field__hint">{{ t('adminForm.styleChaptersHint') }}</p>
+          <label v-if="isEssay" class="dark-toggle">
+            <input v-model="form.dark" type="checkbox">
+            <span>
+              <strong>{{ t('adminForm.essayDark') }}</strong>
+              <small>{{ t('adminForm.essayDarkHint') }}</small>
+            </span>
+          </label>
         </div>
 
         <UiModal v-model="showStylePicker" :title="t('adminForm.style')" size="xl">
@@ -1644,6 +1661,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
             :class="{
               'is-selected': selectedRow === ri,
               'is-chapter-row': isChapterRow(row),
+              'is-pad-row': isPadRow(row),
               'is-dragging': draggingRowIndex === ri,
               'drop-target': dragOverRowIndex === ri && dragOverRowIndex !== draggingRowIndex,
               'row-item--flat': !isEssay
@@ -1664,7 +1682,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
               <span class="row-item__drag">⠿</span>
               <span class="row-item__label">{{ rowListLabel(row, ri) }}</span>
               <span v-if="isEssay" class="row-item__usage" :class="{ full: rowUsed(row) >= 6 }">{{ rowUsed(row) }}/6</span>
-              <span v-else-if="row.cells[0]" class="row-item__type" :class="`row-item__type--${row.cells[0].type}`">{{ cellChipLabel(row.cells[0]) }}</span>
+              <span v-else-if="row.cells[0] && !isPadRow(row)" class="row-item__type" :class="`row-item__type--${row.cells[0].type}`">{{ cellChipLabel(row.cells[0]) }}</span>
               <button
                 type="button"
                 class="row-item__del"
@@ -2550,6 +2568,43 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   color: var(--muted);
 }
 
+.dark-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  margin-top: 0.55rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--subtle);
+  background: color-mix(in srgb, var(--paper) 65%, transparent);
+  cursor: pointer;
+}
+.dark-toggle input {
+  width: 0.86rem;
+  height: 0.86rem;
+  margin: 0.12rem 0 0;
+  accent-color: var(--accent);
+}
+.dark-toggle span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.dark-toggle strong {
+  font-size: 0.52rem;
+  line-height: 1.1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--dark);
+}
+.dark-toggle small {
+  font-size: 0.58rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .media-label {
   margin: 0.65rem 0 0.35rem;
   font-size: 0.44rem;
@@ -2692,6 +2747,17 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 .row-item.is-chapter-row .row-item__label {
   color: var(--accent);
 }
+.row-item.is-pad-row {
+  background: color-mix(in srgb, #D97706 6%, var(--body-bg));
+  border-color: color-mix(in srgb, #D97706 42%, var(--subtle));
+  border-style: dashed;
+}
+.row-item.is-pad-row .row-item__head {
+  border-bottom-color: color-mix(in srgb, #D97706 26%, var(--subtle));
+}
+.row-item.is-pad-row .row-item__label {
+  color: #D97706;
+}
 .row-item.is-dragging { opacity: 0.4; }
 .row-item.drop-target { border-top: 2px solid var(--accent); }
 
@@ -2721,7 +2787,6 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 }
 .row-item__type--image { border-color: color-mix(in srgb, var(--accent) 40%, var(--subtle)); color: var(--dark); }
 .row-item__type--text  { border-color: color-mix(in srgb, #6b7fd4 40%, var(--subtle)); color: var(--dark); }
-.row-item__type--pad   { border-style: dashed; }
 .row-item__del {
   flex-shrink: 0;
   background: none;

@@ -556,6 +556,8 @@
     "styleContactDesc": "กริดหนาแน่น · แผ่นฟิล์ม",
     "styleDarkroomDesc": "ผนังดำ · ทีละภาพ",
     "styleChaptersDesc": "แถวเรียงเต็ม · แบ่งบท — เหมาะกับภาพ 100+ ภาพ",
+    "essayDark": "พื้นหลังสีดำ",
+    "essayDarkHint": "แสดงเรียงความนี้บนผนังดำแบบห้องมืด ด้วยกริดที่ยืดหยุ่นเหมือนเดิม",
     "cellLabel": "แถว {row} ช่อง {cell}",
     "cellName": "ชื่อ",
     "cellNameOptional": "ไม่บังคับ ใช้ภายในเท่านั้น",
