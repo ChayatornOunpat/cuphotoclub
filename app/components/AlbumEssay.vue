@@ -172,7 +172,10 @@ const excerptStyle = computed(() => {
 
 <style scoped>
 .cover {
-  height: 100svh;
+  /* Capped rather than a flat 100svh: on a tall desktop window a full-viewport
+     cover pushes the essay entirely below the fold, and the 860px ceiling keeps
+     the title/print from sprawling on very tall monitors. */
+  height: min(82svh, 860px);
   background: var(--hero-bg);
   position: relative;
   display: flex;
@@ -296,17 +299,43 @@ figcaption .n { color: var(--accent); font-weight: 500; flex-shrink: 0; }
 @media (max-width: 720px) {
   .cover__back { left: 1.5rem; }
   .cover__body { padding: 0 1.5rem 2.5rem; }
-  .cover__subject {
-    top: 5.5rem;
-    left: 1.5rem;
-    right: 1.5rem;
-    bottom: auto;
+  /* Phones: cap the cover below one viewport so the intro peeks above the fold.
+     A 100svh header on a tall, narrow screen reads as a dead end — nothing
+     signals there's an essay underneath. */
+  .cover {
+    height: auto;
+    min-height: 58svh;
+  }
+  /* Portrait/square covers stack in normal flow (print, then title) rather than
+     floating the subject absolutely against a bottom-anchored body: on phones
+     those two are sized independently, which left a tall dead gap between the
+     bottom of the image and the title. */
+  .cover--portrait,
+  .cover--square {
+    justify-content: flex-start;
+  }
+  .cover--portrait .cover__subject,
+  .cover--square .cover__subject {
+    position: relative;
+    inset: auto;
     width: auto;
-    height: 42svh;
+    height: auto;
+    min-height: 0;
+    flex: 0 1 auto;
+    margin: 8rem 1.5rem 0;
+  }
+  /* Deliberately modest: a portrait print sized off the viewport height eats the
+     whole screen on a phone. Width is bounded too so a square cover doesn't run
+     edge to edge. */
+  .cover--portrait .cover__subject :deep(img),
+  .cover--square .cover__subject :deep(img) {
+    max-height: 32svh;
+    max-width: 80%;
   }
   .cover--portrait .cover__body,
   .cover--square .cover__body {
     padding-right: 1.5rem;
+    padding-top: 1.75rem;
   }
   .cover--portrait .cover__title,
   .cover--square .cover__title {

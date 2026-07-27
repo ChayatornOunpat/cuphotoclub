@@ -141,6 +141,8 @@
     "sequencedBy": "เรียงตามวันที่ ล่าสุดก่อน",
     "collections": "คอลเลกชัน",
     "categoryMenu": "หมวดหมู่",
+    "categorySearchPlaceholder": "กรองหมวดหมู่…",
+    "noCategoryResults": "ไม่พบหมวดหมู่ที่ตรงกัน",
     "frames": "ภาพ",
     "latest": "ล่าสุด",
     "album": "อัลบั้ม",

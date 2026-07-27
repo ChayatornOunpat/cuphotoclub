@@ -645,20 +645,27 @@ onUnmounted(() => {
   .head--portrait,
   .head--square {
     height: auto;
-    min-height: 76svh;
+    min-height: 58svh;
+    justify-content: flex-start;
   }
+  /* See AlbumContact.vue — same flow-stacked portrait header on phones. */
   .head__subject {
-    top: 5rem;
-    left: 1.5rem;
-    right: 1.5rem;
-    bottom: auto;
+    position: relative;
+    inset: auto;
     width: auto;
-    height: 32svh;
+    height: auto;
+    min-height: 0;
+    flex: 0 1 auto;
+    margin: 8rem 1.5rem 0;
+  }
+  .head__subject :deep(img) {
+    max-height: 30svh;
+    max-width: 80%;
   }
   .head--portrait .head__body,
   .head--square .head__body {
     padding-right: 1.5rem;
-    padding-top: 38svh;
+    padding-top: 1.75rem;
   }
 
   .chbar { top: 3.6rem; padding: 0.35rem 1.25rem 0.3rem; gap: 1rem; }

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { SelectMenuOption } from '~/components/ui/SelectMenu.vue'
+
 definePageMeta({ layout: 'site' })
 
 const { t } = useI18n()
@@ -39,23 +41,25 @@ function queryText(value: unknown) {
 const activeCat = ref(queryCategory(route.query.category))
 const searchQuery = ref(queryText(route.query.q))
 const normalizedSearch = computed(() => searchQuery.value.trim().toLowerCase())
-const categoryMenuOpen = ref(false)
 const searchOpen = ref(Boolean(normalizedSearch.value))
 const searchInput = ref<HTMLInputElement | null>(null)
+// Quick-access chips; the trailing ones are hidden by CSS on narrow screens.
 const inlineCategoryLimit = 4
 const sortedCategories = computed(() =>
   [...categories.value].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
 )
-const primaryCategories = computed(() => sortedCategories.value.slice(0, inlineCategoryLimit))
-const secondaryCategories = computed(() => sortedCategories.value.slice(inlineCategoryLimit))
-const activeSecondaryCategory = computed(() =>
-  secondaryCategories.value.find(cat => cat.name === activeCat.value) ?? null
-)
-const inlineCategories = computed(() => {
-  const cats = [...primaryCategories.value]
-  if (activeSecondaryCategory.value) cats.push(activeSecondaryCategory.value)
-  return cats
-})
+const inlineCategories = computed(() => sortedCategories.value.slice(0, inlineCategoryLimit))
+// The picker holds every category, so it works the same at both breakpoints and
+// type-to-filter can reach anything.
+const categoryOptions = computed<SelectMenuOption[]>(() => [
+  { value: 'all', label: t('common.all'), count: galleryAlbums.value.length },
+  ...sortedCategories.value.map(cat => ({
+    value: cat.name,
+    label: cat.name,
+    count: cat.count,
+    lang: textLang(cat.name)
+  }))
+])
 const filtered = computed(() => {
   const q = normalizedSearch.value
   if (q) return galleryAlbums.value.filter(a =>
@@ -74,7 +78,6 @@ const page = ref(1)
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
 watch(activeCat, () => {
   page.value = 1
-  categoryMenuOpen.value = false
 })
 watch(() => route.query.category, value => {
   activeCat.value = queryCategory(value)
@@ -119,6 +122,7 @@ function updateColumnCount() {
   const w = window.innerWidth
   columnCount.value = w <= 720 ? 1 : w <= 1000 ? 2 : 3
 }
+
 onMounted(() => {
   updateColumnCount()
   window.addEventListener('resize', updateColumnCount)
@@ -150,7 +154,6 @@ function selectCategory(category: string) {
 }
 
 function toggleSearch() {
-  categoryMenuOpen.value = false
   const query = { ...route.query }
   if (searchOpen.value && !normalizedSearch.value) {
     searchOpen.value = false
@@ -230,46 +233,38 @@ useSeoMeta({
           </div>
           <div class="index-bar__controls">
             <div class="filter" :class="{ searching: searchOpen }">
-              <div v-if="!searchOpen" class="filter__categories">
-                <button :class="{ active: activeCat === 'all' }" @click="selectCategory('all')">
-                  {{ t('common.all') }} <sup>{{ galleryAlbums.length }}</sup>
-                </button>
-                <button
-                  v-for="cat in inlineCategories"
-                  :key="cat.name"
-                  :class="{ active: activeCat === cat.name }"
-                  :lang="textLang(cat.name)"
-                  @click="selectCategory(cat.name)"
-                >
-                  {{ cat.name }} <sup>{{ cat.count }}</sup>
-                </button>
-                <div v-if="secondaryCategories.length" class="filter__menu">
+              <template v-if="!searchOpen">
+                <div class="filter__categories">
                   <button
                     type="button"
-                    class="filter__more"
-                    :class="{ active: activeSecondaryCategory }"
-                    :aria-expanded="categoryMenuOpen"
-                    aria-haspopup="menu"
-                    @click="categoryMenuOpen = !categoryMenuOpen"
+                    :class="{ active: activeCat === 'all' }"
+                    @click="selectCategory('all')"
                   >
-                    {{ t('albums.categoryMenu') }} <sup>{{ secondaryCategories.length }}</sup>
+                    {{ t('common.all') }} <sup>{{ galleryAlbums.length }}</sup>
                   </button>
-                  <div v-if="categoryMenuOpen" class="filter__panel" role="menu">
-                    <button
-                      v-for="cat in secondaryCategories"
-                      :key="`menu-${cat.name}`"
-                      type="button"
-                      role="menuitemradio"
-                      :aria-checked="activeCat === cat.name"
-                      :class="{ active: activeCat === cat.name }"
-                      :lang="textLang(cat.name)"
-                      @click="selectCategory(cat.name)"
-                    >
-                      <span>{{ cat.name }}</span>
-                      <sup>{{ cat.count }}</sup>
-                    </button>
-                  </div>
+                  <button
+                    v-for="cat in inlineCategories"
+                    :key="cat.name"
+                    type="button"
+                    :class="{ active: activeCat === cat.name }"
+                    :lang="textLang(cat.name)"
+                    @click="selectCategory(cat.name)"
+                  >
+                    {{ cat.name }} <sup>{{ cat.count }}</sup>
+                  </button>
                 </div>
+                <!-- Every category, searchable. -->
+                <UiSelectMenu
+                  class="filter__select"
+                  :model-value="activeCat"
+                  :options="categoryOptions"
+                  neutral-value="all"
+                  :label="t('albums.categoryMenu')"
+                  :placeholder="t('albums.categoryMenu')"
+                  :search-placeholder="t('albums.categorySearchPlaceholder')"
+                  :empty-text="t('albums.noCategoryResults')"
+                  @update:model-value="selectCategory"
+                />
                 <button
                   type="button"
                   class="filter-search__button"
@@ -278,7 +273,7 @@ useSeoMeta({
                 >
                   <Icon name="heroicons:magnifying-glass" aria-hidden="true" />
                 </button>
-              </div>
+              </template>
               <div v-else class="filter__search-state">
                 <div class="search">
                   <input
@@ -429,23 +424,28 @@ useSeoMeta({
 }
 .search__clear:hover { color: var(--accent); }
 
-.filter { display: flex; flex-wrap: nowrap; gap: 0.4rem 1.25rem; justify-content: flex-end; align-items: center; min-width: 0; }
+.filter { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; justify-content: flex-end; align-items: center; min-width: 0; }
 .filter.searching {
   width: min(28rem, 100%);
   margin-left: auto;
 }
-.filter__categories,
+.filter__categories {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.4rem 1.25rem;
+  flex: 0 1 auto;
+  min-width: 0;
+}
 .filter__search-state {
   display: flex;
   flex-wrap: nowrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 0.4rem 1.25rem;
+  gap: 0.85rem;
   width: 100%;
   min-width: 0;
-}
-.filter__search-state {
-  gap: 0.85rem;
 }
 .filter button { background: none; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 0.6rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); padding: 0.35rem 0; position: relative; transition: color 0.2s; }
 .filter button:hover { color: var(--dark); }
@@ -454,50 +454,7 @@ useSeoMeta({
 .filter button.active { color: var(--accent); }
 .filter button.active sup { color: var(--accent); }
 .filter button.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); }
-.filter__menu { position: relative; }
-.filter .filter__more {
-  padding-right: 1.2rem;
-}
-.filter .filter__more::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  width: 0.42rem;
-  height: 0.42rem;
-  border-right: 1px solid currentColor;
-  border-bottom: 1px solid currentColor;
-  transform: translateY(-68%) rotate(45deg);
-}
-.filter__panel {
-  position: absolute;
-  top: calc(100% + 0.85rem);
-  right: 0;
-  z-index: 10;
-  width: min(18rem, 72vw);
-  border-top: 2px solid var(--accent);
-  background: color-mix(in srgb, var(--body-bg) 96%, white);
-  box-shadow: 0 1.4rem 3.5rem rgba(26, 25, 24, 0.12);
-}
-.filter__panel button {
-  width: 100%;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1.25rem;
-  border-bottom: 1px solid var(--subtle);
-  padding: 0.9rem 1rem;
-  text-align: left;
-}
-.filter__panel button.active {
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
-}
-.filter__panel button.active::after {
-  display: none;
-}
-.filter__panel button sup {
-  flex-shrink: 0;
-}
+.filter__select { flex: 0 0 auto; }
 .filter__search-state .search {
   flex: 1 1 auto;
 }
@@ -574,19 +531,46 @@ useSeoMeta({
   .page-head__body, .page-head__foot { padding-left: 1.5rem; padding-right: 1.5rem; }
   .page-head__foot { grid-template-columns: 1fr; }
   .page-head__stats { justify-content: flex-start; }
+  .index-bar { margin-bottom: 2.5rem; }
   .index-bar__controls { width: 100%; }
-  .filter { justify-content: flex-start; overflow-x: auto; padding-bottom: 0.25rem; }
-  .filter.searching { width: 100%; margin-left: 0; overflow-x: visible; }
+  .filter {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0.75rem 1rem;
+  }
+  .filter.searching { width: 100%; margin-left: 0; }
+
+  /* Chips take a row of their own and wrap; picker shares the next row with
+     the search toggle. */
   .filter__categories {
+    flex: 1 0 100%;
+    flex-wrap: wrap;
     justify-content: flex-start;
+    gap: 0.35rem 1rem;
   }
-  .filter__categories > button,
-  .filter__menu {
-    flex: 0 0 auto;
+  .filter__categories > button:nth-child(n+5) { display: none; }
+  .filter .filter__categories button { padding: 0.4rem 0; }
+
+  .filter__select { flex: 1 1 auto; min-width: 0; }
+
+  .filter-search__button {
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: 0 0 2.75rem;
+    color: var(--dark);
+    border: 1px solid var(--subtle);
   }
-  .filter__search-state {
-    justify-content: flex-start;
+  .filter-search__button :deep(svg) { width: 1rem; height: 1rem; }
+  .filter-search__button.active { border-color: var(--accent); }
+
+  .filter__search-state { justify-content: flex-start; gap: 0.55rem; }
+  .filter__search-state .search__input {
+    /* 16px keeps iOS Safari from zooming the page on focus. */
+    font-size: 16px;
+    min-height: 2.75rem;
   }
+  .filter__search-state .search__input::placeholder { font-size: 0.6rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .filter button,

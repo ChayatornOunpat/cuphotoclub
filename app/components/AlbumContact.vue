@@ -418,20 +418,29 @@ onUnmounted(() => {
   .head--portrait,
   .head--square {
     height: auto;
-    min-height: 76svh;
+    min-height: 58svh;
+    justify-content: flex-start;
   }
+  /* Flow-stack the print above the title on phones. Absolutely positioning the
+     subject while the body stays bottom-anchored made the two sizes independent,
+     so a tall cover left a dead gap in the middle of the header. */
   .head__subject {
-    top: 5rem;
-    left: 1.5rem;
-    right: 1.5rem;
-    bottom: auto;
+    position: relative;
+    inset: auto;
     width: auto;
-    height: 32svh;
+    height: auto;
+    min-height: 0;
+    flex: 0 1 auto;
+    margin: 8rem 1.5rem 0;
+  }
+  .head__subject :deep(img) {
+    max-height: 30svh;
+    max-width: 80%;
   }
   .head--portrait .head__body,
   .head--square .head__body {
     padding-right: 1.5rem;
-    padding-top: 38svh;
+    padding-top: 1.75rem;
   }
   /* The variable-width flex filmstrip only reads as a contact sheet when many
      frames fit per row. On phones just 1–2 fit, leaving big ragged gaps, so

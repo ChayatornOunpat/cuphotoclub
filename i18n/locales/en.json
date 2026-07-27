@@ -141,6 +141,8 @@
     "sequencedBy": "Sequenced by date, newest first",
     "collections": "Collections",
     "categoryMenu": "Categories",
+    "categorySearchPlaceholder": "Filter categories…",
+    "noCategoryResults": "No categories match.",
     "frames": "Frames",
     "latest": "Latest",
     "album": "Album",

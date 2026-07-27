@@ -98,6 +98,8 @@ html:lang(th) :where(
   .page-head__kicker,
   .stat__label,
   .filter button,
+  .sel__trigger,
+  .sel__option,
   .feature__flag,
   .feature__cat,
   .feature__meta,

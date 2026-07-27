@@ -303,13 +303,18 @@ function plateSizes(span: number) {
 .dk-exit__back.is-disabled:hover { color: var(--dk-dim); }
 
 @media (max-width: 720px) {
-  .dk-head { padding: 7rem 1.25rem 3.5rem; }
+  /* The entry wall is meant to be a full-screen pause on desktop, but on a phone
+     a 100svh wall means the album opens with nothing but the title in view.
+     Pull it under one viewport so the first print peeks above the fold. */
+  .dk-head { min-height: 76svh; padding: 6.5rem 1.25rem 3rem; }
   .dk-head__back { left: 1.5rem; top: 5.5rem; }
+  .dk-head__print { margin-top: 2.25rem; }
+  .dk-head__scroll { margin-top: 2rem; height: 2.5rem; }
   .dk-flow { gap: 4.5rem; padding: 3.5rem 1.25rem 6rem; }
   .dk-spacer { height: 2.5rem; }
   /* Keep each hanging print scannable — 84svh means a portrait image fills the
      screen and demands a full swipe per photo. */
   .dk-plate__print :deep(img) { max-height: 72svh; }
-  .dk-head__print :deep(img) { max-height: 54svh; }
+  .dk-head__print :deep(img) { max-height: 40svh; }
 }
 </style>
