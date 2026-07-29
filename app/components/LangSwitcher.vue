@@ -2,11 +2,13 @@
 const { locale, locales } = useI18n()
 const switchLocalePath = useSwitchLocalePath()
 
+defineProps<{ dark?: boolean }>()
+
 const options = computed(() => locales.value as { code: 'en' | 'th' }[])
 </script>
 
 <template>
-  <span class="langswitch">
+  <span class="langswitch" :class="{ 'langswitch--dark': dark }">
     <template v-for="(loc, i) in options" :key="loc.code">
       <span v-if="i > 0" class="langswitch__sep" aria-hidden="true">/</span>
       <NuxtLink
@@ -43,4 +45,13 @@ nav.light .langswitch__opt.is-active { color: var(--dark); }
   color: rgba(245, 244, 240, 0.3);
 }
 nav.light .langswitch__sep { color: var(--subtle); }
+
+/* Dark variant — used inside mobile menu (light background, dark text) */
+.langswitch--dark .langswitch__opt {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.langswitch--dark .langswitch__opt:hover { color: var(--accent); }
+.langswitch--dark .langswitch__opt.is-active { color: var(--dark); }
+.langswitch--dark .langswitch__sep { color: var(--subtle); font-size: 0.6rem; }
 </style>

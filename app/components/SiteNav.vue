@@ -56,7 +56,7 @@ watch(open, v => {
             </li>
           </ul>
           <div class="mobile-menu__lang">
-            <LangSwitcher />
+            <LangSwitcher dark />
           </div>
         </div>
       </div>

@@ -27,5 +27,5 @@ export const navLinks = [
   { to: '/blog', label: strings.nav.blog },
   { to: '/activities', label: strings.nav.activities },
   { to: '/about', label: strings.nav.about },
-  { to: '/contact', label: strings.nav.contact }
+  { to: '/contacts', label: strings.nav.contact }
 ] as const

@@ -259,7 +259,7 @@ useSeoMeta({
         <div class="intro-photos__text">
           <p class="intro-photos__lead">{{ t('home.introLead') }}</p>
           <p class="intro-photos__body">{{ t('home.introBody') }}</p>
-          <NuxtLink :to="localePath('/contact')" class="intro-photos__link">{{ t('home.introLink') }}</NuxtLink>
+          <NuxtLink :to="localePath('/contacts')" class="intro-photos__link">{{ t('home.introLink') }}</NuxtLink>
         </div>
       </div>
     </section>

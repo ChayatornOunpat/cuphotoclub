@@ -6,7 +6,7 @@ export const defaultSite = {
       { label: 'Blog', to: '/blog' },
       { label: 'Activities', to: '/activities' },
       { label: 'Members', to: '/members' },
-      { label: 'About', to: '/#about' },
+      { label: 'Contact', to: '/contacts' },
       { label: 'Join', to: '/#about', join: true }
     ]
   },
@@ -41,7 +41,7 @@ export const defaultSite = {
       { text: 'sees', em: true }
     ],
     body: 'CU Photo Club is open to all students of Chulalongkorn University regardless of experience level. We meet weekly, run workshops, hold annual exhibitions, and maintain an active archive of visual work from across the decades. If you have curiosity and a camera, you belong here.',
-    cta: { label: 'Join the Club', to: '/contact' },
+    cta: { label: 'Join the Club', to: '/contacts' },
     image: '/club-icon.jpg'
   },
   footer: {
@@ -55,7 +55,7 @@ export const defaultSite = {
           { label: 'History', to: '/#history' },
           { label: 'About', to: '/#about' },
           { label: 'Join', to: '/#about' },
-          { label: 'Contact', to: '/contact' },
+          { label: 'Contact', to: '/contacts' },
           { label: 'Developed By', to: '/developed-by' }
         ]
       },

@@ -1,8 +1,5 @@
 <script setup lang="ts">
-// Standalone contact page — reachable at /contacts but deliberately NOT wired
-// into the live app: no nav/footer entry (those come from content/site.yml) and
-// noindex, so it can be reviewed before it goes public. The existing
-// /contact page (message form) is untouched.
+// Contact info page — shows email, socials, clubroom location & map.
 definePageMeta({ layout: 'site' })
 
 const { locale } = useI18n()
@@ -11,10 +8,7 @@ const { locale } = useI18n()
 // Address matches the Organization structured data in app.vue — keep the two in
 // sync if either changes.
 const EMAILS = [
-  { address: 'cuphotoclub2023@gmail.com', role: { en: 'General enquiries', th: 'ติดต่อทั่วไป' } },
-  // MOCK — placeholder for the club's second Gmail so the two-address layout is
-  // final. Swap in the real address before this page goes live.
-  { address: 'cuphotoclub.example@gmail.com', role: { en: 'Bookings & collaborations', th: 'งานถ่ายภาพและความร่วมมือ' } }
+  { address: 'cuphotoclub2023@gmail.com', role: { en: 'General enquiries', th: 'ติดต่อทั่วไป' } }
 ]
 
 const SOCIALS = [
@@ -66,9 +60,7 @@ const emails = computed(() => EMAILS.filter(e => e.address))
 
 useSeoMeta({
   title: () => c.value.kicker,
-  description: () => c.value.lead,
-  // Draft page: keep it out of search results until it's linked up.
-  robots: 'noindex, nofollow'
+  description: () => c.value.lead
 })
 </script>
 
@@ -94,7 +86,9 @@ useSeoMeta({
           <ul class="mails">
             <li v-for="mail in emails" :key="mail.address">
               <a :href="`mailto:${mail.address}`" class="mail">{{ mail.address }}</a>
-              <span class="mail__role" :lang="textLang(locale === 'th' ? mail.role.th : mail.role.en)">
+              <!-- With a single address the "Email" label above already says it;
+                   the role caption only earns its space once there are two. -->
+              <span v-if="emails.length > 1" class="mail__role" :lang="textLang(locale === 'th' ? mail.role.th : mail.role.en)">
                 {{ locale === 'th' ? mail.role.th : mail.role.en }}
               </span>
             </li>
@@ -267,14 +261,16 @@ ul { list-style: none; padding: 0; margin: 0; }
   background: var(--paper);
   overflow: hidden;
 }
-/* Desaturated so the map sits under the photography rather than competing with
-   it; it returns to full colour on hover, when you're actually reading it. */
+/* Muted with saturate() rather than grayscale() so the map recedes behind the
+   photography but Google's red marker on the building still reads as red — a
+   full grayscale pass turned the pin grey. Full colour on hover, when you're
+   actually reading it. */
 .where__frame {
   width: 100%;
   height: 100%;
   border: 0;
   display: block;
-  filter: grayscale(1) contrast(1.05);
+  filter: saturate(0.5) contrast(1.04);
   transition: filter 0.4s ease;
 }
 .where__map:hover .where__frame { filter: none; }

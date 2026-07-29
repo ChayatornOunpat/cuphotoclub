@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
     '/blog',
     '/activities',
     '/about',
-    '/contact',
+    '/contacts',
     '/developed-by',
     '/members',
     ...albumSlugs.map(slug => `/albums/${slug}`),

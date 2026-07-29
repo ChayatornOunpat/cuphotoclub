@@ -115,7 +115,7 @@
             { "label": "History", "to": "/#history" },
             { "label": "About", "to": "/#about" },
             { "label": "Join", "to": "/#about" },
-            { "label": "Contact", "to": "/contact" },
+            { "label": "Contact", "to": "/contacts" },
             { "label": "Developed By", "to": "/developed-by" }
           ]
         },

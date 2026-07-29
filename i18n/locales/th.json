@@ -115,7 +115,7 @@
             { "label": "ประวัติ", "to": "/#history" },
             { "label": "เกี่ยวกับ", "to": "/#about" },
             { "label": "เข้าร่วม", "to": "/#about" },
-            { "label": "ติดต่อ", "to": "/contact" },
+            { "label": "ติดต่อ", "to": "/contacts" },
             { "label": "ผู้พัฒนาเว็บไซต์", "to": "/developed-by" }
           ]
         },

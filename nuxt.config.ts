@@ -65,7 +65,7 @@ export default defineNuxtConfig({
     // Admin routes and dynamic APIs above are intentionally left uncached.
     '/': { swr: 120 },
     '/about': { swr: 300 },
-    '/contact': { swr: 300 },
+    '/contacts': { swr: 300 },
     '/developed-by': { swr: 300 },
     '/members': { swr: 300 },
     '/members/**': { swr: 300 },

@@ -61,7 +61,7 @@ export function useLocalizedSite(site: Ref<any>) {
               { label: t('site.footer.columns.0.links.2.label'), to: '/#history' },
               { label: t('site.footer.columns.0.links.3.label'), to: '/#about' },
               { label: t('site.footer.columns.0.links.4.label'), to: '/#about' },
-              { label: t('site.footer.columns.0.links.5.label'), to: '/contact' },
+              { label: t('site.footer.columns.0.links.5.label'), to: '/contacts' },
               { label: t('site.footer.columns.0.links.6.label'), to: '/developed-by' }
             ]
           },
