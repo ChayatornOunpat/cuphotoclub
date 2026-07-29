@@ -2310,7 +2310,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   gap: 0.4rem;
   padding: 0.5rem;
   border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--subtle));
-  border-radius: 7px;
+  border-radius: 0;
   background: color-mix(in srgb, var(--accent) 5%, var(--body-bg));
   color: var(--accent);
   font-family: var(--font-sans);
@@ -2327,7 +2327,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   margin-top: 0.4rem;
   padding: 0.5rem;
   border: 1px solid color-mix(in srgb, var(--subtle) 70%, transparent);
-  border-radius: 8px;
+  border-radius: 0;
   /* Elevated near-white surface + soft shadow so the popover reads as a layer
      that opened over the tray, rather than sharing the tray's own colour. */
   background: #fff;
@@ -2341,7 +2341,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   gap: 3px;
   padding: 3px;
   background: color-mix(in srgb, var(--muted) 14%, transparent);
-  border-radius: 7px;
+  border-radius: 0;
   margin-bottom: 0.5rem;
 }
 .addcell__seg-btn {
@@ -2351,7 +2351,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   gap: 0.3rem;
   padding: 0.35rem 0.15rem;
   border: none;
-  border-radius: 5px;
+  border-radius: 0;
   background: transparent;
   color: var(--muted);
   font-family: var(--font-sans);
@@ -2378,7 +2378,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   gap: 0.35rem;
   padding: 0.4rem 0.35rem;
   border: 1px solid var(--subtle);
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--body-bg);
   cursor: grab;
   transition: border-color 0.12s, transform 0.1s;
