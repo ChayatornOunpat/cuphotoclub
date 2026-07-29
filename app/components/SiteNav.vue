@@ -21,7 +21,7 @@ watch(open, v => {
 
 <template>
   <nav :class="{ light, 'menu-open': open }">
-    <NuxtLink :to="localePath('/')" class="logo" @click="close">
+    <NuxtLink :to="localePath('/')" class="logo" draggable="false" @click="close">
       <span class="cu">CU</span>PHOTOCLUB
     </NuxtLink>
 
@@ -92,6 +92,9 @@ nav.light {
   color: #F5F4F0;
   transition: color 0.4s ease;
   z-index: 1;
+  /* Wordmark, not selectable copy — stop drag-to-select / drag-copy of it. */
+  user-select: none;
+  -webkit-user-drag: none;
 }
 nav.light .logo,
 nav.menu-open .logo { color: var(--dark); }

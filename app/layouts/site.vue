@@ -47,6 +47,13 @@ onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true })
 })
 onUnmounted(() => window.removeEventListener('scroll', onScroll))
+
+// This layout is shared across public pages, so it is NOT re-mounted on
+// client-side navigation — onMounted runs once. Without this, navLight goes
+// stale: leaving a hero-less page (which forces navLight = true) and returning
+// to a page with a hero would keep the nav's light background sitting over the
+// hero until the next scroll. Re-run onScroll once the new page is in the DOM.
+useNuxtApp().hook('page:finish', () => nextTick(onScroll))
 </script>
 
 <template>

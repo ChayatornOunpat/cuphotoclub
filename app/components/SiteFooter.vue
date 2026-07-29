@@ -19,7 +19,7 @@ function linkTo(to: string) {
   <footer>
     <div class="footer__grid">
       <div>
-        <NuxtLink :to="localePath('/')" class="footer__brand"><span class="cu">CU</span>PHOTOCLUB</NuxtLink>
+        <NuxtLink :to="localePath('/')" class="footer__brand" draggable="false"><span class="cu">CU</span>PHOTOCLUB</NuxtLink>
         <p class="footer__tagline">{{ footer.tagline }}</p>
       </div>
       <div v-for="col in footer.columns" :key="col.title" class="footer__col">
@@ -59,6 +59,9 @@ footer {
   color: #F5F4F0;
   display: block;
   margin-bottom: 0.85rem;
+  /* Wordmark, not selectable copy — stop drag-to-select / drag-copy of it. */
+  user-select: none;
+  -webkit-user-drag: none;
 }
 .footer__brand .cu { color: var(--accent); }
 .footer__tagline {
