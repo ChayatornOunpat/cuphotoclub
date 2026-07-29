@@ -18,9 +18,12 @@ const SOCIALS = [
 ]
 
 // Query-string embed (no API key needed) + a deep link for "open in Maps".
-const MAP_QUERY = 'อาคารจุลจักรพงษ์ จุฬาลงกรณ์มหาวิทยาลัย'
-const mapEmbedSrc = `https://www.google.com/maps?q=${encodeURIComponent(MAP_QUERY)}&z=17&output=embed`
-const mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(MAP_QUERY)}`
+// Pin the exact coordinates of Chulachakrapong Building — a place-name query
+// made Google highlight the building footprint without dropping a marker, so we
+// feed lat,lng, which always renders the red pin. Source: OpenStreetMap.
+const MAP_COORDS = '13.7354841,100.5309902'
+const mapEmbedSrc = `https://www.google.com/maps?q=${MAP_COORDS}&z=17&output=embed`
+const mapLink = `https://www.google.com/maps/search/?api=1&query=${MAP_COORDS}`
 
 // Copy lives here rather than in i18n/locales while the page is a draft — one
 // place to edit, and no churn in the shared locale files until it ships.
