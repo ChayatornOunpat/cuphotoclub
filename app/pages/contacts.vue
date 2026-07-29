@@ -17,13 +17,25 @@ const SOCIALS = [
   { label: 'Linktree', handle: 'linktr.ee/CUPhotoClub', icon: 'simple-icons:linktree', url: 'https://linktr.ee/CUPhotoClub' }
 ]
 
-// Query-string embed (no API key needed) + a deep link for "open in Maps".
-// Pin the exact coordinates of Chulachakrapong Building — a place-name query
-// made Google highlight the building footprint without dropping a marker, so we
-// feed lat,lng, which always renders the red pin. Source: OpenStreetMap.
+// The clubroom: Chulachakrapong Building. Coordinates (from OpenStreetMap) are
+// the fallback pin; the place name is what the Maps Embed API geocodes.
 const MAP_COORDS = '13.7354841,100.5309902'
-const mapEmbedSrc = `https://www.google.com/maps?q=${MAP_COORDS}&z=17&output=embed`
-const mapLink = `https://www.google.com/maps/search/?api=1&query=${MAP_COORDS}`
+const MAP_QUERY = 'อาคารจุลจักรพงษ์ จุฬาลงกรณ์มหาวิทยาลัย'
+
+// Prefer Google's Maps Embed API — it's the only keyed embed that renders BOTH
+// a proper pin AND a working, clickable place info card. The key is public by
+// design (it ships in the iframe URL); protect it with an HTTP-referrer
+// restriction in the Google Cloud console, not by hiding it. Set it via
+// NUXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY.
+//
+// Without a key (local dev, or before the key is provisioned) we fall back to
+// the keyless place-name embed: the info card loads, though Google may show the
+// building highlight instead of a teardrop pin. The keyed path fixes both.
+const mapsKey = useRuntimeConfig().public.googleMapsEmbedKey
+const mapEmbedSrc = mapsKey
+  ? `https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${encodeURIComponent(MAP_QUERY)}&zoom=17`
+  : `https://www.google.com/maps?q=${encodeURIComponent(MAP_QUERY)}&z=17&output=embed`
+const mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(MAP_QUERY)}`
 
 // Copy lives here rather than in i18n/locales while the page is a draft — one
 // place to edit, and no churn in the shared locale files until it ships.

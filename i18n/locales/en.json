@@ -111,12 +111,8 @@
         {
           "title": "Navigate",
           "links": [
-            { "label": "Albums", "to": "/albums" },
-            { "label": "Blog", "to": "/#stories" },
             { "label": "History", "to": "/#history" },
             { "label": "About", "to": "/#about" },
-            { "label": "Join", "to": "/#about" },
-            { "label": "Contact", "to": "/contacts" },
             { "label": "Developed By", "to": "/developed-by" }
           ]
         },

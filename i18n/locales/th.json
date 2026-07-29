@@ -111,12 +111,8 @@
         {
           "title": "นำทาง",
           "links": [
-            { "label": "อัลบั้ม", "to": "/albums" },
-            { "label": "บทความ", "to": "/#stories" },
             { "label": "ประวัติ", "to": "/#history" },
             { "label": "เกี่ยวกับ", "to": "/#about" },
-            { "label": "เข้าร่วม", "to": "/#about" },
-            { "label": "ติดต่อ", "to": "/contacts" },
             { "label": "ผู้พัฒนาเว็บไซต์", "to": "/developed-by" }
           ]
         },

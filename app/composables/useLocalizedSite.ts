@@ -54,15 +54,15 @@ export function useLocalizedSite(site: Ref<any>) {
         tagline: t('site.footer.tagline'),
         columns: [
           {
+            // Footer nav is intentionally light — top-level destinations
+            // (Albums, Blog, Contact, Join…) already live in the header, so the
+            // footer only carries the pages that aren't in the header: the
+            // homepage narrative anchors and the credits page.
             title: t('site.footer.columns.0.title'),
             links: [
-              { label: t('site.footer.columns.0.links.0.label'), to: '/albums' },
-              { label: t('site.footer.columns.0.links.1.label'), to: '/#stories' },
-              { label: t('site.footer.columns.0.links.2.label'), to: '/#history' },
-              { label: t('site.footer.columns.0.links.3.label'), to: '/#about' },
-              { label: t('site.footer.columns.0.links.4.label'), to: '/#about' },
-              { label: t('site.footer.columns.0.links.5.label'), to: '/contacts' },
-              { label: t('site.footer.columns.0.links.6.label'), to: '/developed-by' }
+              { label: t('site.footer.columns.0.links.0.label'), to: '/#history' },
+              { label: t('site.footer.columns.0.links.1.label'), to: '/#about' },
+              { label: t('site.footer.columns.0.links.2.label'), to: '/developed-by' }
             ]
           },
           {

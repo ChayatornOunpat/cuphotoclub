@@ -3,7 +3,9 @@ import tailwindcss from '@tailwindcss/vite'
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
-  devtools: { enabled: true },
+  // Disabled in dev: the DevTools inspector adds per-navigation RPC overhead.
+  // Re-enable temporarily if you need to inspect the component tree / payload.
+  devtools: { enabled: false },
 
   modules: [
     '@nuxt/image',
@@ -22,6 +24,22 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
     optimizeDeps: {
       include: []
+    },
+    // Pre-transform the shell + public entry points at boot so the first
+    // navigation to a public page doesn't stall on on-demand Vite compilation.
+    // (Vite compiles each route's module graph the first time it's visited.)
+    warmup: {
+      clientFiles: [
+        './app/app.vue',
+        './app/layouts/site.vue',
+        './app/layouts/default.vue',
+        './app/pages/index.vue'
+      ],
+      ssrFiles: [
+        './app/app.vue',
+        './app/layouts/site.vue',
+        './app/pages/index.vue'
+      ]
     }
   },
 
@@ -106,6 +124,10 @@ export default defineNuxtConfig({
           || process.env.NUXT_PUBLIC_REAL_DATA_ONLY === 'true'
           || process.env.NUXT_REAL_DATA_ONLY === 'true',
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL || (process.env.NODE_ENV === 'production' ? 'https://cuphotoclub.com' : 'http://localhost:3000'),
+      // Google Maps Embed API key for the contacts-page map. Public by design
+      // (it ships in the iframe URL) — restrict it by HTTP referrer in Google
+      // Cloud. Empty → contacts.vue falls back to the keyless embed.
+      googleMapsEmbedKey: process.env.NUXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY || '',
       // /cdn-cgi/image/ only exists behind the Cloudflare zone, never in dev.
       // Set NUXT_PUBLIC_IMAGE_TRANSFORMS=false to opt out in production.
       imageTransforms: process.env.NUXT_PUBLIC_IMAGE_TRANSFORMS === 'false'
