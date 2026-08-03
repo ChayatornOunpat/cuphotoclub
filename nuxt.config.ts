@@ -49,9 +49,17 @@ export default defineNuxtConfig({
     db: { dialect: 'sqlite', applyMigrationsDuringDev: true },
     blob: true,
     kv: true,
-    // Persists Nitro's swr route-rule cache in the CACHE KV namespace (see
-    // wrangler.toml). Without it, swr only caches per-isolate in memory.
-    cache: true
+    // swr route-rule cache is intentionally NOT KV-backed. Backing it with the
+    // CACHE KV namespace meant every cache miss wrote the rendered page to KV;
+    // on the free plan (1,000 KV writes/day) that quota was exhausted daily, and
+    // once KV refused writes an unhandled `put()` in the render path 500'd every
+    // swr-cached public page site-wide (the /api/* and Thai routes, which aren't
+    // swr-cached, stayed up). With `cache: false` swr falls back to per-isolate
+    // in-memory caching: no KV writes, so the quota can't be hit, while still
+    // giving the burst protection that fixes Error 1102. Trade-off: the cache is
+    // per-isolate (not shared) and admin edits can take up to the swr TTL to
+    // appear on every isolate. Re-enable only on Workers Paid (1M writes/day).
+    cache: false
   },
 
   nitro: {
