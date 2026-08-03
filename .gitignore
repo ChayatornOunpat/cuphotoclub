@@ -16,6 +16,13 @@ node_modules
 logs
 *.log
 
+# Browser-automation scratch (headless Chrome/Edge profiles + screenshots
+# left behind by agent browser tooling — regenerable, never commit)
+.chrome-debug*
+.edge-*
+.activities-*.png
+.event-*.png
+
 # Misc
 .DS_Store
 .fleet
