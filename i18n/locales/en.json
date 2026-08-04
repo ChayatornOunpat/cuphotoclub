@@ -226,7 +226,11 @@
     "viewEvent": "View event →",
     "close": "Close",
     "selectedEvent": "Selected event",
-    "selectHint": "Select an event on the calendar to preview it here"
+    "selectHint": "Select an event on the calendar to preview it here",
+    "eventDetails": "Event details",
+    "aboutEvent": "About this event",
+    "when": "When",
+    "where": "Where"
   },
   "adminActivities": {
     "title": "Activities",

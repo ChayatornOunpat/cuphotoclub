@@ -24,22 +24,6 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
     optimizeDeps: {
       include: []
-    },
-    // Pre-transform the shell + public entry points at boot so the first
-    // navigation to a public page doesn't stall on on-demand Vite compilation.
-    // (Vite compiles each route's module graph the first time it's visited.)
-    warmup: {
-      clientFiles: [
-        './app/app.vue',
-        './app/layouts/site.vue',
-        './app/layouts/default.vue',
-        './app/pages/index.vue'
-      ],
-      ssrFiles: [
-        './app/app.vue',
-        './app/layouts/site.vue',
-        './app/pages/index.vue'
-      ]
     }
   },
 
