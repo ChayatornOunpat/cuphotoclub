@@ -68,18 +68,13 @@ const secondarySections = computed<SecondarySection[]>(() => [
     to: localePath('/admin/hero-images')
   },
   {
-    key: 'historyImage',
-    title: t('admin.historyImageTitle'),
-    count: historyImage.value?.image ? 1 : 0,
-    meta: t('admin.historyImageMeta'),
-    to: localePath('/admin/history-image')
-  },
-  {
-    key: 'clubroomImage',
-    title: t('admin.clubroomImageTitle'),
-    count: clubroomImage.value?.image ? 1 : 0,
-    meta: t('admin.clubroomImageMeta'),
-    to: localePath('/admin/clubroom-image')
+    // History + Clubroom share one page; the count is how many of the two slots
+    // currently have an image set.
+    key: 'landingImages',
+    title: t('admin.landingImagesTitle'),
+    count: (historyImage.value?.image ? 1 : 0) + (clubroomImage.value?.image ? 1 : 0),
+    meta: t('admin.landingImagesMeta'),
+    to: localePath('/admin/landing-images')
   },
   {
     key: 'r2Images',

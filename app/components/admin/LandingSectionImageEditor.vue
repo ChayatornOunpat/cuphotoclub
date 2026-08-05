@@ -66,7 +66,7 @@ async function save() {
     <header class="landing-image__head">
       <div>
         <p class="landing-image__kicker">{{ sectionNumber }} · {{ sectionLabel }}</p>
-        <h1>{{ title }}</h1>
+        <h2>{{ title }}</h2>
         <p class="landing-image__lead">{{ lead }}</p>
       </div>
       <div class="landing-image__actions">
@@ -113,12 +113,12 @@ async function save() {
 </template>
 
 <style scoped>
+/* One editable landing-page image slot. Rendered as a block so several of
+   them can stack on a single page — the page owns the outer padding, title
+   and any dividers between blocks. */
 .landing-image {
   display: grid;
   gap: 2rem;
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 2.5rem 2rem 5rem;
 }
 
 .landing-image__head {
@@ -136,14 +136,14 @@ async function save() {
   text-transform: uppercase;
 }
 
-.landing-image__head h1 {
+.landing-image__head h2 {
   margin: 0.65rem 0 0.75rem;
   color: var(--dark);
   font-family: var(--font-serif);
-  font-size: clamp(2.8rem, 6vw, 5.5rem);
+  font-size: clamp(1.9rem, 3.6vw, 2.9rem);
   font-weight: 200;
-  letter-spacing: -0.035em;
-  line-height: 0.95;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 .landing-image__lead {
@@ -250,7 +250,6 @@ async function save() {
 }
 
 @media (max-width: 520px) {
-  .landing-image { padding-inline: 1rem; }
   .landing-image__actions { width: 100%; flex-wrap: wrap; }
 }
 </style>

@@ -288,14 +288,15 @@ useSeoMeta({
     <section ref="introSection" class="intro-photos" :class="{ 'intro-photos--in': introVisible }">
       <div class="intro-photos__inner">
         <div class="intro-photos__pile">
-          <div
+          <NuxtLink
             v-for="(a, i) in featuredAlbums.slice(0, 3)"
             :key="i"
+            :to="a.path"
             class="intro-photos__photo"
             :style="{ '--r': `${(i - 1) * 6}deg`, '--i': i }"
           >
             <AppImg :src="a.cover" :alt="a.title" sizes="140px" optimize />
-          </div>
+          </NuxtLink>
         </div>
         <div class="intro-photos__text">
           <div class="eyebrow intro-photos__eyebrow">{{ t('home.introEyebrow') }}</div>
@@ -403,7 +404,7 @@ useSeoMeta({
    without fighting the hover tilt. */
 .intro-photos__photo {
   --d: calc(var(--i, 0) * 110ms);
-  position: relative; z-index: 1;
+  display: block; position: relative; z-index: 1;
   width: 140px; height: 140px; margin-left: -34px; border: 6px solid #fff;
   box-shadow: 0 0.6rem 1.6rem rgba(12, 12, 10, 0.18); background: var(--paper);
   overflow: hidden; transform: rotate(var(--r));
@@ -422,15 +423,18 @@ useSeoMeta({
 .intro-photos--in .intro-photos__photo { translate: 0 0; scale: 1; opacity: 1; }
 
 /* Fan the whole pile out, exaggerating each print's own tilt... */
-.intro-photos__pile:hover .intro-photos__photo {
+.intro-photos__pile:hover .intro-photos__photo,
+.intro-photos__pile:focus-within .intro-photos__photo {
   transform: rotate(calc(var(--r) * 1.5)) translate(calc((var(--i) - 1) * 16px), -6px);
 }
-/* ...and let the print you're pointing at straighten up and come forward. */
-.intro-photos__pile .intro-photos__photo:hover {
+/* ...and let the print you're pointing at (or tabbed to) come forward. */
+.intro-photos__pile .intro-photos__photo:hover,
+.intro-photos__pile .intro-photos__photo:focus-visible {
   z-index: 3;
   transform: rotate(0deg) translate(calc((var(--i) - 1) * 16px), -16px) scale(1.06);
   box-shadow: 0 1.4rem 2.6rem rgba(12, 12, 10, 0.28);
 }
+.intro-photos__photo:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
 .intro-photos__text { max-width: 480px; }
 .intro-photos__eyebrow { margin-bottom: 1.25rem; }
@@ -459,8 +463,10 @@ useSeoMeta({
   .intro-photos__text > * {
     translate: none; scale: none; opacity: 1; transition: none;
   }
-  .intro-photos__pile:hover .intro-photos__photo { transform: rotate(var(--r)); }
-  .intro-photos__pile .intro-photos__photo:hover { transform: rotate(0deg); }
+  .intro-photos__pile:hover .intro-photos__photo,
+  .intro-photos__pile:focus-within .intro-photos__photo { transform: rotate(var(--r)); }
+  .intro-photos__pile .intro-photos__photo:hover,
+  .intro-photos__pile .intro-photos__photo:focus-visible { transform: rotate(0deg); }
 }
 
 @media (max-width: 720px) {
@@ -469,10 +475,12 @@ useSeoMeta({
   /* Narrower prints so the fanned-out pile still fits a phone's width. */
   .intro-photos__pile { align-self: center; padding: 1.25rem 0; }
   .intro-photos__photo { width: 112px; height: 112px; margin-left: -28px; }
-  .intro-photos__pile:hover .intro-photos__photo {
+  .intro-photos__pile:hover .intro-photos__photo,
+  .intro-photos__pile:focus-within .intro-photos__photo {
     transform: rotate(calc(var(--r) * 1.5)) translate(calc((var(--i) - 1) * 10px), -6px);
   }
-  .intro-photos__pile .intro-photos__photo:hover {
+  .intro-photos__pile .intro-photos__photo:hover,
+  .intro-photos__pile .intro-photos__photo:focus-visible {
     transform: rotate(0deg) translate(calc((var(--i) - 1) * 10px), -12px) scale(1.06);
   }
 }
