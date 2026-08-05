@@ -2,7 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import type { BlobObject } from '@nuxthub/core/blob'
 
 interface ImageUsage {
-  kind: 'gallery' | 'hero' | 'history' | 'post-cover' | 'event-cover' | 'member-photo' | 'editorial-album'
+  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'member-photo' | 'editorial-album'
   label: string
   href?: string
   role?: string
@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const prefix = String(query.prefix || '').replace(/[^a-z0-9/_-]/gi, '') || undefined
 
-  const [blobs, galleryPhotos, posts, events, members, heroRows, historyRows, editorialAlbums, trashedKeys] = await Promise.all([
+  const [blobs, galleryPhotos, posts, events, members, heroRows, historyRows, clubroomRows, editorialAlbums, trashedKeys] = await Promise.all([
     listImageBlobs(prefix),
     db
       .select({
@@ -78,6 +78,7 @@ export default defineEventHandler(async (event) => {
     }).from(schema.members).orderBy(schema.members.sortOrder),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'heroImages')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
+    db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'clubroomImage')),
     albumStore.list(),
     trashedKeySet()
   ])
@@ -132,13 +133,23 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const historyImage = decodeHistoryImage(historyRows[0]?.value)
+  const historyImage = decodeManagedImage(historyRows[0]?.value)
   if (historyImage) {
     addUsage(otherUsage, historyImage, {
       kind: 'history',
       label: 'Our History',
       href: '/admin/history-image',
       role: 'history image'
+    })
+  }
+
+  const clubroomImage = decodeManagedImage(clubroomRows[0]?.value)
+  if (clubroomImage) {
+    addUsage(otherUsage, clubroomImage, {
+      kind: 'clubroom',
+      label: 'Clubroom',
+      href: '/admin/clubroom-image',
+      role: 'clubroom image'
     })
   }
 

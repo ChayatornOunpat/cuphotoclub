@@ -12,15 +12,16 @@ const localizedSite = useLocalizedSite(site)
 
 // All awaited fetches run in parallel — awaiting them one after another
 // would serialize three round trips into the SSR time.
-const [{ data: home }, { data: heroImagesData }, { data: historyImageData }] = await Promise.all([
+const [{ data: home }, { data: heroImagesData }, { data: landingImagesData }] = await Promise.all([
   useAsyncData('home', () =>
     $fetch('/api/home').catch(() => ({ albums: [], posts: [], events: [] }))
   ),
   useAsyncData('hero-images', () =>
     $fetch<{ images: string[] }>('/api/hero-images').catch(() => ({ images: [] }))
   ),
-  useAsyncData('history-image', () =>
-    $fetch<{ image: string }>('/api/history-image').catch(() => ({ image: '' }))
+  useAsyncData('landing-images', () =>
+    $fetch<{ historyImage: string, clubroomImage: string }>('/api/landing-images')
+      .catch(() => ({ historyImage: '', clubroomImage: '' }))
   )
 ])
 
@@ -58,7 +59,7 @@ const heroWithImage = computed(() => {
 const historyWithImage = computed(() => {
   const base = localizedSite.value?.history
   if (!base) return base
-  const managedImage = historyImageData.value?.image
+  const managedImage = landingImagesData.value?.historyImage
   if (!managedImage) return base
   return { ...base, image: imageSrc(managedImage) }
 })
@@ -84,9 +85,11 @@ const featuredAlbums = computed(() =>
 // Until a dedicated clubroom photograph is uploaded, use a real image from the
 // club archive rather than presenting the logo as a photograph. The fallback
 // remains deterministic for empty or offline data states.
-const aboutWithImage = computed(() => {
+const clubroomWithImage = computed(() => {
   const base = localizedSite.value?.about
   if (!base) return base
+  const managedImage = landingImagesData.value?.clubroomImage
+  if (managedImage) return { ...base, image: imageSrc(managedImage) }
   const archivePhoto = featuredAlbums.value[0]
   if (!archivePhoto) return base
   return { ...base, image: archivePhoto.cover, imageAlt: archivePhoto.title }
@@ -292,7 +295,7 @@ useSeoMeta({
 
     <HistorySection :history="historyWithImage ?? localizedSite.history" :data-chapter="t('nav.history')" />
 
-    <AboutSection :about="aboutWithImage ?? localizedSite.about" :data-chapter="t('site.about.eyebrow')" />
+    <AboutSection :about="clubroomWithImage ?? localizedSite.about" :data-chapter="t('site.about.eyebrow')" />
 
     <Teleport to="body">
       <div

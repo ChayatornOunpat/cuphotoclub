@@ -3,13 +3,14 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { t } = useI18n()
 const localePath = useLocalePath()
-const [{ data: albums }, { data: posts }, { data: events }, { data: members }, { data: heroImages }, { data: historyImage }] = await Promise.all([
+const [{ data: albums }, { data: posts }, { data: events }, { data: members }, { data: heroImages }, { data: historyImage }, { data: clubroomImage }] = await Promise.all([
   useFetch('/api/admin/albums'),
   useFetch('/api/admin/posts'),
   useFetch('/api/admin/events'),
   useFetch('/api/admin/members'),
   useFetch('/api/admin/hero-images'),
-  useFetch('/api/admin/history-image')
+  useFetch('/api/admin/history-image'),
+  useFetch('/api/admin/clubroom-image')
 ])
 const { user } = useUserSession()
 const canManage = computed(() => user.value?.role === 'owner' || user.value?.role === 'admin')
@@ -72,6 +73,13 @@ const secondarySections = computed<SecondarySection[]>(() => [
     count: historyImage.value?.image ? 1 : 0,
     meta: t('admin.historyImageMeta'),
     to: localePath('/admin/history-image')
+  },
+  {
+    key: 'clubroomImage',
+    title: t('admin.clubroomImageTitle'),
+    count: clubroomImage.value?.image ? 1 : 0,
+    meta: t('admin.clubroomImageMeta'),
+    to: localePath('/admin/clubroom-image')
   },
   {
     key: 'r2Images',

@@ -12,14 +12,14 @@ export default defineEventHandler(async (event) => {
   const image = result.data.image || ''
   await db
     .insert(schema.settings)
-    .values({ key: 'historyImage', value: image })
+    .values({ key: 'clubroomImage', value: image })
     .onConflictDoUpdate({ target: schema.settings.key, set: { value: image, updatedAt: new Date() } })
 
   await recordAdminAudit(actor, {
     action: 'update',
     entityType: 'settings',
-    entityId: 'historyImage',
-    entityTitle: 'History image',
+    entityId: 'clubroomImage',
+    entityTitle: 'Clubroom image',
     metadata: { image: image || null }
   })
 

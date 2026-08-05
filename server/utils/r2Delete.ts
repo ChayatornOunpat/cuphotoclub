@@ -31,6 +31,7 @@ export interface R2DeleteReferenceInfo {
   member: boolean
   hero: boolean
   history: boolean
+  clubroom: boolean
   editorialAlbum: boolean
 }
 
@@ -42,12 +43,13 @@ export function emptyR2DeleteReferenceInfo(): R2DeleteReferenceInfo {
     member: false,
     hero: false,
     history: false,
+    clubroom: false,
     editorialAlbum: false
   }
 }
 
 export function isR2DeleteReferenced(info: R2DeleteReferenceInfo) {
-  return info.galleryPhoto || info.post || info.activity || info.member || info.hero || info.history || info.editorialAlbum
+  return info.galleryPhoto || info.post || info.activity || info.member || info.hero || info.history || info.clubroom || info.editorialAlbum
 }
 
 export async function getR2DeleteReferences(keys: string[]) {
@@ -71,6 +73,7 @@ export async function getR2DeleteReferences(keys: string[]) {
     members,
     heroRows,
     historyRows,
+    clubroomRows,
     editorialAlbums
   ] = await Promise.all([
     selectChunked(normalizedKeys, c => db.select({ r2Key: schema.photos.r2Key }).from(schema.photos).where(inArray(schema.photos.r2Key, c))),
@@ -79,6 +82,7 @@ export async function getR2DeleteReferences(keys: string[]) {
     selectChunked(normalizedKeys, c => db.select({ photoR2Key: schema.members.photoR2Key }).from(schema.members).where(inArray(schema.members.photoR2Key, c))),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'heroImages')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
+    db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'clubroomImage')),
     albumStore.list()
   ])
 
@@ -104,8 +108,11 @@ export async function getR2DeleteReferences(keys: string[]) {
     if (key && keySet.has(key)) ensure(key).hero = true
   }
 
-  const historyKey = normalizeR2Key(decodeHistoryImage(historyRows[0]?.value))
+  const historyKey = normalizeR2Key(decodeManagedImage(historyRows[0]?.value))
   if (historyKey && keySet.has(historyKey)) ensure(historyKey).history = true
+
+  const clubroomKey = normalizeR2Key(decodeManagedImage(clubroomRows[0]?.value))
+  if (clubroomKey && keySet.has(clubroomKey)) ensure(clubroomKey).clubroom = true
 
   for (const album of editorialAlbums) {
     const coverKey = normalizeR2Key(album.coverSrc)
@@ -125,10 +132,11 @@ export async function scrubR2DeleteReferences(keys: string[]) {
   const keySet = new Set(normalizedKeys)
   if (!normalizedKeys.length) return
 
-  const [galleryPhotos, heroRows, historyRows, editorialAlbums] = await Promise.all([
+  const [galleryPhotos, heroRows, historyRows, clubroomRows, editorialAlbums] = await Promise.all([
     selectChunked(normalizedKeys, c => db.select({ id: schema.photos.id }).from(schema.photos).where(inArray(schema.photos.r2Key, c))),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'heroImages')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
+    db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'clubroomImage')),
     albumStore.list()
   ])
 
@@ -157,11 +165,18 @@ export async function scrubR2DeleteReferences(keys: string[]) {
       .where(eq(schema.settings.key, 'heroImages'))
   }
 
-  const historyImage = normalizeR2Key(decodeHistoryImage(historyRows[0]?.value))
+  const historyImage = normalizeR2Key(decodeManagedImage(historyRows[0]?.value))
   if (historyImage && keySet.has(historyImage)) {
     await db.update(schema.settings)
       .set({ value: '', updatedAt: new Date() })
       .where(eq(schema.settings.key, 'historyImage'))
+  }
+
+  const clubroomImage = normalizeR2Key(decodeManagedImage(clubroomRows[0]?.value))
+  if (clubroomImage && keySet.has(clubroomImage)) {
+    await db.update(schema.settings)
+      .set({ value: '', updatedAt: new Date() })
+      .where(eq(schema.settings.key, 'clubroomImage'))
   }
 
   for (const album of editorialAlbums) {
