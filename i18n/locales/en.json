@@ -44,6 +44,7 @@
     "statYearsLabel": "Years archiving",
     "statOpenValue": "Open",
     "statOpenLabel": "To all students",
+    "introEyebrow": "Who we are",
     "introLead": "We're just a bunch of students who really like cameras.",
     "introBody": "Since 1967 we've been meeting up, teaching each other, and shooting everything from campus life to street corners of Bangkok — no experience needed, just curiosity.",
     "introLink": "Come shoot with us →",
@@ -87,6 +88,9 @@
       "eyebrow": "Our History",
       "imageAlt": "Archival photograph from CU Photo Club history",
       "quote": "Every photograph we make is a letter to the future.",
+      "quoteLead": "A letter to the ",
+      "quoteAccent": "future.",
+      "today": "Today",
       "body": [
         "Founded in 1967 by a small group of Chulalongkorn University students with borrowed cameras and a shared obsession with the image, the CU Photo Club has grown into one of Thailand's most respected student photography organisations.",
         "Over five decades, we have documented student life, cultural shifts, and the evolving cityscape of Bangkok — building an archive that is both personal record and historical testimony."

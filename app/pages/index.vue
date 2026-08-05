@@ -177,6 +177,12 @@ watch(heroIndex, () => {
   heroReadyTimer = setTimeout(onHeroReady, 6000)
 })
 
+// ── Intro strip: deal the photo pile in the first time the section scrolls into
+//    view, then stop observing (one-shot — it should never replay on scroll-up).
+const introSection = ref<HTMLElement | null>(null)
+const introVisible = ref(false)
+let introObserver: IntersectionObserver | null = null
+
 function onScroll() {
   const total = document.body.scrollHeight - window.innerHeight
   progress.value = total > 0 ? (window.scrollY / total) * 100 : 0
@@ -208,11 +214,21 @@ onMounted(() => {
   }
   constructionNoticeOpen.value = sessionStorage.getItem(constructionNoticeKey) !== '1'
   window.addEventListener('scroll', onScroll, { passive: true })
+  if (introSection.value) {
+    introObserver = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting) return
+      introVisible.value = true
+      introObserver?.disconnect()
+      introObserver = null
+    }, { threshold: 0.25 })
+    introObserver.observe(introSection.value)
+  }
   // Fallback: never trap the visitor behind the loading screen.
   heroReadyTimer = setTimeout(onHeroReady, 6000)
 })
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
+  introObserver?.disconnect()
   if (heroReadyTimer) clearTimeout(heroReadyTimer)
   if (import.meta.client) document.documentElement.style.overflow = ''
 })
@@ -269,19 +285,20 @@ useSeoMeta({
     <!-- Signature pink line: dark → light transition -->
     <div class="cut-line" />
 
-    <section class="intro-photos">
+    <section ref="introSection" class="intro-photos" :class="{ 'intro-photos--in': introVisible }">
       <div class="intro-photos__inner">
         <div class="intro-photos__pile">
           <div
             v-for="(a, i) in featuredAlbums.slice(0, 3)"
             :key="i"
             class="intro-photos__photo"
-            :style="{ '--r': `${(i - 1) * 6}deg` }"
+            :style="{ '--r': `${(i - 1) * 6}deg`, '--i': i }"
           >
-            <AppImg :src="a.cover" :alt="a.title" sizes="120px" optimize />
+            <AppImg :src="a.cover" :alt="a.title" sizes="140px" optimize />
           </div>
         </div>
         <div class="intro-photos__text">
+          <div class="eyebrow intro-photos__eyebrow">{{ t('home.introEyebrow') }}</div>
           <p class="intro-photos__lead">{{ t('home.introLead') }}</p>
           <p class="intro-photos__body">{{ t('home.introBody') }}</p>
           <NuxtLink :to="localePath('/contacts')" class="intro-photos__link">{{ t('home.introLink') }}</NuxtLink>
@@ -378,28 +395,86 @@ useSeoMeta({
 
 .intro-photos { background: var(--body-bg); padding: 4rem 3rem; }
 .intro-photos__inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 3.5rem; }
-.intro-photos__pile { display: flex; flex-shrink: 0; }
+.intro-photos__pile { display: flex; flex-shrink: 0; padding: 1.75rem 0; }
+
+/* Prints in a pile: they overlap at rest, fan apart when you reach for them,
+   and the one under the cursor lifts clear of the others. `translate`/`scale`
+   stay separate from `transform` so the deal-in entrance can animate position
+   without fighting the hover tilt. */
 .intro-photos__photo {
-  width: 120px; height: 120px; margin-left: -28px; border: 6px solid #fff;
+  --d: calc(var(--i, 0) * 110ms);
+  position: relative; z-index: 1;
+  width: 140px; height: 140px; margin-left: -34px; border: 6px solid #fff;
   box-shadow: 0 0.6rem 1.6rem rgba(12, 12, 10, 0.18); background: var(--paper);
-  overflow: hidden; transform: rotate(var(--r)); transition: transform 0.2s ease;
+  overflow: hidden; transform: rotate(var(--r));
+  translate: 0 1.5rem; scale: 0.94; opacity: 0;
+  transition:
+    transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.45s ease,
+    translate 0.8s cubic-bezier(0.18, 0.84, 0.24, 1) var(--d),
+    scale 0.8s cubic-bezier(0.18, 0.84, 0.24, 1) var(--d),
+    opacity 0.7s ease var(--d);
 }
 .intro-photos__photo:first-child { margin-left: 0; }
 .intro-photos__photo :deep(img) { width: 100%; height: 100%; object-fit: cover; display: block; }
-.intro-photos__pile:hover .intro-photos__photo { transform: rotate(0deg) translateY(-4px); }
+
+/* Deal-in: staggered, once, the first time the strip scrolls into view. */
+.intro-photos--in .intro-photos__photo { translate: 0 0; scale: 1; opacity: 1; }
+
+/* Fan the whole pile out, exaggerating each print's own tilt... */
+.intro-photos__pile:hover .intro-photos__photo {
+  transform: rotate(calc(var(--r) * 1.5)) translate(calc((var(--i) - 1) * 16px), -6px);
+}
+/* ...and let the print you're pointing at straighten up and come forward. */
+.intro-photos__pile .intro-photos__photo:hover {
+  z-index: 3;
+  transform: rotate(0deg) translate(calc((var(--i) - 1) * 16px), -16px) scale(1.06);
+  box-shadow: 0 1.4rem 2.6rem rgba(12, 12, 10, 0.28);
+}
+
 .intro-photos__text { max-width: 480px; }
+.intro-photos__eyebrow { margin-bottom: 1.25rem; }
+.intro-photos__text > * {
+  translate: 0 0.75rem; opacity: 0;
+  transition:
+    translate 0.7s cubic-bezier(0.18, 0.84, 0.24, 1) var(--d),
+    opacity 0.7s ease var(--d);
+}
+.intro-photos__text > :nth-child(1) { --d: 140ms; }
+.intro-photos__text > :nth-child(2) { --d: 230ms; }
+.intro-photos__text > :nth-child(3) { --d: 320ms; }
+.intro-photos__text > :nth-child(4) { --d: 410ms; }
+.intro-photos--in .intro-photos__text > * { translate: 0 0; opacity: 1; }
 .intro-photos__lead {
   font-family: var(--font-serif); font-size: clamp(1.4rem, 2.6vw, 2rem); font-weight: 300;
   line-height: 1.3; color: var(--dark); margin-bottom: 1rem;
 }
 .intro-photos__body { font-size: 0.85rem; line-height: 1.85; color: var(--muted); margin-bottom: 1.25rem; }
-.intro-photos__link { color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 500; }
+.intro-photos__link { display: inline-block; color: var(--accent); text-decoration: none; font-size: 0.75rem; font-weight: 500; }
 .intro-photos__link:hover { text-decoration: underline; }
+
+/* No motion: show everything in place, no deal-in, no fan-out. */
+@media (prefers-reduced-motion: reduce) {
+  .intro-photos__photo,
+  .intro-photos__text > * {
+    translate: none; scale: none; opacity: 1; transition: none;
+  }
+  .intro-photos__pile:hover .intro-photos__photo { transform: rotate(var(--r)); }
+  .intro-photos__pile .intro-photos__photo:hover { transform: rotate(0deg); }
+}
 
 @media (max-width: 720px) {
   .intro-photos { padding: 3rem 1.5rem; }
   .intro-photos__inner { flex-direction: column; align-items: flex-start; gap: 2rem; }
-  .intro-photos__pile { align-self: center; }
+  /* Narrower prints so the fanned-out pile still fits a phone's width. */
+  .intro-photos__pile { align-self: center; padding: 1.25rem 0; }
+  .intro-photos__photo { width: 112px; height: 112px; margin-left: -28px; }
+  .intro-photos__pile:hover .intro-photos__photo {
+    transform: rotate(calc(var(--r) * 1.5)) translate(calc((var(--i) - 1) * 10px), -6px);
+  }
+  .intro-photos__pile .intro-photos__photo:hover {
+    transform: rotate(0deg) translate(calc((var(--i) - 1) * 10px), -12px) scale(1.06);
+  }
 }
 
 #progress {

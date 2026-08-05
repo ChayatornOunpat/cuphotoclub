@@ -27,12 +27,15 @@ export const defaultSite = {
     image: '/club-icon.jpg',
     imageAlt: 'Archival photograph from CU Photo Club history',
     quote: 'Every photograph we make is a letter to the future.',
+    quoteLead: 'A letter to the ',
+    quoteAccent: 'future.',
     body: [
       "Founded in 1967 by a small group of Chulalongkorn University students with borrowed cameras and a shared obsession with the image, the CU Photo Club has grown into one of Thailand's most respected student photography organisations.",
       'Over five decades, we have documented student life, cultural shifts, and the evolving cityscape of Bangkok - building an archive that is both personal record and historical testimony.'
     ],
     sinceNum: '1967',
-    sinceText: ['Year founded', 'Bangkok, Thailand']
+    sinceText: ['Year founded', 'Bangkok, Thailand'],
+    timeline: ['1967', '1980', '2000', 'Today']
   },
   about: {
     eyebrow: 'Where to find us',
@@ -42,7 +45,7 @@ export const defaultSite = {
       { text: 'up.', em: true }
     ],
     body: 'Our clubroom sits on the third floor of Chulachakrapong Building - a shared space for meeting, making, and looking closely together.',
-    cta: { label: 'See the exact location', to: 'https://www.google.com/maps/search/?api=1&query=13.7354841%2C100.5309902' },
+    cta: { label: 'See the exact location', to: 'https://maps.app.goo.gl/Z5YnTEwFsYpxzyX59' },
     image: '/club-icon.jpg',
     imageAlt: 'Photograph from the CU Photo Club archive',
     photoCaption: 'Frame 04 / CU Photo Club',

@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CU Photo Club — History section directions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Spectral:ital,wght@0,200;0,300;1,200;1,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --hero-bg: #0c0c0a;
+      --body-bg: #f5f4f0;
+      --dark: #1a1918;
+      --history: #2c2a26;
+      --muted: #7c7a72;
+      --subtle: #e2ded8;
+      --paper: #eeeae2;
+      --accent: #e8186e;
+      --serif: 'Spectral', Georgia, serif;
+      --sans: 'Inter', sans-serif;
+    }
+
+    html { max-width: 100%; overflow-x: hidden; scroll-behavior: smooth; }
+    body {
+      min-width: 320px;
+      max-width: 100%;
+      overflow-x: hidden;
+      background: #d9d5cd;
+      color: var(--dark);
+      font-family: var(--sans);
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; }
+    img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+    .chooser {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      min-height: 58px;
+      padding: 0.7rem clamp(1rem, 3vw, 3rem);
+      border-bottom: 2px solid var(--accent);
+      background: rgba(12, 12, 10, 0.96);
+      color: #f5f4f0;
+      backdrop-filter: blur(14px);
+    }
+    .chooser__brand {
+      margin-right: auto;
+      font-size: 0.58rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    .chooser__brand span { color: var(--accent); }
+    .chooser__label {
+      color: rgba(245, 244, 240, 0.5);
+      font-size: 0.52rem;
+      letter-spacing: 0.17em;
+      text-transform: uppercase;
+    }
+    .chooser__options { display: flex; gap: 0.35rem; }
+    .chooser__button {
+      min-width: 2.3rem;
+      min-height: 2.1rem;
+      border: 1px solid rgba(245, 244, 240, 0.22);
+      background: transparent;
+      color: #f5f4f0;
+      cursor: pointer;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      transition: border-color 180ms ease, background 180ms ease;
+    }
+    .chooser__button:hover,
+    .chooser__button:focus-visible { border-color: var(--accent); outline: none; }
+    .chooser__button[aria-selected="true"] { border-color: var(--accent); background: var(--accent); }
+
+    .mockup { display: none; }
+    .mockup.is-active { display: block; }
+    .mockup,
+    .mockup > *,
+    .a__grid > *,
+    .b__layout > *,
+    .b__bottom > *,
+    .c__grid > * { min-width: 0; }
+    .mockup__note {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      padding: 0.8rem clamp(1rem, 3vw, 3rem);
+      border-bottom: 1px solid rgba(26, 25, 24, 0.12);
+      background: var(--paper);
+      color: var(--muted);
+      font-size: 0.55rem;
+      letter-spacing: 0.14em;
+      line-height: 1.5;
+      text-transform: uppercase;
+    }
+    .mockup__note strong { color: var(--dark); font-weight: 500; }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.56rem;
+      font-weight: 400;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+    }
+    .eyebrow::after { content: ''; width: 4rem; height: 1px; background: currentColor; opacity: 0.35; }
+    .eyebrow__num { color: var(--accent); }
+
+    .managed-photo { position: relative; overflow: hidden; background: #44413b; }
+    .managed-photo::after {
+      content: 'MANAGED IMAGE 03 / ARCHIVE PHOTOGRAPH';
+      position: absolute;
+      right: 1rem;
+      bottom: 1rem;
+      max-width: calc(100% - 2rem);
+      padding: 0.5rem 0.65rem;
+      background: rgba(12, 12, 10, 0.82);
+      color: rgba(245, 244, 240, 0.78);
+      font-size: 0.42rem;
+      letter-spacing: 0.14em;
+      line-height: 1.4;
+      text-transform: uppercase;
+    }
+
+    /* ── Option A: The archive print ───────────────────────────────────── */
+    .option-a {
+      position: relative;
+      min-height: 820px;
+      padding: clamp(3.5rem, 7vw, 7rem) clamp(1rem, 5vw, 5rem);
+      overflow: hidden;
+      background: var(--history);
+      color: #f0ede6;
+    }
+    .option-a::before {
+      content: '1967';
+      position: absolute;
+      top: -0.15em;
+      right: -0.03em;
+      color: rgba(240, 237, 230, 0.035);
+      font-family: var(--serif);
+      font-size: clamp(13rem, 31vw, 33rem);
+      font-weight: 200;
+      letter-spacing: -0.09em;
+      line-height: 0.8;
+      pointer-events: none;
+    }
+    .a__grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.12fr) minmax(320px, 0.88fr);
+      gap: clamp(3rem, 7vw, 8rem);
+      max-width: 1380px;
+      margin: 0 auto;
+      align-items: center;
+    }
+    .a__print { position: relative; padding: 1.1rem 1.1rem 3.2rem; background: #d7d1c7; transform: rotate(-1.2deg); }
+    .a__photo { aspect-ratio: 4 / 3; }
+    .a__photo img { filter: grayscale(1) contrast(1.12) brightness(0.86); }
+    .a__print-meta {
+      position: absolute;
+      right: 1.1rem;
+      bottom: 1.15rem;
+      left: 1.1rem;
+      display: flex;
+      justify-content: space-between;
+      color: #514e48;
+      font-size: 0.47rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .a__content { padding-top: 1rem; }
+    .a__eyebrow { color: rgba(240, 237, 230, 0.45); }
+    .a__quote {
+      margin: clamp(3rem, 7vw, 6.5rem) 0 2.4rem;
+      font-family: var(--serif);
+      font-size: clamp(2.8rem, 5.3vw, 6.1rem);
+      font-style: italic;
+      font-weight: 200;
+      letter-spacing: -0.04em;
+      line-height: 0.98;
+    }
+    .a__quote em { color: var(--accent); font-weight: 200; }
+    .a__copy {
+      max-width: 34rem;
+      color: rgba(240, 237, 230, 0.58);
+      font-size: 0.78rem;
+      line-height: 1.9;
+    }
+    .a__copy p + p { margin-top: 1rem; }
+    .a__footer {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 2rem;
+      margin-top: 3rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid rgba(240, 237, 230, 0.16);
+    }
+    .a__year { color: var(--accent); font-family: var(--serif); font-size: 4rem; font-weight: 200; line-height: 0.8; }
+    .a__year-label { color: rgba(240, 237, 230, 0.42); font-size: 0.48rem; letter-spacing: 0.17em; line-height: 1.6; text-align: right; text-transform: uppercase; }
+
+    /* ── Option B: The living time axis ────────────────────────────────── */
+    .option-b {
+      position: relative;
+      min-height: min(900px, calc(100svh - 100px));
+      overflow: hidden;
+      background: var(--hero-bg);
+      color: #f5f4f0;
+    }
+    .b__photo { position: absolute; inset: 0; }
+    .b__photo img { filter: grayscale(0.85) sepia(0.18) contrast(1.12) brightness(0.58); }
+    .b__photo::before {
+      content: '';
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(12, 12, 10, 0.96) 0%, rgba(12, 12, 10, 0.77) 42%, rgba(12, 12, 10, 0.16) 100%);
+    }
+    .b__photo::after { z-index: 2; }
+    .b__layout {
+      position: relative;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr);
+      min-height: inherit;
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 0 clamp(1rem, 4vw, 4rem);
+    }
+    .b__axis {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: clamp(4rem, 8vw, 7rem) 1.5rem clamp(3rem, 5vw, 5rem) 0;
+      border-right: 1px solid rgba(245, 244, 240, 0.2);
+    }
+    .b__tick { position: relative; color: rgba(245, 244, 240, 0.38); font-size: 0.5rem; letter-spacing: 0.15em; }
+    .b__tick::after { content: ''; position: absolute; top: 50%; right: -1.55rem; width: 0.55rem; height: 1px; background: rgba(245, 244, 240, 0.35); }
+    .b__tick:first-child { color: var(--accent); }
+    .b__tick:first-child::after { height: 7px; width: 7px; right: -1.78rem; margin-top: -3px; background: var(--accent); border-radius: 50%; }
+    .b__content {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      max-width: 900px;
+      padding: clamp(4rem, 8vw, 7rem) 0 clamp(3rem, 5vw, 5rem) clamp(2rem, 7vw, 8rem);
+    }
+    .b__eyebrow { color: rgba(245, 244, 240, 0.52); }
+    .b__quote {
+      max-width: 850px;
+      margin: 4rem 0;
+      font-family: var(--serif);
+      font-size: clamp(3.6rem, 7.3vw, 8.6rem);
+      font-style: italic;
+      font-weight: 200;
+      letter-spacing: -0.055em;
+      line-height: 0.87;
+      text-wrap: balance;
+    }
+    .b__quote span { color: var(--accent); }
+    .b__bottom { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 3rem; align-items: end; }
+    .b__copy { max-width: 620px; color: rgba(245, 244, 240, 0.6); font-size: 0.75rem; line-height: 1.85; }
+    .b__copy p + p { margin-top: 0.8rem; }
+    .b__founded { padding-left: 1.25rem; border-left: 2px solid var(--accent); }
+    .b__founded strong { display: block; color: #f5f4f0; font-family: var(--serif); font-size: 3.8rem; font-weight: 200; line-height: 0.9; }
+    .b__founded span { display: block; margin-top: 0.55rem; color: rgba(245, 244, 240, 0.45); font-size: 0.47rem; letter-spacing: 0.17em; line-height: 1.5; text-transform: uppercase; }
+
+    /* ── Option C: Museum folio ────────────────────────────────────────── */
+    .option-c {
+      position: relative;
+      min-height: 850px;
+      padding: clamp(3rem, 6vw, 6rem) clamp(1rem, 5vw, 5rem);
+      overflow: hidden;
+      background: var(--body-bg);
+      color: var(--dark);
+    }
+    .option-c::after { content: ''; position: absolute; top: 0; right: clamp(1rem, 5vw, 5rem); left: clamp(1rem, 5vw, 5rem); height: 2px; background: var(--accent); }
+    .c__wrap { max-width: 1450px; margin: 0 auto; }
+    .c__header { display: flex; align-items: center; justify-content: space-between; gap: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--subtle); }
+    .c__eyebrow { color: var(--muted); }
+    .c__folio { color: var(--muted); font-size: 0.48rem; letter-spacing: 0.17em; line-height: 1.5; text-align: right; text-transform: uppercase; }
+    .c__grid {
+      display: grid;
+      grid-template-columns: minmax(180px, 0.38fr) minmax(300px, 0.78fr) minmax(340px, 1.12fr);
+      min-height: 650px;
+      border-bottom: 1px solid var(--subtle);
+    }
+    .c__year-col { display: flex; flex-direction: column; justify-content: space-between; padding: clamp(2.5rem, 5vw, 5rem) 2rem 2rem 0; border-right: 1px solid var(--subtle); }
+    .c__year {
+      color: var(--accent);
+      font-family: var(--serif);
+      font-size: clamp(5rem, 10vw, 10rem);
+      font-weight: 200;
+      letter-spacing: -0.07em;
+      line-height: 0.75;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+    }
+    .c__year-note { color: var(--muted); font-size: 0.47rem; letter-spacing: 0.16em; line-height: 1.6; text-transform: uppercase; }
+    .c__story { display: flex; flex-direction: column; justify-content: space-between; padding: clamp(2.5rem, 5vw, 5rem) clamp(2rem, 5vw, 5rem) 2rem; }
+    .c__quote {
+      font-family: var(--serif);
+      font-size: clamp(2.7rem, 4.4vw, 5.1rem);
+      font-style: italic;
+      font-weight: 200;
+      letter-spacing: -0.04em;
+      line-height: 1.02;
+    }
+    .c__quote em { color: var(--accent); font-weight: 200; }
+    .c__copy { max-width: 430px; color: var(--muted); font-size: 0.75rem; line-height: 1.85; }
+    .c__copy p + p { margin-top: 0.9rem; }
+    .c__photo-col { padding: clamp(2.5rem, 5vw, 5rem) 0 2rem; }
+    .c__photo { height: 100%; min-height: 520px; }
+    .c__photo img { filter: grayscale(1) contrast(1.05); }
+    .c__caption { display: flex; justify-content: space-between; gap: 1rem; margin-top: 0.75rem; color: var(--muted); font-size: 0.44rem; letter-spacing: 0.14em; text-transform: uppercase; }
+
+    @media (max-width: 980px) {
+      .a__grid { grid-template-columns: 1fr; gap: 4rem; }
+      .a__print { max-width: 700px; }
+      .b__quote { font-size: clamp(3.4rem, 10vw, 7rem); }
+      .c__grid { grid-template-columns: 130px 1fr; }
+      .c__photo-col { grid-column: 1 / -1; padding-top: 0; }
+      .c__photo { min-height: 480px; }
+    }
+
+    @media (max-width: 680px) {
+      .chooser { width: 100vw; max-width: 100vw; gap: 0.6rem; padding-inline: 1rem; }
+      .chooser__label { display: none; }
+      .chooser__brand { margin-right: 7.5rem; font-size: 0.47rem; white-space: nowrap; }
+      .chooser__options { position: absolute; top: 0.7rem; right: 1rem; flex-shrink: 0; }
+      .chooser__button { min-width: 2rem; }
+      .mockup__note { width: 100vw; max-width: 100vw; align-items: flex-start; flex-direction: column; gap: 0.3rem; }
+      .mockup__note span { max-width: 100%; font-size: 0.47rem; }
+      .option-a, .option-c { padding-inline: 1rem; }
+      .a__quote { margin-top: 3rem; }
+      .a__footer { align-items: flex-start; flex-direction: column; }
+      .a__year-label { text-align: left; }
+      .b__layout { grid-template-columns: 54px minmax(0, 1fr); padding-inline: 1rem; }
+      .b__axis { padding-right: 0.8rem; }
+      .b__tick { font-size: 0.42rem; writing-mode: vertical-rl; }
+      .b__tick::after { right: -0.85rem; }
+      .b__tick:first-child::after { right: -1.06rem; }
+      .b__content { padding-left: 1.25rem; }
+      .b__quote { max-width: 100%; overflow-wrap: break-word; }
+      .b__bottom { grid-template-columns: 1fr; }
+      .b__founded { margin-top: 1rem; }
+      .c__header { align-items: flex-start; }
+      .c__folio { display: none; }
+      .c__wrap,
+      .c__grid,
+      .c__story { width: 100%; max-width: 100%; }
+      .c__grid { grid-template-columns: 62px minmax(0, 1fr); }
+      .c__year-col { padding-right: 0.8rem; }
+      .c__year { font-size: 4.2rem; }
+      .c__year-note { font-size: 0.4rem; }
+      .c__story { width: calc(100vw - 94px); max-width: calc(100vw - 94px); padding-inline: 1.25rem 0; }
+      .c__quote { max-width: 100%; overflow-wrap: break-word; }
+      .c__copy { margin-top: 3rem; }
+      .c__photo-col { width: calc(100vw - 32px); max-width: calc(100vw - 32px); overflow: hidden; }
+      .c__photo { min-height: 380px; }
+      .c__caption { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="chooser" aria-label="Choose a History section direction">
+    <p class="chooser__brand"><span>CU</span> Photo Club / 03</p>
+    <p class="chooser__label">History directions</p>
+    <div class="chooser__options" role="tablist" aria-label="Mockup options">
+      <button class="chooser__button" type="button" role="tab" aria-selected="true" data-option="a">A</button>
+      <button class="chooser__button" type="button" role="tab" aria-selected="false" data-option="b">B</button>
+      <button class="chooser__button" type="button" role="tab" aria-selected="false" data-option="c">C</button>
+    </div>
+  </nav>
+
+  <main>
+    <article class="mockup is-active" data-mockup="a">
+      <div class="mockup__note">
+        <strong>Option A — The archive print</strong>
+        <span>Tactile, intimate, and easiest to blend into the current landing rhythm</span>
+      </div>
+      <section class="option-a">
+        <div class="a__grid">
+          <figure class="a__print">
+            <div class="managed-photo a__photo">
+              <img src="https://images.unsplash.com/photo-1452780212940-6f5c0d14d848?auto=format&amp;fit=crop&amp;w=1400&amp;q=88" alt="Placeholder for the managed CU Photo Club archival photograph">
+            </div>
+            <figcaption class="a__print-meta"><span>CU Photo Club archive</span><span>Frame 03 · Bangkok</span></figcaption>
+          </figure>
+          <div class="a__content">
+            <p class="eyebrow a__eyebrow"><span class="eyebrow__num">03</span> Our History</p>
+            <blockquote class="a__quote">Every photograph is a letter to the <em>future.</em></blockquote>
+            <div class="a__copy">
+              <p>Founded in 1967 by a small group of Chulalongkorn University students with borrowed cameras and a shared obsession with the image, the CU Photo Club has grown into one of Thailand's most respected student photography organisations.</p>
+              <p>Over five decades, we have documented student life, cultural shifts, and the evolving cityscape of Bangkok—building an archive that is both personal record and historical testimony.</p>
+            </div>
+            <div class="a__footer">
+              <strong class="a__year">1967</strong>
+              <span class="a__year-label">Year founded<br>Bangkok, Thailand</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </article>
+
+    <article class="mockup" data-mockup="b">
+      <div class="mockup__note">
+        <strong>Option B — The living time axis</strong>
+        <span>Cinematic and immersive; turns one archival image into the section's atmosphere</span>
+      </div>
+      <section class="option-b">
+        <div class="managed-photo b__photo">
+          <img src="https://images.unsplash.com/photo-1452780212940-6f5c0d14d848?auto=format&amp;fit=crop&amp;w=2200&amp;q=90" alt="Placeholder for the managed CU Photo Club archival photograph">
+        </div>
+        <div class="b__layout">
+          <div class="b__axis" aria-label="Timeline from 1967 to today">
+            <span class="b__tick">1967</span>
+            <span class="b__tick">1980</span>
+            <span class="b__tick">2000</span>
+            <span class="b__tick">Today</span>
+          </div>
+          <div class="b__content">
+            <p class="eyebrow b__eyebrow"><span class="eyebrow__num">03</span> Our History</p>
+            <blockquote class="b__quote">A letter to the <span>future.</span></blockquote>
+            <div class="b__bottom">
+              <div class="b__copy">
+                <p>Founded in 1967 by Chulalongkorn University students with borrowed cameras and a shared obsession with the image, CU Photo Club has grown into one of Thailand's most respected student photography organisations.</p>
+                <p>Across five decades, the archive has become both a personal record and historical testimony of student life, cultural change, and Bangkok.</p>
+              </div>
+              <div class="b__founded"><strong>1967</strong><span>Year founded<br>Bangkok, Thailand</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </article>
+
+    <article class="mockup" data-mockup="c">
+      <div class="mockup__note">
+        <strong>Option C — Museum folio</strong>
+        <span>Bright, archival, and typographic; feels like an exhibition catalogue opened on the homepage</span>
+      </div>
+      <section class="option-c">
+        <div class="c__wrap">
+          <header class="c__header">
+            <p class="eyebrow c__eyebrow"><span class="eyebrow__num">03</span> Our History</p>
+            <p class="c__folio">Archive folio 001<br>Chulalongkorn University</p>
+          </header>
+          <div class="c__grid">
+            <div class="c__year-col">
+              <strong class="c__year">1967</strong>
+              <span class="c__year-note">Bangkok<br>Thailand</span>
+            </div>
+            <div class="c__story">
+              <blockquote class="c__quote">Every photograph we make is a letter to the <em>future.</em></blockquote>
+              <div class="c__copy">
+                <p>Founded by a small group of Chulalongkorn University students with borrowed cameras and a shared obsession with the image, CU Photo Club has grown into one of Thailand's most respected student photography organisations.</p>
+                <p>Over five decades, we have documented student life, cultural shifts, and the evolving cityscape of Bangkok.</p>
+              </div>
+            </div>
+            <figure class="c__photo-col">
+              <div class="managed-photo c__photo">
+                <img src="https://images.unsplash.com/photo-1452780212940-6f5c0d14d848?auto=format&amp;fit=crop&amp;w=1400&amp;q=88" alt="Placeholder for the managed CU Photo Club archival photograph">
+              </div>
+              <figcaption class="c__caption"><span>Club archive / selected frame</span><span>Personal record · Historical testimony</span></figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <script>
+    const buttons = [...document.querySelectorAll('[data-option]')]
+    const mockups = [...document.querySelectorAll('[data-mockup]')]
+
+    function showOption(option, updateHash = true) {
+      buttons.forEach(button => button.setAttribute('aria-selected', String(button.dataset.option === option)))
+      mockups.forEach(mockup => mockup.classList.toggle('is-active', mockup.dataset.mockup === option))
+      if (updateHash) history.replaceState(null, '', `#${option}`)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
+    buttons.forEach((button, index) => {
+      button.addEventListener('click', () => showOption(button.dataset.option))
+      button.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+        event.preventDefault()
+        const step = event.key === 'ArrowRight' ? 1 : -1
+        const next = buttons[(index + step + buttons.length) % buttons.length]
+        next.focus()
+        showOption(next.dataset.option)
+      })
+    })
+
+    const initial = location.hash.slice(1).toLowerCase()
+    if (buttons.some(button => button.dataset.option === initial)) showOption(initial, false)
+  </script>
+</body>
+</html>

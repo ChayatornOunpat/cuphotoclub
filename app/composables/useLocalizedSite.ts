@@ -27,6 +27,8 @@ export function useLocalizedSite(site: Ref<any>) {
         eyebrow: t('site.history.eyebrow'),
         imageAlt: t('site.history.imageAlt'),
         quote: t('site.history.quote'),
+        quoteLead: t('site.history.quoteLead'),
+        quoteAccent: t('site.history.quoteAccent'),
         body: [
           t('site.history.body.0'),
           t('site.history.body.1')
@@ -34,7 +36,8 @@ export function useLocalizedSite(site: Ref<any>) {
         sinceText: [
           t('site.history.sinceText.0'),
           t('site.history.sinceText.1')
-        ]
+        ],
+        timeline: [base.history.sinceNum, '1980', '2000', t('site.history.today')]
       },
       about: {
         ...base.about,
