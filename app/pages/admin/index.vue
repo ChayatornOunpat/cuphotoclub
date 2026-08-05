@@ -3,12 +3,13 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { t } = useI18n()
 const localePath = useLocalePath()
-const [{ data: albums }, { data: posts }, { data: events }, { data: members }, { data: heroImages }] = await Promise.all([
+const [{ data: albums }, { data: posts }, { data: events }, { data: members }, { data: heroImages }, { data: historyImage }] = await Promise.all([
   useFetch('/api/admin/albums'),
   useFetch('/api/admin/posts'),
   useFetch('/api/admin/events'),
   useFetch('/api/admin/members'),
-  useFetch('/api/admin/hero-images')
+  useFetch('/api/admin/hero-images'),
+  useFetch('/api/admin/history-image')
 ])
 const { user } = useUserSession()
 const canManage = computed(() => user.value?.role === 'owner' || user.value?.role === 'admin')
@@ -64,6 +65,13 @@ const secondarySections = computed<SecondarySection[]>(() => [
     count: heroImages.value?.images?.length ?? 0,
     meta: t('admin.heroImagesMeta'),
     to: localePath('/admin/hero-images')
+  },
+  {
+    key: 'historyImage',
+    title: t('admin.historyImageTitle'),
+    count: historyImage.value?.image ? 1 : 0,
+    meta: t('admin.historyImageMeta'),
+    to: localePath('/admin/history-image')
   },
   {
     key: 'r2Images',

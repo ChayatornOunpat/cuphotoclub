@@ -85,6 +85,7 @@
     },
     "history": {
       "eyebrow": "Our History",
+      "imageAlt": "Archival photograph from CU Photo Club history",
       "quote": "Every photograph we make is a letter to the future.",
       "body": [
         "Founded in 1967 by a small group of Chulalongkorn University students with borrowed cameras and a shared obsession with the image, the CU Photo Club has grown into one of Thailand's most respected student photography organisations.",
@@ -96,14 +97,21 @@
       ]
     },
     "about": {
-      "eyebrow": "About Us",
+      "eyebrow": "Where to find us",
       "heading": [
-        { "text": "A community" },
-        { "text": "that " },
-        { "text": "sees", "em": true }
+        { "text": "Follow the" },
+        { "text": "frames " },
+        { "text": "up.", "em": true }
       ],
-      "body": "CU Photo Club is open to all students of Chulalongkorn University regardless of experience level. We run workshops, Photo Camp, 1 Day Trip photo outings, annual exhibitions, and maintain an active archive of visual work from across the decades. If you have curiosity and a camera, you belong here.",
-      "ctaLabel": "Join the Club"
+      "body": "Our clubroom sits on the third floor of Chulachakrapong Building — a shared space for meeting, making, and looking closely together.",
+      "ctaLabel": "See the exact location",
+      "imageAlt": "Photograph from the CU Photo Club archive",
+      "photoCaption": "Frame 04 / CU Photo Club",
+      "route": [
+        { "label": "01 · Campus", "lines": ["Enter from", "Phaya Thai Road"] },
+        { "label": "02 · Building", "lines": ["Chulachakrapong", "Building"] },
+        { "label": "03 · Room", "lines": ["Third floor", "CU Photo Club"] }
+      ]
     },
     "footer": {
       "tagline": "Official photography club of\nChulalongkorn University, Bangkok, Thailand",
@@ -112,7 +120,7 @@
           "title": "Navigate",
           "links": [
             { "label": "History", "to": "/#history" },
-            { "label": "About", "to": "/#about" },
+            { "label": "Clubroom", "to": "/#about" },
             { "label": "Developed By", "to": "/developed-by" }
           ]
         },
@@ -378,6 +386,17 @@
     "heroImagesLead": "The system picks one of these images at random on each page load.",
     "addImages": "Add Images",
     "heroImagesEmpty": "No images yet — click \"Add Images\" to upload or select",
+    "historyImageTitle": "Our History Image",
+    "historyImageMeta": "Homepage history photograph",
+    "historyImageLead": "Choose the archival photograph shown in section 03 · Our History. The preview matches the crop and tone used on the public landing page.",
+    "historyImagePickerTitle": "Choose the Our History image",
+    "historyImagePreviewAlt": "Preview of the selected Our History photograph",
+    "historyImageEmpty": "Choose the history photograph",
+    "historyImageEmptyHint": "Select or upload one image from the club archive. The existing site image remains as a fallback until you save.",
+    "selectImage": "Select Image",
+    "changeImage": "Change Image",
+    "selectedImage": "Selected image",
+    "clearSelection": "Clear Selection",
     "removeImage": "Remove image",
     "saved": "Saved",
     "sectionContent": "Content",

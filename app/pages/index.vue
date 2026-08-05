@@ -10,14 +10,17 @@ const localePath = useLocalePath()
 const localizedPath = useLocalizedContentPath()
 const localizedSite = useLocalizedSite(site)
 
-// Both awaited fetches run in parallel — awaiting them one after another
-// would serialize two round trips into the SSR time.
-const [{ data: home }, { data: heroImagesData }] = await Promise.all([
+// All awaited fetches run in parallel — awaiting them one after another
+// would serialize three round trips into the SSR time.
+const [{ data: home }, { data: heroImagesData }, { data: historyImageData }] = await Promise.all([
   useAsyncData('home', () =>
     $fetch('/api/home').catch(() => ({ albums: [], posts: [], events: [] }))
   ),
   useAsyncData('hero-images', () =>
     $fetch<{ images: string[] }>('/api/hero-images').catch(() => ({ images: [] }))
+  ),
+  useAsyncData('history-image', () =>
+    $fetch<{ image: string }>('/api/history-image').catch(() => ({ image: '' }))
   )
 ])
 
@@ -52,6 +55,14 @@ const heroWithImage = computed(() => {
   return { ...base, image: `/images/${imgs[heroIndex.value % imgs.length]}` }
 })
 
+const historyWithImage = computed(() => {
+  const base = localizedSite.value?.history
+  if (!base) return base
+  const managedImage = historyImageData.value?.image
+  if (!managedImage) return base
+  return { ...base, image: imageSrc(managedImage) }
+})
+
 // ── Featured Work: FeaturedWork.vue lays out a randomised, rectangle-guaranteed
 //    wall from these albums. The randomness is driven by a seed that is created
 //    once on the server and serialised via useState, so the server and client
@@ -69,6 +80,17 @@ const featuredAlbums = computed(() =>
     }))
     .filter(a => a.cover)
 )
+
+// Until a dedicated clubroom photograph is uploaded, use a real image from the
+// club archive rather than presenting the logo as a photograph. The fallback
+// remains deterministic for empty or offline data states.
+const aboutWithImage = computed(() => {
+  const base = localizedSite.value?.about
+  if (!base) return base
+  const archivePhoto = featuredAlbums.value[0]
+  if (!archivePhoto) return base
+  return { ...base, image: archivePhoto.cover, imageAlt: archivePhoto.title }
+})
 
 // ── Stories: albums, posts, and events merged into one feed, newest first.
 const feed = computed(() => {
@@ -268,9 +290,9 @@ useSeoMeta({
 
     <StoriesSection :lead="leadStory" :items="smallStories" :data-chapter="t('home.latest')" />
 
-    <HistorySection :history="localizedSite.history" :data-chapter="t('nav.history')" />
+    <HistorySection :history="historyWithImage ?? localizedSite.history" :data-chapter="t('nav.history')" />
 
-    <AboutSection :about="localizedSite.about" :data-chapter="t('nav.about')" />
+    <AboutSection :about="aboutWithImage ?? localizedSite.about" :data-chapter="t('site.about.eyebrow')" />
 
     <Teleport to="body">
       <div

@@ -3,7 +3,7 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: 'R2 Images' })
 
 interface ImageUsage {
-  kind: 'gallery' | 'hero' | 'post-cover' | 'event-cover' | 'member-photo' | 'editorial-album'
+  kind: 'gallery' | 'hero' | 'history' | 'post-cover' | 'event-cover' | 'member-photo' | 'editorial-album'
   label: string
   href?: string
   role?: string
@@ -388,7 +388,7 @@ async function confirmDelete(image: R2Image) {
     warningItems: hasReferences
       ? [
           `${image.albums.length + image.usages.length} known reference${image.albums.length + image.usages.length === 1 ? '' : 's'}`,
-          'Trashing it clears the covers, hero images, gallery tiles, or album layouts that use it. Restoring brings back the file, not those references.'
+          'Trashing it clears the covers, hero or history images, gallery tiles, or album layouts that use it. Restoring brings back the file, not those references.'
         ]
       : []
   })
@@ -589,7 +589,7 @@ async function bulkDelete() {
       : 'This selects every R2 image currently loaded in this inventory.')
   }
   if (referencedCount) {
-    warningItems.push(`${referencedCount} selected image${referencedCount === 1 ? ' is' : 's are'} referenced by albums, heroes, posts, events, members, or layouts.`)
+    warningItems.push(`${referencedCount} selected image${referencedCount === 1 ? ' is' : 's are'} referenced by albums, hero or history sections, posts, events, members, or layouts.`)
     warningItems.push('Trashing referenced images clears those references. Restoring brings back the file, not the references.')
   }
 
@@ -680,6 +680,7 @@ function trashReferenceLabels(item: TrashItem): string[] {
     activity: 'Activity cover',
     member: 'Member photo',
     hero: 'Hero',
+    history: 'Our History',
     editorialAlbum: 'Album'
   }
   return Object.entries(item.references)

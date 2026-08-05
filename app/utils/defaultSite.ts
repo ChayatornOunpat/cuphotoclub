@@ -7,7 +7,7 @@ export const defaultSite = {
       { label: 'Activities', to: '/activities' },
       { label: 'Members', to: '/members' },
       { label: 'Contact', to: '/contacts' },
-      { label: 'Join', to: '/#about', join: true }
+      { label: 'Join', to: '/contacts', join: true }
     ]
   },
   hero: {
@@ -25,6 +25,7 @@ export const defaultSite = {
   history: {
     eyebrow: 'Our History',
     image: '/club-icon.jpg',
+    imageAlt: 'Archival photograph from CU Photo Club history',
     quote: 'Every photograph we make is a letter to the future.',
     body: [
       "Founded in 1967 by a small group of Chulalongkorn University students with borrowed cameras and a shared obsession with the image, the CU Photo Club has grown into one of Thailand's most respected student photography organisations.",
@@ -34,15 +35,24 @@ export const defaultSite = {
     sinceText: ['Year founded', 'Bangkok, Thailand']
   },
   about: {
-    eyebrow: 'About Us',
+    eyebrow: 'Where to find us',
     heading: [
-      { text: 'A community' },
-      { text: 'that ' },
-      { text: 'sees', em: true }
+      { text: 'Follow the' },
+      { text: 'frames ' },
+      { text: 'up.', em: true }
     ],
-    body: 'CU Photo Club is open to all students of Chulalongkorn University regardless of experience level. We meet weekly, run workshops, hold annual exhibitions, and maintain an active archive of visual work from across the decades. If you have curiosity and a camera, you belong here.',
-    cta: { label: 'Join the Club', to: '/contacts' },
-    image: '/club-icon.jpg'
+    body: 'Our clubroom sits on the third floor of Chulachakrapong Building - a shared space for meeting, making, and looking closely together.',
+    cta: { label: 'See the exact location', to: 'https://www.google.com/maps/search/?api=1&query=13.7354841%2C100.5309902' },
+    image: '/club-icon.jpg',
+    imageAlt: 'Photograph from the CU Photo Club archive',
+    photoCaption: 'Frame 04 / CU Photo Club',
+    coordinates: '13.7355° N · 100.5310° E',
+    floor: '3F',
+    route: [
+      { label: '01 · Campus', lines: ['Enter from', 'Phaya Thai Road'] },
+      { label: '02 · Building', lines: ['Chulachakrapong', 'Building'] },
+      { label: '03 · Room', lines: ['Third floor', 'CU Photo Club'] }
+    ]
   },
   footer: {
     tagline: 'Official photography club of\nChulalongkorn University, Bangkok, Thailand',
@@ -53,8 +63,8 @@ export const defaultSite = {
           { label: 'Albums', to: '/albums' },
           { label: 'Blog', to: '/blog' },
           { label: 'History', to: '/#history' },
-          { label: 'About', to: '/#about' },
-          { label: 'Join', to: '/#about' },
+          { label: 'Clubroom', to: '/#about' },
+          { label: 'Join', to: '/contacts' },
           { label: 'Contact', to: '/contacts' },
           { label: 'Developed By', to: '/developed-by' }
         ]

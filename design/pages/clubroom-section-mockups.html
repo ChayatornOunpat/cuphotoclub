@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CU Photo Club — Clubroom section directions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Spectral:ital,wght@0,200;0,300;1,200;1,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --hero-bg: #0c0c0a;
+      --body-bg: #f5f4f0;
+      --dark: #1a1918;
+      --muted: #7c7a72;
+      --subtle: #e2ded8;
+      --paper: #eeeae2;
+      --accent: #e8186e;
+      --serif: 'Spectral', Georgia, serif;
+      --sans: 'Inter', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      min-width: 320px;
+      background: #d9d5cd;
+      color: var(--dark);
+      font-family: var(--sans);
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, a { font: inherit; }
+    img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+    .chooser {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      min-height: 58px;
+      padding: 0.7rem clamp(1rem, 3vw, 3rem);
+      background: rgba(12, 12, 10, 0.96);
+      border-bottom: 2px solid var(--accent);
+      color: #f5f4f0;
+      backdrop-filter: blur(14px);
+    }
+    .chooser__brand {
+      margin-right: auto;
+      font-size: 0.58rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    .chooser__brand span { color: var(--accent); }
+    .chooser__label {
+      color: rgba(245, 244, 240, 0.5);
+      font-size: 0.52rem;
+      letter-spacing: 0.17em;
+      text-transform: uppercase;
+    }
+    .chooser__options { display: flex; gap: 0.35rem; }
+    .chooser__button {
+      min-width: 2.3rem;
+      min-height: 2.1rem;
+      border: 1px solid rgba(245, 244, 240, 0.22);
+      background: transparent;
+      color: #f5f4f0;
+      cursor: pointer;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      transition: border-color 180ms ease, background 180ms ease;
+    }
+    .chooser__button:hover { border-color: var(--accent); }
+    .chooser__button[aria-selected="true"] {
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+
+    .mockup { display: none; }
+    .mockup.is-active { display: block; }
+    .mockup__note {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      padding: 0.8rem clamp(1rem, 3vw, 3rem);
+      border-bottom: 1px solid rgba(26, 25, 24, 0.12);
+      background: var(--paper);
+      color: var(--muted);
+      font-size: 0.55rem;
+      letter-spacing: 0.14em;
+      line-height: 1.5;
+      text-transform: uppercase;
+    }
+    .mockup__note strong { color: var(--dark); font-weight: 500; }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.56rem;
+      font-weight: 400;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+    }
+    .eyebrow::after { content: ''; width: 4rem; height: 1px; background: currentColor; opacity: 0.35; }
+    .eyebrow__num { color: var(--accent); }
+    .photo { position: relative; overflow: hidden; background: #cac6bd; }
+    .photo::after {
+      content: 'PLACEHOLDER PHOTOGRAPH — REPLACE WITH ACTUAL CLUBROOM IMAGE';
+      position: absolute;
+      right: 1rem;
+      bottom: 1rem;
+      max-width: calc(100% - 2rem);
+      padding: 0.55rem 0.7rem;
+      background: rgba(12, 12, 10, 0.78);
+      color: rgba(245, 244, 240, 0.82);
+      font-size: 0.44rem;
+      letter-spacing: 0.14em;
+      line-height: 1.4;
+    }
+    .map-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.8rem;
+      color: inherit;
+      font-size: 0.58rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+    .map-link span { transition: transform 180ms ease; }
+    .map-link:hover { color: var(--accent); }
+    .map-link:hover span { transform: translate(0.18rem, -0.18rem); }
+
+    /* A — restrained editorial split */
+    .option-a {
+      min-height: calc(100vh - 100px);
+      padding: clamp(4rem, 8vw, 8rem) clamp(1.25rem, 4vw, 4rem);
+      background: var(--body-bg);
+      border-top: 2px solid var(--accent);
+    }
+    .a__grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
+      gap: clamp(3rem, 8vw, 9rem);
+      align-items: center;
+      width: min(100%, 1380px);
+      margin: 0 auto;
+    }
+    .a__heading {
+      margin: clamp(3rem, 6vw, 5.5rem) 0 2rem;
+      font-family: var(--serif);
+      font-size: clamp(3.5rem, 6.5vw, 7.4rem);
+      font-weight: 200;
+      letter-spacing: -0.045em;
+      line-height: 0.86;
+    }
+    .a__heading em { color: var(--accent); font-weight: 200; }
+    .a__intro { max-width: 31rem; color: var(--muted); font-size: 0.82rem; line-height: 1.9; }
+    .a__address {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1.35rem;
+      margin: 2.6rem 0 2.2rem;
+      padding-top: 1.3rem;
+      border-top: 1px solid var(--subtle);
+      font-style: normal;
+    }
+    .a__floor {
+      color: var(--accent);
+      font-family: var(--serif);
+      font-size: 2.6rem;
+      font-weight: 300;
+      line-height: 0.9;
+    }
+    .a__address p { font-size: 0.74rem; line-height: 1.75; }
+    .a__photo { aspect-ratio: 4 / 5; }
+    .a__photo img { filter: saturate(0.72) contrast(1.03); }
+    .a__caption {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 0.75rem;
+      color: var(--muted);
+      font-size: 0.48rem;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    /* B — photographic threshold */
+    .option-b {
+      position: relative;
+      min-height: calc(100vh - 100px);
+      background: var(--hero-bg);
+      color: #f5f4f0;
+      overflow: hidden;
+    }
+    .b__photo { position: absolute; inset: 0; }
+    .b__photo img { filter: grayscale(0.15) saturate(0.65) contrast(1.12); }
+    .b__photo::before {
+      content: '';
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(12, 12, 10, 0.9) 0%, rgba(12, 12, 10, 0.65) 40%, rgba(12, 12, 10, 0.08) 75%);
+    }
+    .b__photo::after { z-index: 2; }
+    .b__content {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: calc(100vh - 100px);
+      width: min(100%, 1480px);
+      margin: 0 auto;
+      padding: clamp(3.5rem, 7vw, 7rem) clamp(1.25rem, 4vw, 4rem) 2.5rem;
+    }
+    .b__eyebrow { color: rgba(245, 244, 240, 0.72); }
+    .b__heading {
+      max-width: 760px;
+      margin-top: auto;
+      font-family: var(--serif);
+      font-size: clamp(4rem, 8.4vw, 10rem);
+      font-weight: 200;
+      letter-spacing: -0.05em;
+      line-height: 0.82;
+    }
+    .b__heading em { color: var(--accent); font-weight: 200; }
+    .b__info {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 2.5rem;
+      align-items: end;
+      margin-top: clamp(3rem, 7vw, 7rem);
+      padding-top: 1.25rem;
+      border-top: 1px solid rgba(245, 244, 240, 0.28);
+    }
+    .b__label {
+      margin-bottom: 0.65rem;
+      color: rgba(245, 244, 240, 0.5);
+      font-size: 0.48rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .b__value { font-size: 0.72rem; line-height: 1.65; }
+
+    /* C — graphic wayfinding / contact sheet */
+    .option-c {
+      min-height: calc(100vh - 100px);
+      padding: clamp(3rem, 6vw, 6rem) clamp(1.25rem, 4vw, 4rem);
+      background: var(--paper);
+      border-top: 2px solid var(--accent);
+    }
+    .c__grid {
+      display: grid;
+      grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.1fr);
+      width: min(100%, 1380px);
+      min-height: min(760px, calc(100vh - 170px));
+      margin: 0 auto;
+      background: var(--body-bg);
+      box-shadow: 0 1.5rem 5rem rgba(26, 25, 24, 0.12);
+    }
+    .c__visual {
+      position: relative;
+      min-height: 600px;
+      padding: 2rem;
+      background: var(--dark);
+      color: #f5f4f0;
+    }
+    .c__photo { height: 78%; margin-top: 3.5rem; }
+    .c__photo img { filter: grayscale(1) contrast(1.08); }
+    .c__frame-num {
+      position: absolute;
+      z-index: 3;
+      top: 1.5rem;
+      right: 1.7rem;
+      color: var(--accent);
+      font-family: var(--serif);
+      font-size: clamp(6rem, 11vw, 11rem);
+      font-weight: 200;
+      letter-spacing: -0.08em;
+      line-height: 0.8;
+    }
+    .c__visual-note {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 1.1rem;
+      color: rgba(245, 244, 240, 0.55);
+      font-size: 0.47rem;
+      letter-spacing: 0.14em;
+      line-height: 1.5;
+      text-transform: uppercase;
+    }
+    .c__content {
+      display: flex;
+      flex-direction: column;
+      padding: clamp(2rem, 5vw, 5.5rem);
+    }
+    .c__heading {
+      margin: clamp(3.5rem, 7vw, 6.5rem) 0 2rem;
+      font-family: var(--serif);
+      font-size: clamp(3.2rem, 6vw, 6.8rem);
+      font-weight: 200;
+      letter-spacing: -0.045em;
+      line-height: 0.9;
+    }
+    .c__heading em { color: var(--accent); font-weight: 200; }
+    .c__body { max-width: 34rem; color: var(--muted); font-size: 0.82rem; line-height: 1.9; }
+    .c__route {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      margin-top: auto;
+      padding: 2.4rem 0 2rem;
+    }
+    .c__step { position: relative; padding-right: 1rem; border-top: 1px solid var(--subtle); }
+    .c__step::before {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: 0;
+      width: 7px;
+      height: 7px;
+      background: var(--body-bg);
+      border: 1px solid var(--muted);
+      border-radius: 50%;
+    }
+    .c__step:last-child::before { border-color: var(--accent); background: var(--accent); }
+    .c__step strong {
+      display: block;
+      margin: 1.1rem 0 0.45rem;
+      font-size: 0.5rem;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .c__step span { color: var(--muted); font-size: 0.62rem; line-height: 1.5; }
+
+    @media (max-width: 820px) {
+      .chooser { gap: 0.75rem; }
+      .chooser__label { display: none; }
+      .mockup__note { align-items: flex-start; flex-direction: column; gap: 0.35rem; }
+      .a__grid, .c__grid { grid-template-columns: 1fr; }
+      .a__grid { gap: 3rem; }
+      .a__photo { aspect-ratio: 5 / 4; }
+      .b__photo::before { background: linear-gradient(0deg, rgba(12, 12, 10, 0.9), rgba(12, 12, 10, 0.18)); }
+      .b__info { grid-template-columns: 1fr 1fr; }
+      .b__info .map-link { grid-column: 1 / -1; }
+      .c__visual { min-height: 500px; }
+      .c__content { min-height: 620px; }
+    }
+
+    @media (max-width: 520px) {
+      .chooser__brand { font-size: 0.5rem; }
+      .chooser__button { min-width: 2rem; }
+      .option-a, .option-c { padding-inline: 1rem; }
+      .b__content { min-height: calc(100svh - 100px); }
+      .b__info { grid-template-columns: 1fr; gap: 1rem; }
+      .b__info .map-link { grid-column: auto; margin-top: 0.75rem; }
+      .c__visual { min-height: 420px; padding: 1.25rem; }
+      .c__content { min-height: 560px; }
+      .c__route { gap: 0.25rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="chooser" aria-label="Choose a clubroom section direction">
+    <p class="chooser__brand"><span>CU</span> Photo Club / 04</p>
+    <p class="chooser__label">Clubroom directions</p>
+    <div class="chooser__options" role="tablist" aria-label="Mockup options">
+      <button class="chooser__button" type="button" role="tab" aria-selected="true" data-option="a">A</button>
+      <button class="chooser__button" type="button" role="tab" aria-selected="false" data-option="b">B</button>
+      <button class="chooser__button" type="button" role="tab" aria-selected="false" data-option="c">C</button>
+    </div>
+  </nav>
+
+  <main>
+    <article class="mockup is-active" data-mockup="a">
+      <div class="mockup__note">
+        <strong>Option A — Editorial address</strong>
+        <span>Quiet, clear, and closest to the current homepage rhythm</span>
+      </div>
+      <section class="option-a">
+        <div class="a__grid">
+          <div>
+            <p class="eyebrow"><span class="eyebrow__num">04</span> Find the clubroom</p>
+            <h1 class="a__heading">Our door<br>is <em>open.</em></h1>
+            <p class="a__intro">The CU Photo Club room is where prints are reviewed, cameras are passed around, and the next outing begins. Come upstairs and find us on campus.</p>
+            <address class="a__address">
+              <strong class="a__floor">3F</strong>
+              <p>Chulachakrapong Building<br>Phaya Thai Road, Wang Mai<br>Pathum Wan, Bangkok 10330</p>
+            </address>
+            <a class="map-link" href="https://www.google.com/maps/search/?api=1&amp;query=%E0%B8%AD%E0%B8%B2%E0%B8%84%E0%B8%B2%E0%B8%A3%E0%B8%88%E0%B8%B8%E0%B8%A5%E0%B8%88%E0%B8%B1%E0%B8%81%E0%B8%A3%E0%B8%9E%E0%B8%87%E0%B8%A9%E0%B9%8C%20%E0%B8%88%E0%B8%B8%E0%B8%AC%E0%B8%B2%E0%B8%A5%E0%B8%87%E0%B8%81%E0%B8%A3%E0%B8%93%E0%B9%8C%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%A7%E0%B8%B4%E0%B8%97%E0%B8%A2%E0%B8%B2%E0%B8%A5%E0%B8%B1%E0%B8%A2" target="_blank" rel="noopener noreferrer">Open in Google Maps <span aria-hidden="true">↗</span></a>
+          </div>
+          <figure>
+            <div class="photo a__photo">
+              <img src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&amp;fit=crop&amp;w=1200&amp;q=85" alt="Placeholder for a photograph of the CU Photo Club room">
+            </div>
+            <figcaption class="a__caption"><span>CU Photo Clubroom</span><span>Chulachakrapong Building</span></figcaption>
+          </figure>
+        </div>
+      </section>
+    </article>
+
+    <article class="mockup" data-mockup="b">
+      <div class="mockup__note">
+        <strong>Option B — Photographic threshold</strong>
+        <span>Immersive, cinematic, and lets the eventual clubroom photograph lead</span>
+      </div>
+      <section class="option-b">
+        <div class="photo b__photo">
+          <img src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&amp;fit=crop&amp;w=2000&amp;q=88" alt="Placeholder for a photograph looking into the CU Photo Club room">
+        </div>
+        <div class="b__content">
+          <p class="eyebrow b__eyebrow"><span class="eyebrow__num">04</span> The clubroom</p>
+          <h1 class="b__heading">Come find us<br>on the <em>third.</em></h1>
+          <div class="b__info">
+            <div>
+              <p class="b__label">Building</p>
+              <p class="b__value">Chulachakrapong Building<br>Chulalongkorn University</p>
+            </div>
+            <div>
+              <p class="b__label">Address</p>
+              <p class="b__value">3rd floor · Phaya Thai Road<br>Pathum Wan, Bangkok 10330</p>
+            </div>
+            <a class="map-link" href="https://www.google.com/maps/search/?api=1&amp;query=%E0%B8%AD%E0%B8%B2%E0%B8%84%E0%B8%B2%E0%B8%A3%E0%B8%88%E0%B8%B8%E0%B8%A5%E0%B8%88%E0%B8%B1%E0%B8%81%E0%B8%A3%E0%B8%9E%E0%B8%87%E0%B8%A9%E0%B9%8C%20%E0%B8%88%E0%B8%B8%E0%B8%AC%E0%B8%B2%E0%B8%A5%E0%B8%87%E0%B8%81%E0%B8%A3%E0%B8%93%E0%B9%8C%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%A7%E0%B8%B4%E0%B8%97%E0%B8%A2%E0%B8%B2%E0%B8%A5%E0%B8%B1%E0%B8%A2" target="_blank" rel="noopener noreferrer">Open map <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+      </section>
+    </article>
+
+    <article class="mockup" data-mockup="c">
+      <div class="mockup__note">
+        <strong>Option C — Wayfinding field note</strong>
+        <span>Graphic, useful, and connects the section to photography contact sheets</span>
+      </div>
+      <section class="option-c">
+        <div class="c__grid">
+          <div class="c__visual">
+            <span class="c__frame-num">3F</span>
+            <div class="photo c__photo">
+              <img src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&amp;fit=crop&amp;w=1000&amp;q=85" alt="Placeholder for a documentary photograph of the CU Photo Club room">
+            </div>
+            <div class="c__visual-note"><span>Frame 04 / The clubroom</span><span>13.7355° N · 100.5310° E</span></div>
+          </div>
+          <div class="c__content">
+            <p class="eyebrow"><span class="eyebrow__num">04</span> Where to find us</p>
+            <h1 class="c__heading">Follow the<br>frames <em>up.</em></h1>
+            <p class="c__body">Our clubroom sits on the third floor of Chulachakrapong Building—a shared space for meeting, making, and looking closely together.</p>
+            <div class="c__route" aria-label="Directions to the clubroom">
+              <div class="c__step"><strong>01 · Campus</strong><span>Enter from<br>Phaya Thai Road</span></div>
+              <div class="c__step"><strong>02 · Building</strong><span>Chulachakrapong<br>Building</span></div>
+              <div class="c__step"><strong>03 · Room</strong><span>Third floor<br>CU Photo Club</span></div>
+            </div>
+            <a class="map-link" href="https://www.google.com/maps/search/?api=1&amp;query=%E0%B8%AD%E0%B8%B2%E0%B8%84%E0%B8%B2%E0%B8%A3%E0%B8%88%E0%B8%B8%E0%B8%A5%E0%B8%88%E0%B8%B1%E0%B8%81%E0%B8%A3%E0%B8%9E%E0%B8%87%E0%B8%A9%E0%B9%8C%20%E0%B8%88%E0%B8%B8%E0%B8%AC%E0%B8%B2%E0%B8%A5%E0%B8%87%E0%B8%81%E0%B8%A3%E0%B8%93%E0%B9%8C%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%A7%E0%B8%B4%E0%B8%97%E0%B8%A2%E0%B8%B2%E0%B8%A5%E0%B8%B1%E0%B8%A2" target="_blank" rel="noopener noreferrer">See the exact location <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <script>
+    const buttons = [...document.querySelectorAll('[data-option]')]
+    const mockups = [...document.querySelectorAll('[data-mockup]')]
+
+    function show(option) {
+      buttons.forEach(button => button.setAttribute('aria-selected', String(button.dataset.option === option)))
+      mockups.forEach(mockup => mockup.classList.toggle('is-active', mockup.dataset.mockup === option))
+      history.replaceState(null, '', `#option-${option}`)
+      window.scrollTo({ top: 0, behavior: 'auto' })
+    }
+
+    buttons.forEach(button => button.addEventListener('click', () => show(button.dataset.option)))
+
+    const initial = location.hash.match(/^#option-([abc])$/)?.[1]
+    if (initial) show(initial)
+  </script>
+</body>
+</html>

@@ -25,6 +25,7 @@ export function useLocalizedSite(site: Ref<any>) {
       history: {
         ...base.history,
         eyebrow: t('site.history.eyebrow'),
+        imageAlt: t('site.history.imageAlt'),
         quote: t('site.history.quote'),
         body: [
           t('site.history.body.0'),
@@ -44,6 +45,22 @@ export function useLocalizedSite(site: Ref<any>) {
           { text: t('site.about.heading.2.text'), em: true }
         ],
         body: t('site.about.body'),
+        imageAlt: t('site.about.imageAlt'),
+        photoCaption: t('site.about.photoCaption'),
+        route: [
+          {
+            label: t('site.about.route.0.label'),
+            lines: [t('site.about.route.0.lines.0'), t('site.about.route.0.lines.1')]
+          },
+          {
+            label: t('site.about.route.1.label'),
+            lines: [t('site.about.route.1.lines.0'), t('site.about.route.1.lines.1')]
+          },
+          {
+            label: t('site.about.route.2.label'),
+            lines: [t('site.about.route.2.lines.0'), t('site.about.route.2.lines.1')]
+          }
+        ],
         cta: {
           ...base.about.cta,
           label: t('site.about.ctaLabel')

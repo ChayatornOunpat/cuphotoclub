@@ -121,6 +121,7 @@ const dockHidden = ref(true)
 const activeDock = ref<'content' | 'cell'>('cell')
 const editorEl = ref<HTMLElement | null>(null)
 const canvasEl = ref<HTMLElement | null>(null)
+const trayEl = ref<HTMLElement | null>(null)
 const TRAY_MIN_WIDTH = 280
 const TRAY_MAX_WIDTH = 460
 const TRAY_DEFAULT_WIDTH = 340
@@ -839,6 +840,36 @@ function scrollPreviewToRow(ri: number, ci?: number) {
   })
 }
 
+// Keep the left tray in sync with the selection: clicking a frame on the canvas
+// scrolls the sidebar so its matching row/cell entry is centred. Scrolls only
+// the tray (never the page/canvas), and stays put when the entry is already
+// visible so clicking within the tray itself doesn't jump.
+function scrollTrayToSelection() {
+  const tray = trayEl.value
+  if (!tray) return
+  nextTick(() => {
+    const target = (tray.querySelector('.cell-chip.is-selected')
+      ?? tray.querySelector('.row-item.is-selected')) as HTMLElement | null
+    if (!target) return
+
+    const trayRect = tray.getBoundingClientRect()
+    // The topbar is sticky inside the tray, so it overlays the top of the
+    // scroll viewport — offset the visible region by its height.
+    const topbar = tray.querySelector('.tray__topbar') as HTMLElement | null
+    const viewTop = trayRect.top + (topbar?.getBoundingClientRect().height ?? 0)
+    const viewBottom = trayRect.bottom
+    const targetRect = target.getBoundingClientRect()
+
+    if (targetRect.top >= viewTop && targetRect.bottom <= viewBottom) return
+
+    const targetCenter = targetRect.top + targetRect.height / 2
+    const viewCenter = viewTop + (viewBottom - viewTop) / 2
+    tray.scrollTo({ top: tray.scrollTop + (targetCenter - viewCenter), behavior: 'smooth' })
+  })
+}
+
+watch([selectedRow, selectedCell], scrollTrayToSelection)
+
 function selectRow(ri: number) {
   selectedRow.value = ri
   selectedCell.value = null
@@ -1385,7 +1416,7 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
     <div class="sr-only" aria-live="assertive" aria-atomic="true">{{ dockAnnouncement }}</div>
 
     <!-- LEFT TRAY -->
-    <aside class="tray">
+    <aside ref="trayEl" class="tray">
       <!-- Save / Cancel row -->
       <div class="tray__topbar">
         <NuxtLink :to="localePath('/admin/albums')" class="btn-ghost">{{ t('admin.cancel') }}</NuxtLink>

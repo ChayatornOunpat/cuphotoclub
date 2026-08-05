@@ -3,6 +3,7 @@ defineProps<{
   history: {
     eyebrow: string
     image: string
+    imageAlt: string
     quote: string
     body: string[]
     sinceNum: string
@@ -15,7 +16,7 @@ defineProps<{
   <section id="history" class="history">
     <div class="wrap history__grid">
       <div class="history__photo">
-        <AppImg :src="history.image" alt="Archive" width="900" height="675" sizes="sm:100vw lg:50vw" optimize />
+        <AppImg :src="history.image" :alt="history.imageAlt" width="900" height="675" sizes="sm:100vw lg:50vw" optimize />
       </div>
       <div>
         <div class="eyebrow history__eyebrow">
