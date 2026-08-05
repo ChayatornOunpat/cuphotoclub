@@ -8,6 +8,7 @@ interface EventItem {
   title: string
   summary: string | null
   body: string
+  galleryR2Keys: string[]
   eventDate: string | null
   location: string | null
   coverR2Key: string | null
@@ -30,36 +31,38 @@ function errMsg(e: unknown, fb: string) {
 
 const form = reactive({
   title: '', slug: '', summary: '', body: '', eventDate: '', location: '',
-  coverR2Key: null as string | null, registerUrl: '', status: 'draft' as 'draft' | 'published'
+  coverR2Key: null as string | null, galleryR2Keys: [] as string[],
+  registerUrl: '', status: 'draft' as 'draft' | 'published'
 })
 watchEffect(() => {
   const e = ev.value
   if (e) Object.assign(form, {
     title: e.title, slug: e.slug, summary: e.summary ?? '', body: e.body ?? '',
     eventDate: e.eventDate ? new Date(e.eventDate).toISOString().slice(0, 10) : '',
-    location: e.location ?? '', coverR2Key: e.coverR2Key, registerUrl: e.registerUrl ?? '', status: e.status
+    location: e.location ?? '', coverR2Key: e.coverR2Key,
+    galleryR2Keys: [...(e.galleryR2Keys ?? [])],
+    registerUrl: e.registerUrl ?? '', status: e.status
   })
 })
 
 const saving = ref(false)
 const savedMsg = ref('')
-const bodyImagePickerOpen = ref(false)
-const uploadedBodyImageKeys = ref<string[]>([])
+const activityImagePickerOpen = ref(false)
+const postImagePickerOpen = ref(false)
+function addGalleryImages(keys: string[]) {
+  form.galleryR2Keys = [...new Set([...form.galleryR2Keys, ...keys.filter(Boolean)])].slice(0, 24)
+}
 
-function appendBodyImages(keys: string[]) {
-  const uniqueKeys = [...new Set(keys.filter(Boolean))]
-  if (!uniqueKeys.length) return
+function moveGalleryImage(index: number, direction: -1 | 1) {
+  const target = index + direction
+  if (target < 0 || target >= form.galleryR2Keys.length) return
+  const next = [...form.galleryR2Keys]
+  ;[next[index], next[target]] = [next[target]!, next[index]!]
+  form.galleryR2Keys = next
+}
 
-  const fallbackAlt = form.title.trim() || t('adminActivities.bodyImageAlt')
-  const markdown = uniqueKeys
-    .map((key, index) => {
-      const suffix = uniqueKeys.length > 1 ? ` ${index + 1}` : ''
-      const alt = `${fallbackAlt}${suffix}`.replace(/[\[\]]/g, '')
-      return `![${alt}](/images/${key})`
-    })
-    .join('\n\n')
-
-  form.body = [form.body.trimEnd(), markdown].filter(Boolean).join('\n\n')
+function removeGalleryImage(key: string) {
+  form.galleryR2Keys = form.galleryR2Keys.filter(item => item !== key)
 }
 
 async function save() {
@@ -70,6 +73,7 @@ async function save() {
       method: 'PATCH',
       body: {
         title: form.title, slug: form.slug, summary: form.summary || null, body: form.body,
+        galleryR2Keys: form.galleryR2Keys,
         eventDate: form.eventDate || null, location: form.location || null,
         coverR2Key: form.coverR2Key, registerUrl: form.registerUrl || null, status: form.status
       }
@@ -139,22 +143,71 @@ async function remove() {
         <UiField :label="t('adminActivities.body')" input-id="e-body">
           <UiTextarea id="e-body" v-model="form.body" :rows="14" class="font-mono" />
         </UiField>
-        <div class="space-y-3 border-t border-line pt-4">
-          <div>
-            <h3 class="text-sm font-semibold text-ink">{{ t('adminActivities.bodyImages') }}</h3>
-            <p class="mt-1 text-xs leading-5 text-ink-soft">{{ t('adminActivities.bodyImagesHint') }}</p>
+        <section class="activity-media" :aria-label="t('adminActivities.galleryTitle')">
+          <div class="activity-media__head">
+            <div>
+              <p class="activity-media__kicker">{{ t('adminActivities.galleryKicker') }}</p>
+              <h3>{{ t('adminActivities.galleryTitle') }}</h3>
+              <p>{{ t('adminActivities.galleryHint') }}</p>
+            </div>
+            <span v-if="form.galleryR2Keys.length" class="activity-media__count">
+              {{ t('adminActivities.galleryImageCount', { count: form.galleryR2Keys.length }) }}
+            </span>
           </div>
+
           <AdminR2ImageUploader
-            v-model="uploadedBodyImageKeys"
-            :prefix="`events/${id}/body`"
+            v-model="form.galleryR2Keys"
+            :prefix="`events/${id}/gallery`"
+            :max-files="24"
             :show-previews="false"
-            @uploaded="appendBodyImages"
           />
-          <UiButton variant="secondary" size="sm" @click="bodyImagePickerOpen = true">
-            <Icon name="heroicons:photo" class="size-4" />
-            {{ t('adminActivities.choosePostImages') }}
-          </UiButton>
-        </div>
+          <div class="activity-media__library">
+            <div class="activity-media__library-actions">
+              <UiButton variant="secondary" size="sm" @click="activityImagePickerOpen = true">
+                <Icon name="heroicons:photo" class="size-4" />
+                {{ t('adminActivities.chooseActivityImages') }}
+              </UiButton>
+              <UiButton variant="secondary" size="sm" @click="postImagePickerOpen = true">
+                <Icon name="heroicons:photo" class="size-4" />
+                {{ t('adminActivities.choosePostImages') }}
+              </UiButton>
+            </div>
+            <span>{{ t('adminActivities.galleryOrderHint') }}</span>
+          </div>
+
+          <div v-if="form.galleryR2Keys.length" class="activity-media__tray">
+            <article v-for="(key, index) in form.galleryR2Keys" :key="key" class="activity-media__item">
+              <div class="activity-media__thumb">
+                <img :src="`/images/${key}`" alt="">
+                <span>{{ String(index + 1).padStart(2, '0') }}</span>
+              </div>
+              <div class="activity-media__item-body">
+                <code>{{ key.split('/').at(-1) }}</code>
+                <div class="activity-media__controls">
+                  <button
+                    type="button"
+                    :disabled="index === 0"
+                    :aria-label="t('adminActivities.moveEarlier')"
+                    @click="moveGalleryImage(index, -1)"
+                  ><Icon name="heroicons:arrow-left" /></button>
+                  <button
+                    type="button"
+                    :disabled="index === form.galleryR2Keys.length - 1"
+                    :aria-label="t('adminActivities.moveLater')"
+                    @click="moveGalleryImage(index, 1)"
+                  ><Icon name="heroicons:arrow-right" /></button>
+                  <button
+                    type="button"
+                    class="activity-media__remove"
+                    :aria-label="t('adminActivities.removeFromGallery')"
+                    @click="removeGalleryImage(key)"
+                  ><Icon name="heroicons:x-mark" /></button>
+                </div>
+              </div>
+            </article>
+          </div>
+          <p v-else class="activity-media__empty">{{ t('adminActivities.galleryEmpty') }}</p>
+        </section>
       </section>
 
       <aside class="space-y-5">
@@ -198,11 +251,165 @@ async function remove() {
     </UiModal>
 
     <AdminImagePickerModal
-      v-model="bodyImagePickerOpen"
+      v-model="activityImagePickerOpen"
+      :prefix="`events/${id}`"
+      multiple
+      :title="t('adminActivities.chooseActivityImages')"
+      @select="addGalleryImages"
+    />
+
+    <AdminImagePickerModal
+      v-model="postImagePickerOpen"
       prefix="content-posts"
       multiple
       :title="t('adminActivities.choosePostImages')"
-      @select="appendBodyImages"
+      @select="addGalleryImages"
     />
   </div>
 </template>
+
+<style scoped>
+.activity-media {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--subtle);
+}
+
+.activity-media__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.1rem;
+}
+
+.activity-media__head > div { max-width: 38rem; }
+.activity-media__kicker {
+  margin-bottom: 0.45rem;
+  color: var(--accent);
+  font-size: 0.5rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.activity-media__head h3 {
+  color: var(--dark);
+  font-family: var(--font-serif);
+  font-size: 1.45rem;
+  font-weight: 300;
+  line-height: 1.15;
+}
+.activity-media__head p:last-child {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.65;
+}
+.activity-media__count {
+  flex: 0 0 auto;
+  padding-bottom: 0.25rem;
+  color: var(--muted);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.activity-media__library {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.8rem;
+}
+.activity-media__library-actions { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+.activity-media__library > span {
+  color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1.5;
+}
+
+.activity-media__tray {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.7rem;
+  margin-top: 1.25rem;
+}
+.activity-media__item {
+  min-width: 0;
+  border: 1px solid var(--subtle);
+  background: var(--body-bg);
+}
+.activity-media__thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--paper);
+}
+.activity-media__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.activity-media__thumb span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 0.32rem 0.48rem;
+  background: var(--dark);
+  color: #F5F4F0;
+  font-size: 0.43rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.activity-media__item-body { padding: 0.7rem; }
+.activity-media__item code {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.55rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-media__controls button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+}
+.activity-media__controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin-top: 0.65rem;
+  background: var(--subtle);
+}
+.activity-media__controls button {
+  display: grid;
+  min-height: 2rem;
+  place-items: center;
+  background: var(--body-bg);
+}
+.activity-media__controls button:hover:not(:disabled),
+.activity-media__controls button:focus-visible { color: var(--accent); }
+.activity-media__controls button:disabled { cursor: default; opacity: 0.28; }
+.activity-media__controls button:focus-visible { outline: 1px solid var(--accent); outline-offset: -2px; }
+.activity-media__controls :deep(svg) { width: 0.9rem; height: 0.9rem; }
+.activity-media__controls .activity-media__remove:hover,
+.activity-media__controls .activity-media__remove:focus-visible { color: #b42318; }
+.activity-media__empty {
+  margin-top: 1.25rem;
+  padding: 1.25rem;
+  border: 1px dashed var(--subtle);
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+@media (max-width: 680px) {
+  .activity-media__head { align-items: flex-start; flex-direction: column; }
+  .activity-media__library { align-items: flex-start; flex-direction: column; }
+  .activity-media__tray { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+</style>

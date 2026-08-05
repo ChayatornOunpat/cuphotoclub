@@ -99,6 +99,13 @@
       "when": 1784892770984,
       "tag": "0013_thin_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1785953980066,
+      "tag": "0014_normal_black_widow",
+      "breakpoints": true
     }
   ]
 }

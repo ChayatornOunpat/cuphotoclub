@@ -2,7 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import type { BlobObject } from '@nuxthub/core/blob'
 
 interface ImageUsage {
-  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'member-photo' | 'editorial-album'
+  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'event-gallery' | 'member-photo' | 'editorial-album'
   label: string
   href?: string
   role?: string
@@ -69,7 +69,8 @@ export default defineEventHandler(async (event) => {
       id: schema.events.id,
       slug: schema.events.slug,
       title: schema.events.title,
-      coverR2Key: schema.events.coverR2Key
+      coverR2Key: schema.events.coverR2Key,
+      galleryR2Keys: schema.events.galleryR2Keys
     }).from(schema.events).orderBy(desc(schema.events.createdAt)),
     db.select({
       id: schema.members.id,
@@ -112,6 +113,14 @@ export default defineEventHandler(async (event) => {
       href: `/admin/activities/${item.id}`,
       role: 'activity cover'
     })
+    for (const key of item.galleryR2Keys) {
+      addUsage(otherUsage, key, {
+        kind: 'event-gallery',
+        label: item.title,
+        href: `/admin/activities/${item.id}`,
+        role: 'activity gallery'
+      })
+    }
   }
 
   for (const member of members) {

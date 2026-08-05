@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
       const mock = devMockEvents().find(ev => ev.slug === slug)
       if (mock) {
         const { body, ...rest } = mock
-        return { ...rest, bodyHtml: renderMarkdown(body) }
+        return { ...rest, galleryR2Keys: [], bodyHtml: renderMarkdown(body) }
       }
     }
     throw createError({ statusCode: 404, message: 'ไม่พบกิจกรรม' })
@@ -28,6 +28,7 @@ export default defineEventHandler(async (event) => {
     title: row.title,
     summary: row.summary,
     coverR2Key: row.coverR2Key,
+    galleryR2Keys: row.galleryR2Keys,
     eventDate: row.eventDate,
     endDate: row.endDate,
     location: row.location,

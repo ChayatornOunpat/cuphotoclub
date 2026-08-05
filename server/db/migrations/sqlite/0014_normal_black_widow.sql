@@ -1,0 +1,1 @@
+ALTER TABLE `events` ADD `gallery_r2_keys` text DEFAULT '[]' NOT NULL;

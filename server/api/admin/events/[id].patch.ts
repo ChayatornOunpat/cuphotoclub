@@ -6,6 +6,7 @@ const bodySchema = z.object({
   slug: z.string().trim().min(1).optional(),
   summary: z.string().trim().nullable().optional(),
   body: z.string().optional(),
+  galleryR2Keys: z.array(z.string().trim().min(1)).max(24).optional(),
   eventDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
   location: z.string().trim().nullable().optional(),
@@ -30,6 +31,7 @@ export default defineEventHandler(async (event) => {
   if (data.title !== undefined) updates.title = data.title
   if (data.summary !== undefined) updates.summary = data.summary
   if (data.body !== undefined) updates.body = data.body
+  if (data.galleryR2Keys !== undefined) updates.galleryR2Keys = [...new Set(data.galleryR2Keys)]
   if (data.location !== undefined) updates.location = data.location
   if (data.registerUrl !== undefined) updates.registerUrl = data.registerUrl || null
   if (data.eventDate !== undefined) updates.eventDate = data.eventDate ? new Date(data.eventDate) : null

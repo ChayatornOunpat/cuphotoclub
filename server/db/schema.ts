@@ -87,6 +87,7 @@ export const events = sqliteTable('events', {
   title: text('title').notNull(),
   summary: text('summary'),
   body: text('body').notNull().default(''), // markdown
+  galleryR2Keys: text('gallery_r2_keys', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
   eventDate: integer('event_date', { mode: 'timestamp' }),
   endDate: integer('end_date', { mode: 'timestamp' }), // optional last day for multi-day events
   location: text('location'),

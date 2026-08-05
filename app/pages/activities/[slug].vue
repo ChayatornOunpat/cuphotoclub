@@ -7,6 +7,7 @@ interface EventItem {
   title: string
   summary: string | null
   coverR2Key: string | null
+  galleryR2Keys: string[]
   eventDate: string | null
   endDate: string | null
   location: string | null
@@ -32,6 +33,16 @@ const imageSrc = computed(() => {
   if (/^(https?:)?\/\//i.test(key) || key.startsWith('/')) return key
   return `/images/${key}`
 })
+function publicImageSrc(key: string) {
+  const value = key.trim()
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('/')) return value
+  return `/images/${value}`
+}
+const galleryImages = computed(() => (ev.value?.galleryR2Keys ?? []).map((key, index) => ({
+  key,
+  src: publicImageSrc(key),
+  alt: t('activities.galleryFrameAlt', { title: ev.value?.title ?? '', number: index + 1 })
+})))
 const coverUrl = computed(() => {
   if (!imageSrc.value) return undefined
   return /^https?:\/\//i.test(imageSrc.value) ? imageSrc.value : `${origin}${imageSrc.value}`
@@ -80,7 +91,7 @@ useHead(() => ({
       '@type': 'Event',
       name: ev.value!.title,
       description: ev.value!.summary || ev.value!.title,
-      image: coverUrl.value ? [coverUrl.value] : undefined,
+      image: [coverUrl.value, ...galleryImages.value.map(item => /^https?:\/\//i.test(item.src) ? item.src : `${origin}${item.src}`)].filter(Boolean),
       startDate: ev.value!.eventDate || undefined,
       endDate: ev.value!.endDate || ev.value!.eventDate || undefined,
       eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
@@ -150,6 +161,18 @@ useHead(() => ({
             </a>
           </div>
         </aside>
+      </div>
+    </section>
+
+    <section v-if="galleryImages.length" class="event-gallery" :aria-label="t('activities.galleryLabel')">
+      <div class="event-gallery__head">
+        <p>{{ t('activities.galleryLabel') }}</p>
+        <span>{{ t('activities.galleryFrames', { count: galleryImages.length }) }}</span>
+      </div>
+      <div class="event-gallery__grid">
+        <figure v-for="image in galleryImages" :key="image.key" class="event-gallery__frame">
+          <img :src="image.src" :alt="image.alt" loading="lazy">
+        </figure>
       </div>
     </section>
 
@@ -379,6 +402,57 @@ useHead(() => ({
 }
 .register-link:hover { border-color: var(--accent); background: var(--accent); }
 
+/* ── Mini gallery ── */
+.event-gallery {
+  width: min(100%, 1180px);
+  margin: -3.5rem auto 7rem;
+  padding: 0 3rem;
+}
+.event-gallery__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 0 0.9rem;
+  border-bottom: 1px solid var(--subtle);
+}
+.event-gallery__head p {
+  color: var(--dark);
+  font: 300 1.25rem/1.2 var(--font-serif);
+}
+.event-gallery__head span {
+  color: var(--muted);
+  font-size: 0.54rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.event-gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+.event-gallery__frame {
+  grid-column: span 4;
+  aspect-ratio: 4 / 3;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+.event-gallery__frame:nth-child(6n + 1),
+.event-gallery__frame:nth-child(6n + 5) { grid-column: span 5; }
+.event-gallery__frame:nth-child(6n + 2),
+.event-gallery__frame:nth-child(6n + 4) { grid-column: span 3; }
+.event-gallery__frame:only-child { grid-column: span 7; }
+.event-gallery__frame:first-child:nth-last-child(2) { grid-column: span 7; }
+.event-gallery__frame:first-child:nth-last-child(2) + .event-gallery__frame { grid-column: span 5; }
+.event-gallery__frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* ── Exit ── */
 .event-exit {
   display: flex;
@@ -419,6 +493,15 @@ useHead(() => ({
   .story__body { margin-top: 2.25rem; font-size: 0.94rem; }
   .facts__row { grid-template-columns: 3.75rem minmax(0, 1fr); }
   .register-link { min-height: 3.75rem; }
+  .event-gallery { margin: -1.5rem auto 4rem; padding-inline: 1.25rem; }
+  .event-gallery__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .event-gallery__frame,
+  .event-gallery__frame:nth-child(n),
+  .event-gallery__frame:only-child,
+  .event-gallery__frame:first-child:nth-last-child(2),
+  .event-gallery__frame:first-child:nth-last-child(2) + .event-gallery__frame { grid-column: span 1; }
+  .event-gallery__frame:nth-child(3n + 1) { grid-column: span 2; aspect-ratio: 16 / 10; }
+  .event-gallery__frame:only-child { grid-column: span 2; }
   .event-exit { min-height: 6rem; padding-inline: 1.25rem; }
 }
 

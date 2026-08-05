@@ -70,6 +70,7 @@ export async function getR2DeleteReferences(keys: string[]) {
     galleryPhotos,
     posts,
     activities,
+    activityGalleries,
     members,
     heroRows,
     historyRows,
@@ -79,6 +80,7 @@ export async function getR2DeleteReferences(keys: string[]) {
     selectChunked(normalizedKeys, c => db.select({ r2Key: schema.photos.r2Key }).from(schema.photos).where(inArray(schema.photos.r2Key, c))),
     selectChunked(normalizedKeys, c => db.select({ coverR2Key: schema.posts.coverR2Key }).from(schema.posts).where(inArray(schema.posts.coverR2Key, c))),
     selectChunked(normalizedKeys, c => db.select({ coverR2Key: schema.events.coverR2Key }).from(schema.events).where(inArray(schema.events.coverR2Key, c))),
+    db.select({ galleryR2Keys: schema.events.galleryR2Keys }).from(schema.events),
     selectChunked(normalizedKeys, c => db.select({ photoR2Key: schema.members.photoR2Key }).from(schema.members).where(inArray(schema.members.photoR2Key, c))),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'heroImages')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
@@ -97,6 +99,12 @@ export async function getR2DeleteReferences(keys: string[]) {
   for (const item of activities) {
     const key = normalizeR2Key(item.coverR2Key)
     if (key) ensure(key).activity = true
+  }
+  for (const item of activityGalleries) {
+    for (const value of item.galleryR2Keys) {
+      const key = normalizeR2Key(value)
+      if (key && keySet.has(key)) ensure(key).activity = true
+    }
   }
   for (const item of members) {
     const key = normalizeR2Key(item.photoR2Key)
@@ -132,8 +140,9 @@ export async function scrubR2DeleteReferences(keys: string[]) {
   const keySet = new Set(normalizedKeys)
   if (!normalizedKeys.length) return
 
-  const [galleryPhotos, heroRows, historyRows, clubroomRows, editorialAlbums] = await Promise.all([
+  const [galleryPhotos, activityGalleries, heroRows, historyRows, clubroomRows, editorialAlbums] = await Promise.all([
     selectChunked(normalizedKeys, c => db.select({ id: schema.photos.id }).from(schema.photos).where(inArray(schema.photos.r2Key, c))),
+    db.select({ id: schema.events.id, galleryR2Keys: schema.events.galleryR2Keys }).from(schema.events),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'heroImages')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'clubroomImage')),
@@ -157,6 +166,12 @@ export async function scrubR2DeleteReferences(keys: string[]) {
     ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.events).set({ coverR2Key: null }).where(inArray(schema.events.coverR2Key, c))),
     ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.members).set({ photoR2Key: null }).where(inArray(schema.members.photoR2Key, c)))
   ])
+
+  await Promise.all(activityGalleries.map((item) => {
+    const next = item.galleryR2Keys.filter(key => !keySet.has(normalizeR2Key(key) || ''))
+    if (next.length === item.galleryR2Keys.length) return Promise.resolve()
+    return db.update(schema.events).set({ galleryR2Keys: next }).where(eq(schema.events.id, item.id))
+  }))
 
   const heroImages = decodeHeroImages(heroRows[0]?.value)
   if (heroImages.some(item => keySet.has(normalizeR2Key(item) || ''))) {
