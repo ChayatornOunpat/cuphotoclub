@@ -1,6 +1,6 @@
 <script setup lang="ts">
 interface FeedItem {
-  kind: 'album' | 'post' | 'event'
+  kind: 'album' | 'post'
   title: string
   tag: string
   date: string

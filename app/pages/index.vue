@@ -95,7 +95,21 @@ const clubroomWithImage = computed(() => {
   return { ...base, image: archivePhoto.cover, imageAlt: archivePhoto.title }
 })
 
-// ── Stories: albums, posts, and events merged into one feed, newest first.
+// ── Activities: a dedicated, compact landing strip. Events deliberately stay
+//    out of the editorial "Latest" feed below.
+const activityItems = computed(() =>
+  (home.value?.events ?? [])
+    .map(event => ({
+      title: event.title,
+      date: event.eventDate ? new Date(event.eventDate).toISOString() : '',
+      endDate: event.endDate ? new Date(event.endDate).toISOString() : '',
+      location: event.location ?? '',
+      path: localizedPath(`/activities/${event.slug}`)
+    }))
+    .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'))
+)
+
+// ── Stories: albums and posts only, newest first.
 const feed = computed(() => {
   const albumItems = (home.value?.albums ?? [])
     .map(a => ({
@@ -121,20 +135,7 @@ const feed = computed(() => {
       path: localizedPath(`/blog/${p.slug}`)
     }))
     .filter(p => p.image)
-  const eventItems = (home.value?.events ?? [])
-    .map(event => ({
-      kind: 'event' as const,
-      title: event.title,
-      tag: event.location ? `${t('nav.activities')} · ${event.location}` : t('nav.activities'),
-      date: event.eventDate ?? '',
-      published: event.eventDate ?? '',
-      image: imageSrc(event.coverR2Key),
-      excerpt: event.summary ?? '',
-      path: localizedPath(`/activities/${event.slug}`)
-    }))
-    .filter(event => event.image)
-
-  return [...albumItems, ...postItems, ...eventItems].sort((a, b) => b.published.localeCompare(a.published))
+  return [...albumItems, ...postItems].sort((a, b) => b.published.localeCompare(a.published))
 })
 
 const leadStory = computed(() => feed.value[0] ?? null)
@@ -308,6 +309,8 @@ useSeoMeta({
     </section>
 
     <FeaturedWork :albums="featuredAlbums" :seed="featuredSeed" :data-chapter="t('home.featuredWork')" />
+
+    <ActivitiesStrip :items="activityItems" />
 
     <StoriesSection :lead="leadStory" :items="smallStories" :data-chapter="t('home.latest')" />
 

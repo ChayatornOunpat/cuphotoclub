@@ -31,6 +31,7 @@ export default defineEventHandler(async () => {
       summary: schema.events.summary,
       coverR2Key: schema.events.coverR2Key,
       eventDate: schema.events.eventDate,
+      endDate: schema.events.endDate,
       location: schema.events.location
     })
     .from(schema.events)
@@ -44,6 +45,15 @@ export default defineEventHandler(async () => {
     postStore.list(),
     eventsQuery
   ])
+
+  // Match the public activities endpoint in an empty local database so the
+  // landing activity strip can be reviewed without seeding D1. Production
+  // always uses the published database rows above.
+  const landingEvents = import.meta.dev && !events.length
+    ? devMockEvents()
+        .slice(0, 3)
+        .map(({ body, publishedAt, registerUrl, ...event }) => event)
+    : events
 
   // "Lego-grid" albums built in the canvas editor (schema.contentAlbums, via albumStore) are a
   // separate system from the relational galleries above (schema.albums/photos) — merge both so
@@ -90,6 +100,6 @@ export default defineEventHandler(async () => {
   return {
     albums,
     posts,
-    events
+    events: landingEvents
   }
 })

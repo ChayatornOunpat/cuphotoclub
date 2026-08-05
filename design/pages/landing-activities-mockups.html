@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CU Photo Club — Landing activities component directions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Spectral:ital,wght@0,200;0,300;1,200;1,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --hero: #0c0c0a;
+      --body: #f5f4f0;
+      --dark: #1a1918;
+      --muted: #7c7a72;
+      --line: #e2ded8;
+      --paper: #eeeae2;
+      --accent: #e8186e;
+      --serif: 'Spectral', Georgia, serif;
+      --sans: 'Inter', sans-serif;
+    }
+
+    html { min-width: 320px; max-width: 100%; overflow-x: hidden; scroll-behavior: smooth; }
+    body {
+      min-width: 320px;
+      overflow-x: hidden;
+      background: #d8d3cb;
+      color: var(--dark);
+      font-family: var(--sans);
+      font-weight: 300;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+    button { font: inherit; }
+    img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+    .chooser {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      min-height: 58px;
+      padding: 0.7rem clamp(1rem, 3vw, 3rem);
+      border-bottom: 2px solid var(--accent);
+      background: rgba(12, 12, 10, 0.97);
+      color: var(--body);
+      backdrop-filter: blur(14px);
+    }
+    .chooser__brand {
+      margin-right: auto;
+      font-size: 0.58rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    .chooser__brand span { color: var(--accent); }
+    .chooser__label { color: rgba(245, 244, 240, 0.5); font-size: 0.52rem; letter-spacing: 0.17em; text-transform: uppercase; }
+    .chooser__options { display: flex; gap: 0.35rem; }
+    .chooser__button {
+      min-width: 2.3rem;
+      min-height: 2.1rem;
+      border: 1px solid rgba(245, 244, 240, 0.22);
+      background: transparent;
+      color: var(--body);
+      cursor: pointer;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      transition: border-color 180ms ease, background 180ms ease;
+    }
+    .chooser__button:hover,
+    .chooser__button:focus-visible { border-color: var(--accent); outline: none; }
+    .chooser__button[aria-selected="true"] { border-color: var(--accent); background: var(--accent); }
+
+    .mockup { display: none; }
+    .mockup.is-active { display: block; }
+    .mockup__note {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      padding: 0.8rem clamp(1rem, 3vw, 3rem);
+      border-bottom: 1px solid rgba(26, 25, 24, 0.12);
+      background: var(--paper);
+      color: var(--muted);
+      font-size: 0.53rem;
+      letter-spacing: 0.13em;
+      line-height: 1.5;
+      text-transform: uppercase;
+    }
+    .mockup__note strong { color: var(--dark); font-weight: 500; }
+
+    /* Enough surrounding page to judge the section handoff. */
+    .landing-context { background: var(--body); }
+    .context-before,
+    .context-after { padding: clamp(2.2rem, 5vw, 4.5rem) clamp(1rem, 5vw, 5rem); }
+    .context-before { min-height: 210px; border-bottom: 1px solid var(--line); }
+    .context-after { min-height: 310px; border-top: 1px solid var(--line); background: var(--paper); }
+    .context__inner { max-width: 1380px; margin: 0 auto; }
+    .context__ghosts { display: grid; grid-template-columns: 1.45fr 0.75fr 0.75fr; gap: 1rem; margin-top: 2rem; }
+    .context__ghost { height: 72px; border: 1px solid var(--line); background: linear-gradient(100deg, #e8e4dd, #f1eee8); }
+    .context__ghost:first-child { height: 94px; }
+    .context-after h2 {
+      max-width: 630px;
+      margin-top: 1.6rem;
+      font-family: var(--serif);
+      font-size: clamp(2.8rem, 6vw, 6.4rem);
+      font-weight: 200;
+      letter-spacing: -0.045em;
+      line-height: 0.94;
+    }
+    .context-after h2 em { color: var(--accent); font-weight: 200; }
+    .context-after p:last-child { max-width: 590px; margin-top: 1.4rem; color: var(--muted); font-size: 0.68rem; line-height: 1.8; }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+      color: var(--muted);
+      font-size: 0.54rem;
+      font-weight: 400;
+      letter-spacing: 0.23em;
+      text-transform: uppercase;
+    }
+    .eyebrow::after { content: ''; width: 3.5rem; height: 1px; background: currentColor; opacity: 0.3; }
+    .eyebrow__num { color: var(--accent); }
+    .meta { color: var(--muted); font-size: 0.5rem; letter-spacing: 0.14em; line-height: 1.5; text-transform: uppercase; }
+    .arrow { display: inline-block; transition: transform 180ms ease; }
+    a:hover .arrow { transform: translateX(0.3rem); }
+
+    /* ── A / Date-led agenda ─────────────────────────────────────────── */
+    .agenda {
+      padding: clamp(3rem, 6vw, 5rem) clamp(1rem, 5vw, 5rem);
+      border-top: 2px solid var(--accent);
+      background: var(--body);
+    }
+    .agenda__inner {
+      display: grid;
+      grid-template-columns: minmax(180px, 0.5fr) minmax(420px, 1.35fr) minmax(260px, 0.75fr);
+      max-width: 1380px;
+      margin: 0 auto;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .agenda__intro { display: flex; flex-direction: column; justify-content: space-between; padding: 2rem 2rem 2rem 0; }
+    .agenda__intro h2 {
+      max-width: 230px;
+      margin: 2rem 0;
+      font-family: var(--serif);
+      font-size: clamp(2.4rem, 4.4vw, 4.8rem);
+      font-weight: 200;
+      letter-spacing: -0.045em;
+      line-height: 0.93;
+    }
+    .agenda__intro h2 em { color: var(--accent); font-weight: 200; }
+    .agenda__all { width: fit-content; color: var(--dark); font-size: 0.52rem; letter-spacing: 0.16em; text-decoration: none; text-transform: uppercase; }
+    .agenda__feature {
+      display: grid;
+      grid-template-columns: 118px minmax(0, 1fr);
+      gap: clamp(1.5rem, 3vw, 3.5rem);
+      padding: 2rem clamp(1.5rem, 4vw, 4rem);
+      border-right: 1px solid var(--line);
+      border-left: 1px solid var(--line);
+      color: inherit;
+      text-decoration: none;
+      transition: background 200ms ease;
+    }
+    .agenda__feature:hover { background: #f0ece5; }
+    .agenda__date { color: var(--accent); text-align: center; }
+    .agenda__day { display: block; font-family: var(--serif); font-size: 6.5rem; font-weight: 200; letter-spacing: -0.08em; line-height: 0.75; }
+    .agenda__month { display: block; margin-top: 0.8rem; font-size: 0.53rem; letter-spacing: 0.26em; text-transform: uppercase; }
+    .agenda__feature-copy { display: flex; flex-direction: column; justify-content: center; }
+    .agenda__status { width: fit-content; margin-bottom: 1.15rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--accent); color: var(--accent); font-size: 0.48rem; letter-spacing: 0.2em; text-transform: uppercase; }
+    .agenda__feature h3 { font-family: var(--serif); font-size: clamp(1.8rem, 3.2vw, 3.3rem); font-weight: 300; letter-spacing: -0.03em; line-height: 1; }
+    .agenda__feature p { max-width: 520px; margin-top: 1rem; color: var(--muted); font-size: 0.7rem; line-height: 1.75; }
+    .agenda__place { margin-top: 1.25rem; }
+    .agenda__next { padding: 0 0 0 2rem; }
+    .agenda__next-item { display: grid; grid-template-columns: 44px 1fr; gap: 1.2rem; padding: 1.6rem 0; color: inherit; text-decoration: none; }
+    .agenda__next-item + .agenda__next-item { border-top: 1px solid var(--line); }
+    .agenda__next-date { color: var(--accent); font-family: var(--serif); font-size: 1.8rem; font-weight: 200; line-height: 0.9; }
+    .agenda__next-date small { display: block; margin-top: 0.35rem; color: var(--muted); font-family: var(--sans); font-size: 0.42rem; letter-spacing: 0.16em; text-transform: uppercase; }
+    .agenda__next h4 { font-family: var(--serif); font-size: 1rem; font-weight: 300; line-height: 1.25; transition: color 180ms ease; }
+    .agenda__next-item:hover h4 { color: var(--accent); }
+    .agenda__next .meta { margin-top: 0.5rem; font-size: 0.43rem; }
+
+    /* ── B / Darkroom contact strip ──────────────────────────────────── */
+    .contact-strip { padding: 0 clamp(1rem, 4vw, 4rem); background: var(--hero); color: var(--body); }
+    .contact-strip__inner { display: grid; grid-template-columns: 200px minmax(0, 1fr) 70px; max-width: 1450px; margin: 0 auto; }
+    .contact-strip__head { display: flex; flex-direction: column; justify-content: space-between; padding: 2.2rem 2rem 2.2rem 0; border-right: 1px solid rgba(245, 244, 240, 0.16); }
+    .contact-strip__head .eyebrow { color: rgba(245, 244, 240, 0.5); }
+    .contact-strip__head h2 { margin-top: 2.2rem; font-family: var(--serif); font-size: 2.5rem; font-style: italic; font-weight: 200; letter-spacing: -0.03em; line-height: 0.95; }
+    .contact-strip__head h2 span { color: var(--accent); }
+    .contact-strip__events { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .contact-event { position: relative; min-height: 255px; padding: 2rem; border-right: 1px solid rgba(245, 244, 240, 0.16); color: inherit; text-decoration: none; overflow: hidden; }
+    .contact-event::after { content: ''; position: absolute; right: 1.2rem; bottom: 1rem; left: 1.2rem; height: 3px; background: repeating-linear-gradient(90deg, rgba(245, 244, 240, 0.28) 0 2px, transparent 2px 10px); }
+    .contact-event__index { color: rgba(245, 244, 240, 0.32); font-size: 0.45rem; letter-spacing: 0.2em; }
+    .contact-event__date { margin-top: 2.8rem; color: var(--accent); font-size: 0.5rem; letter-spacing: 0.18em; text-transform: uppercase; }
+    .contact-event h3 { max-width: 260px; margin-top: 0.8rem; font-family: var(--serif); font-size: clamp(1.25rem, 2.1vw, 2.05rem); font-weight: 300; line-height: 1.05; }
+    .contact-event .meta { margin-top: 1rem; color: rgba(245, 244, 240, 0.43); font-size: 0.43rem; }
+    .contact-event__wash { position: absolute; inset: 0; background: var(--accent); opacity: 0; transform: translateY(100%); transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms ease; }
+    .contact-event > *:not(.contact-event__wash) { position: relative; z-index: 1; }
+    .contact-event:hover .contact-event__wash { opacity: 0.08; transform: translateY(0); }
+    .contact-strip__link { display: grid; place-items: center; color: var(--accent); text-decoration: none; }
+    .contact-strip__link span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 0.48rem; letter-spacing: 0.18em; text-transform: uppercase; }
+
+    /* ── C / Campus ticker ───────────────────────────────────────────── */
+    .ticker { padding: 1.6rem clamp(1rem, 5vw, 5rem); border-top: 2px solid var(--accent); border-bottom: 1px solid var(--line); background: var(--body); }
+    .ticker__inner { display: grid; grid-template-columns: 160px minmax(0, 1fr) auto; align-items: center; max-width: 1380px; margin: 0 auto; }
+    .ticker__label { padding-right: 1.5rem; }
+    .ticker__label strong { display: block; font-family: var(--serif); font-size: 1.45rem; font-style: italic; font-weight: 300; line-height: 1; }
+    .ticker__label span { display: block; margin-top: 0.45rem; color: var(--accent); font-size: 0.42rem; letter-spacing: 0.19em; text-transform: uppercase; }
+    .ticker__events { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-right: 1px solid var(--line); border-left: 1px solid var(--line); }
+    .ticker-event { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.95rem; align-items: center; padding: 0.3rem clamp(1rem, 2vw, 2rem); color: inherit; text-decoration: none; }
+    .ticker-event + .ticker-event { border-left: 1px solid var(--line); }
+    .ticker-event time { color: var(--accent); font-family: var(--serif); font-size: 1.9rem; font-weight: 200; letter-spacing: -0.06em; line-height: 1; }
+    .ticker-event time small { display: block; color: var(--muted); font-family: var(--sans); font-size: 0.39rem; letter-spacing: 0.15em; text-align: center; text-transform: uppercase; }
+    .ticker-event h3 { overflow: hidden; font-family: var(--serif); font-size: 0.92rem; font-weight: 300; line-height: 1.18; text-overflow: ellipsis; white-space: nowrap; transition: color 180ms ease; }
+    .ticker-event:hover h3 { color: var(--accent); }
+    .ticker-event p { margin-top: 0.3rem; overflow: hidden; color: var(--muted); font-size: 0.43rem; letter-spacing: 0.12em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+    .ticker__all { padding-left: 1.8rem; color: var(--dark); font-size: 0.49rem; letter-spacing: 0.16em; text-decoration: none; text-transform: uppercase; white-space: nowrap; }
+
+    @media (max-width: 950px) {
+      .agenda__inner { grid-template-columns: 180px minmax(0, 1fr); }
+      .agenda__next { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; padding: 0; border-top: 1px solid var(--line); }
+      .agenda__next-item { padding: 1.5rem 2rem; }
+      .agenda__next-item + .agenda__next-item { border-top: 0; border-left: 1px solid var(--line); }
+      .contact-strip__inner { grid-template-columns: 170px minmax(0, 1fr) 60px; }
+      .contact-strip__events { grid-template-columns: 1fr; }
+      .contact-event { min-height: auto; }
+      .contact-event__date { margin-top: 1.2rem; }
+      .ticker__inner { grid-template-columns: 130px minmax(0, 1fr); }
+      .ticker__events { grid-template-columns: 1fr; border-right: 0; }
+      .ticker-event { padding-block: 0.85rem; }
+      .ticker-event + .ticker-event { border-top: 1px solid var(--line); border-left: 0; }
+      .ticker__all { grid-column: 2; padding: 1rem 0 0 1rem; }
+    }
+
+    @media (max-width: 680px) {
+      .chooser { gap: 0.65rem; padding-inline: 1rem; }
+      .chooser__brand { margin-right: 7.5rem; font-size: 0.45rem; white-space: nowrap; }
+      .chooser__label { display: none; }
+      .chooser__options { position: absolute; right: 1rem; }
+      .chooser__button { min-width: 2rem; }
+      .mockup__note { align-items: flex-start; flex-direction: column; gap: 0.3rem; }
+      .context-before { min-height: 150px; }
+      .context__ghosts { grid-template-columns: 1fr 0.7fr; }
+      .context__ghost:last-child { display: none; }
+      .agenda__inner { grid-template-columns: 1fr; }
+      .agenda__intro { min-height: 210px; padding-right: 0; }
+      .agenda__feature { grid-template-columns: 72px minmax(0, 1fr); padding-inline: 0; border: 0; border-top: 1px solid var(--line); }
+      .agenda__day { font-size: 4.6rem; }
+      .agenda__next { grid-column: auto; grid-template-columns: 1fr; }
+      .agenda__next-item { padding-inline: 0; }
+      .agenda__next-item + .agenda__next-item { border-top: 1px solid var(--line); border-left: 0; }
+      .contact-strip { padding-inline: 1rem; }
+      .contact-strip__inner { grid-template-columns: 1fr 48px; }
+      .contact-strip__head { grid-column: 1 / -1; padding-right: 0; border-right: 0; border-bottom: 1px solid rgba(245, 244, 240, 0.16); }
+      .contact-strip__events { grid-column: 1; }
+      .contact-event { padding-inline: 0.5rem; }
+      .contact-strip__link { grid-column: 2; grid-row: 2; }
+      .ticker__inner { grid-template-columns: 1fr; }
+      .ticker__label { padding: 0 0 1rem; }
+      .ticker__events { border-top: 1px solid var(--line); border-left: 0; }
+      .ticker-event { padding-inline: 0; }
+      .ticker__all { grid-column: auto; padding-left: 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="chooser" aria-label="Choose a landing activity component direction">
+    <p class="chooser__brand"><span>CU</span> Photo Club / Activities</p>
+    <p class="chooser__label">Compact landing directions</p>
+    <div class="chooser__options" role="tablist" aria-label="Mockup options">
+      <button class="chooser__button" type="button" role="tab" aria-selected="true" data-option="a">A</button>
+      <button class="chooser__button" type="button" role="tab" aria-selected="false" data-option="b">B</button>
+      <button class="chooser__button" type="button" role="tab" aria-selected="false" data-option="c">C</button>
+    </div>
+  </nav>
+
+  <main>
+    <article class="mockup is-active" data-mockup="a">
+      <div class="mockup__note">
+        <strong>Option A — Date-led agenda · Recommended</strong>
+        <span>One clear “up next” event plus two quieter dates; compact without becoming a ticker</span>
+      </div>
+      <div class="landing-context">
+        <section class="context-before" aria-hidden="true">
+          <div class="context__inner">
+            <p class="eyebrow"><span class="eyebrow__num">01</span> Featured work</p>
+            <div class="context__ghosts"><div class="context__ghost"></div><div class="context__ghost"></div><div class="context__ghost"></div></div>
+          </div>
+        </section>
+
+        <section class="agenda">
+          <div class="agenda__inner">
+            <header class="agenda__intro">
+              <p class="eyebrow"><span class="eyebrow__num">02</span> What’s happening</p>
+              <h2>Meet us <em>outside.</em></h2>
+              <a class="agenda__all" href="#">Full calendar <span class="arrow">→</span></a>
+            </header>
+
+            <a class="agenda__feature" href="#">
+              <time class="agenda__date" datetime="2026-08-08"><span class="agenda__day">08</span><span class="agenda__month">Aug · Sat</span></time>
+              <div class="agenda__feature-copy">
+                <span class="agenda__status">Up next · Registration open</span>
+                <h3>Golden Hour Photowalk</h3>
+                <p>An evening along the Chao Phraya, chasing the last light with any camera you own.</p>
+                <span class="meta agenda__place">17:00 · Chao Phraya Riverside</span>
+              </div>
+            </a>
+
+            <div class="agenda__next" aria-label="More upcoming activities">
+              <a class="agenda__next-item" href="#">
+                <time class="agenda__next-date" datetime="2026-08-17">17<small>Aug</small></time>
+                <div><h4>Film Development Workshop</h4><p class="meta">3 days · Arts Darkroom</p></div>
+              </a>
+              <a class="agenda__next-item" href="#">
+                <time class="agenda__next-date" datetime="2026-08-24">24<small>Aug</small></time>
+                <div><h4>Street Photography Night</h4><p class="meta">Sam Yan · 19:00</p></div>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section class="context-after">
+          <div class="context__inner">
+            <p class="eyebrow"><span class="eyebrow__num">03</span> The latest</p>
+            <h2>New albums and <em>stories.</em></h2>
+            <p>Activities no longer compete here. This section becomes a quieter editorial feed for finished photo work and journal posts.</p>
+          </div>
+        </section>
+      </div>
+    </article>
+
+    <article class="mockup" data-mockup="b">
+      <div class="mockup__note">
+        <strong>Option B — Darkroom contact strip</strong>
+        <span>Three upcoming moments read like frames on a roll; strongest visual separation from “The Latest”</span>
+      </div>
+      <div class="landing-context">
+        <section class="context-before" aria-hidden="true">
+          <div class="context__inner">
+            <p class="eyebrow"><span class="eyebrow__num">01</span> Featured work</p>
+            <div class="context__ghosts"><div class="context__ghost"></div><div class="context__ghost"></div><div class="context__ghost"></div></div>
+          </div>
+        </section>
+
+        <section class="contact-strip">
+          <div class="contact-strip__inner">
+            <header class="contact-strip__head">
+              <p class="eyebrow"><span class="eyebrow__num">02</span> On the calendar</p>
+              <h2>See what’s <span>next.</span></h2>
+            </header>
+            <div class="contact-strip__events">
+              <a class="contact-event" href="#">
+                <span class="contact-event__wash"></span>
+                <span class="contact-event__index">FRAME 01 / 03</span>
+                <p class="contact-event__date">08 Aug · 17:00</p>
+                <h3>Golden Hour Photowalk</h3>
+                <p class="meta">Chao Phraya Riverside</p>
+              </a>
+              <a class="contact-event" href="#">
+                <span class="contact-event__wash"></span>
+                <span class="contact-event__index">FRAME 02 / 03</span>
+                <p class="contact-event__date">17—19 Aug</p>
+                <h3>Film Development Workshop</h3>
+                <p class="meta">Faculty of Arts Darkroom</p>
+              </a>
+              <a class="contact-event" href="#">
+                <span class="contact-event__wash"></span>
+                <span class="contact-event__index">FRAME 03 / 03</span>
+                <p class="contact-event__date">24 Aug · 19:00</p>
+                <h3>Street Photography Night</h3>
+                <p class="meta">Sam Yan — Banthat Thong</p>
+              </a>
+            </div>
+            <a class="contact-strip__link" href="#"><span>All activities →</span></a>
+          </div>
+        </section>
+
+        <section class="context-after">
+          <div class="context__inner">
+            <p class="eyebrow"><span class="eyebrow__num">03</span> The latest</p>
+            <h2>New albums and <em>stories.</em></h2>
+            <p>Editorial content resumes on paper after the dark calendar strip, making the content types unmistakably separate.</p>
+          </div>
+        </section>
+      </div>
+    </article>
+
+    <article class="mockup" data-mockup="c">
+      <div class="mockup__note">
+        <strong>Option C — Campus ticker</strong>
+        <span>The lightest footprint: immediate dates and places in one glance, with almost no interruption to the landing flow</span>
+      </div>
+      <div class="landing-context">
+        <section class="context-before" aria-hidden="true">
+          <div class="context__inner">
+            <p class="eyebrow"><span class="eyebrow__num">01</span> Featured work</p>
+            <div class="context__ghosts"><div class="context__ghost"></div><div class="context__ghost"></div><div class="context__ghost"></div></div>
+          </div>
+        </section>
+
+        <aside class="ticker" aria-label="Upcoming CU Photo Club activities">
+          <div class="ticker__inner">
+            <div class="ticker__label"><strong>What’s on</strong><span>August 2026</span></div>
+            <div class="ticker__events">
+              <a class="ticker-event" href="#">
+                <time datetime="2026-08-08">08<small>Aug</small></time>
+                <div><h3>Golden Hour Photowalk</h3><p>17:00 · Chao Phraya</p></div>
+              </a>
+              <a class="ticker-event" href="#">
+                <time datetime="2026-08-17">17<small>Aug</small></time>
+                <div><h3>Film Development Workshop</h3><p>Arts Darkroom · 3 days</p></div>
+              </a>
+              <a class="ticker-event" href="#">
+                <time datetime="2026-08-24">24<small>Aug</small></time>
+                <div><h3>Street Photography Night</h3><p>19:00 · Sam Yan</p></div>
+              </a>
+            </div>
+            <a class="ticker__all" href="#">Calendar <span class="arrow">→</span></a>
+          </div>
+        </aside>
+
+        <section class="context-after">
+          <div class="context__inner">
+            <p class="eyebrow"><span class="eyebrow__num">02</span> The latest</p>
+            <h2>New albums and <em>stories.</em></h2>
+            <p>The ticker is intentionally unnumbered as a major chapter, so the existing landing sequence can stay nearly unchanged.</p>
+          </div>
+        </section>
+      </div>
+    </article>
+  </main>
+
+  <script>
+    const buttons = [...document.querySelectorAll('[data-option]')]
+    const mockups = [...document.querySelectorAll('[data-mockup]')]
+
+    function showOption(option, updateHash = true) {
+      buttons.forEach(button => button.setAttribute('aria-selected', String(button.dataset.option === option)))
+      mockups.forEach(mockup => mockup.classList.toggle('is-active', mockup.dataset.mockup === option))
+      if (updateHash) history.replaceState(null, '', `#${option}`)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
+    buttons.forEach((button, index) => {
+      button.addEventListener('click', () => showOption(button.dataset.option))
+      button.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+        event.preventDefault()
+        const step = event.key === 'ArrowRight' ? 1 : -1
+        const next = buttons[(index + step + buttons.length) % buttons.length]
+        next.focus()
+        showOption(next.dataset.option)
+      })
+    })
+
+    const initial = location.hash.slice(1).toLowerCase()
+    if (buttons.some(button => button.dataset.option === initial)) showOption(initial, false)
+  </script>
+</body>
+</html>
