@@ -43,6 +43,25 @@ watchEffect(() => {
 
 const saving = ref(false)
 const savedMsg = ref('')
+const bodyImagePickerOpen = ref(false)
+const uploadedBodyImageKeys = ref<string[]>([])
+
+function appendBodyImages(keys: string[]) {
+  const uniqueKeys = [...new Set(keys.filter(Boolean))]
+  if (!uniqueKeys.length) return
+
+  const fallbackAlt = form.title.trim() || t('adminActivities.bodyImageAlt')
+  const markdown = uniqueKeys
+    .map((key, index) => {
+      const suffix = uniqueKeys.length > 1 ? ` ${index + 1}` : ''
+      const alt = `${fallbackAlt}${suffix}`.replace(/[\[\]]/g, '')
+      return `![${alt}](/images/${key})`
+    })
+    .join('\n\n')
+
+  form.body = [form.body.trimEnd(), markdown].filter(Boolean).join('\n\n')
+}
+
 async function save() {
   saving.value = true
   savedMsg.value = ''
@@ -120,6 +139,22 @@ async function remove() {
         <UiField :label="t('adminActivities.body')" input-id="e-body">
           <UiTextarea id="e-body" v-model="form.body" :rows="14" class="font-mono" />
         </UiField>
+        <div class="space-y-3 border-t border-line pt-4">
+          <div>
+            <h3 class="text-sm font-semibold text-ink">{{ t('adminActivities.bodyImages') }}</h3>
+            <p class="mt-1 text-xs leading-5 text-ink-soft">{{ t('adminActivities.bodyImagesHint') }}</p>
+          </div>
+          <AdminR2ImageUploader
+            v-model="uploadedBodyImageKeys"
+            :prefix="`events/${id}/body`"
+            :show-previews="false"
+            @uploaded="appendBodyImages"
+          />
+          <UiButton variant="secondary" size="sm" @click="bodyImagePickerOpen = true">
+            <Icon name="heroicons:photo" class="size-4" />
+            {{ t('adminActivities.choosePostImages') }}
+          </UiButton>
+        </div>
       </section>
 
       <aside class="space-y-5">
@@ -161,5 +196,13 @@ async function remove() {
         <UiButton variant="danger" :loading="deleting" @click="remove">{{ t('admin.delete') }}</UiButton>
       </div>
     </UiModal>
+
+    <AdminImagePickerModal
+      v-model="bodyImagePickerOpen"
+      prefix="content-posts"
+      multiple
+      :title="t('adminActivities.choosePostImages')"
+      @select="appendBodyImages"
+    />
   </div>
 </template>

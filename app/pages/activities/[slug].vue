@@ -37,7 +37,9 @@ const coverUrl = computed(() => {
   return /^https?:\/\//i.test(imageSrc.value) ? imageSrc.value : `${origin}${imageSrc.value}`
 })
 const intlLocale = computed(() => (locale.value === 'th' ? 'th-TH' : 'en-GB'))
-const hasBody = computed(() => Boolean(ev.value?.bodyHtml?.replace(/<[^>]*>/g, '').trim()))
+// Keep image-only activity bodies visible; stripping tags made a body containing
+// only Markdown images look empty even though it had meaningful content.
+const hasBody = computed(() => Boolean(ev.value?.bodyHtml?.trim()))
 
 // Event dates are stored as UTC midnight, so a fixed UTC timezone recovers the
 // intended calendar day regardless of the viewer's timezone.
