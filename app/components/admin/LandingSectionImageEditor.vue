@@ -96,7 +96,7 @@ async function save() {
     </section>
 
     <button v-else type="button" class="landing-image__empty" @click="pickerOpen = true">
-      <Icon name="heroicons:photo" aria-hidden="true" />
+      <Icon name="heroicons:photo" class="landing-image__empty-icon" aria-hidden="true" />
       <strong>{{ emptyTitle }}</strong>
       <span>{{ emptyHint }}</span>
     </button>
@@ -233,7 +233,17 @@ async function save() {
 
 .landing-image__empty:hover,
 .landing-image__empty:focus-visible { border-color: var(--accent); color: var(--accent); }
-.landing-image__empty :deep(svg) { align-self: end; width: 2rem; height: 2rem; }
+/* Sized on the Icon element itself: @nuxt/icon renders a span in css mode, so a
+   `:deep(svg)` rule never matches and the icon falls back to 1em. Kept on
+   currentColor + opacity so it picks up the button's accent hover. */
+.landing-image__empty-icon {
+  align-self: end;
+  width: 2.75rem;
+  height: 2.75rem;
+  opacity: 0.45;
+}
+.landing-image__empty:hover .landing-image__empty-icon,
+.landing-image__empty:focus-visible .landing-image__empty-icon { opacity: 1; }
 .landing-image__empty strong { align-self: end; font-size: 0.8rem; font-weight: 500; }
 .landing-image__empty span { align-self: start; max-width: 380px; color: var(--muted); font-size: 0.7rem; line-height: 1.6; }
 .landing-image__status { color: var(--muted); font-size: 0.72rem; }
