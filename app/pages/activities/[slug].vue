@@ -633,7 +633,6 @@ useHead(() => ({
 .gallery-lightbox-leave-to .gallery-lightbox__stage { opacity: 0; }
 .gallery-lightbox-enter-from .gallery-lightbox__stage,
 .gallery-lightbox-leave-to .gallery-lightbox__stage { transform: scale(0.985); }
-}
 
 /* ── Exit ── */
 .event-exit {
