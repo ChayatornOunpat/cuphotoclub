@@ -191,8 +191,7 @@ async function openEdit(ev: EventRow) {
 // folder (same trick the cover uploader uses with events/covers). Once saved,
 // edits scope uploads to the event's own folder.
 const GALLERY_MAX = 24
-const activityImagePickerOpen = ref(false)
-const postImagePickerOpen = ref(false)
+const libraryPickerOpen = ref(false)
 
 const galleryPrefix = computed(() =>
   editing.value ? `events/${editing.value.id}/gallery` : 'events/gallery'
@@ -200,6 +199,36 @@ const galleryPrefix = computed(() =>
 const activityLibraryPrefix = computed(() =>
   editing.value ? `events/${editing.value.id}` : 'events'
 )
+
+// /api/admin/albums returns every album in full (rows and all), so it is
+// fetched on first picker open rather than with the page.
+const albumSources = ref<{ label: string, prefix: string }[]>([])
+let albumsRequested = false
+
+async function ensureAlbumSources() {
+  if (albumsRequested) return
+  albumsRequested = true
+  try {
+    const albums = await $fetch<Array<{ id: string, title: string }>>('/api/admin/albums')
+    albumSources.value = albums.map(album => ({
+      label: t('adminActivities.sourceAlbum', { name: album.title }),
+      prefix: `content-albums/${album.id}`
+    }))
+  } catch {
+    albumsRequested = false // let the next open retry
+  }
+}
+
+const librarySources = computed(() => [
+  { label: t('adminActivities.sourceActivityUploads'), prefix: activityLibraryPrefix.value },
+  { label: t('adminActivities.sourceBlogPosts'), prefix: 'content-posts' },
+  ...albumSources.value
+])
+
+function openLibraryPicker() {
+  ensureAlbumSources()
+  libraryPickerOpen.value = true
+}
 
 function addGalleryImages(keys: string[]) {
   form.galleryR2Keys = [...new Set([...form.galleryR2Keys, ...keys.filter(Boolean)])].slice(0, GALLERY_MAX)
@@ -472,13 +501,9 @@ function chipTitle(ev: EventRow) {
 
           <div class="activity-media__library">
             <div class="activity-media__library-actions">
-              <UiButton variant="secondary" size="sm" type="button" @click="activityImagePickerOpen = true">
+              <UiButton variant="secondary" size="sm" type="button" @click="openLibraryPicker">
                 <Icon name="heroicons:photo" class="btn-icon" />
-                {{ t('adminActivities.chooseActivityImages') }}
-              </UiButton>
-              <UiButton variant="secondary" size="sm" type="button" @click="postImagePickerOpen = true">
-                <Icon name="heroicons:photo" class="btn-icon" />
-                {{ t('adminActivities.choosePostImages') }}
+                {{ t('adminPicker.chooseFromLibrary') }}
               </UiButton>
             </div>
             <span>{{ t('adminActivities.galleryOrderHint') }}</span>
@@ -542,18 +567,10 @@ function chipTitle(ev: EventRow) {
         and Escape handling while a child is open.
       -->
       <AdminImagePickerModal
-        v-model="activityImagePickerOpen"
-        :prefix="activityLibraryPrefix"
+        v-model="libraryPickerOpen"
+        :sources="librarySources"
         multiple
-        :title="t('adminActivities.chooseActivityImages')"
-        @select="addGalleryImages"
-      />
-
-      <AdminImagePickerModal
-        v-model="postImagePickerOpen"
-        prefix="content-posts"
-        multiple
-        :title="t('adminActivities.choosePostImages')"
+        :title="t('adminPicker.chooseFromLibrary')"
         @select="addGalleryImages"
       />
 

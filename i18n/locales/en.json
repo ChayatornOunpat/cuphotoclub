@@ -250,7 +250,11 @@
     "where": "Where",
     "galleryLabel": "Activity gallery",
     "galleryFrames": "{count} frames",
-    "galleryFrameAlt": "{title}, gallery image {number}"
+    "galleryFrameAlt": "{title}, gallery image {number}",
+    "galleryOpenImage": "Open gallery image {number}",
+    "galleryViewerLabel": "Activity gallery image viewer",
+    "galleryPrevious": "Previous image",
+    "galleryNext": "Next image"
   },
   "adminActivities": {
     "title": "Activities",
@@ -287,6 +291,9 @@
     "galleryHint": "A separate gallery shown below the activity details. These images never enter the text.",
     "chooseActivityImages": "Choose activity uploads",
     "choosePostImages": "Choose images from posts",
+    "sourceActivityUploads": "Activity uploads",
+    "sourceBlogPosts": "Blog posts",
+    "sourceAlbum": "Album — {name}",
     "galleryOrderHint": "The order here is the order visitors will see. Up to 24 images.",
     "galleryImageCount": "{count} images",
     "moveEarlier": "Move image earlier",
@@ -529,7 +536,8 @@
     "cancel": "Cancel",
     "select": "Select",
     "managePhotos": "Manage Photos",
-    "chooseFromLibrary": "Choose from library"
+    "chooseFromLibrary": "Choose from library",
+    "source": "Source"
   },
   "adminPhotoManager": {
     "title": "Photos",

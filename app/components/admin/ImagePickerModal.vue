@@ -4,10 +4,14 @@ const props = withDefaults(defineProps<{
   multiple?: boolean
   title?: string
   initialSort?: SortMode
+  // Optional multi-source mode: renders a source dropdown and loads one
+  // source at a time. Callers that pass a single `prefix` are unaffected.
+  sources?: PickerSource[]
 }>(), {
   prefix: 'uploads',
   multiple: false,
-  initialSort: 'newest'
+  initialSort: 'newest',
+  sources: undefined
 })
 
 const open = defineModel<boolean>({ required: true })
@@ -21,6 +25,13 @@ interface LibraryImage {
   uploadedAt?: string
   orderAt?: number
   size?: number
+}
+
+// Not exported: `<script setup>` forbids ES exports. Callers pass a matching
+// object literal and structural typing does the rest.
+interface PickerSource {
+  label: string
+  prefix: string
 }
 
 type SortMode = 'newest' | 'oldest' | 'name-asc' | 'name-desc'
@@ -39,6 +50,15 @@ const managerOpen = ref(false)
 const sortMode = ref<SortMode>('newest')
 const thumbnailSize = ref<ThumbnailSize>('medium')
 const lastSelectedKey = ref<string | null>(null)
+const activeSourceIndex = ref(0)
+
+// Single-prefix callers keep their old behaviour; multi-source callers drive
+// the listing from the dropdown instead.
+const activePrefix = computed(() => {
+  const list = props.sources
+  if (!list?.length) return props.prefix
+  return list[activeSourceIndex.value]?.prefix ?? list[0]?.prefix ?? props.prefix
+})
 
 // orderAt is the upload queue-order stamp; uploadedAt (completion time) covers
 // images uploaded before the stamp existed. An image with neither is almost
@@ -71,14 +91,18 @@ const thumbnailGridStyle = computed(() => {
 })
 
 async function loadLibrary() {
+  const requested = activePrefix.value
   loading.value = true
   try {
-    const result = await $fetch<{ keys: string[], images?: LibraryImage[] }>('/api/admin/media', { query: { prefix: props.prefix } })
+    const result = await $fetch<{ keys: string[], images?: LibraryImage[] }>('/api/admin/media', { query: { prefix: requested } })
+    // A slow response for a source the user has already switched away from
+    // must not overwrite the newer one.
+    if (requested !== activePrefix.value) return
     libraryImages.value = result.images ?? result.keys.map(key => ({ key }))
   } catch {
-    libraryImages.value = []
+    if (requested === activePrefix.value) libraryImages.value = []
   } finally {
-    loading.value = false
+    if (requested === activePrefix.value) loading.value = false
   }
 }
 
@@ -87,6 +111,16 @@ watch(open, val => {
   selected.value = new Set()
   lastSelectedKey.value = null
   sortMode.value = props.initialSort
+  activeSourceIndex.value = 0
+  loadLibrary()
+})
+
+// Switching source reloads the grid. Selection deliberately survives the
+// switch so images can be gathered from several albums in one pass; the
+// shift-range anchor does not, since it refers to the old grid.
+watch(activePrefix, () => {
+  if (!open.value) return
+  lastSelectedKey.value = null
   loadLibrary()
 })
 
@@ -149,6 +183,23 @@ function selectionOrder(key: string) {
 <template>
   <UiModal v-model="open" :title="modalTitle" size="xl" flush>
     <div class="picker">
+
+      <!--
+        Sits outside .picker__library on purpose: the library swaps between
+        loading / empty / grid states, and the source dropdown has to stay
+        reachable in all three — otherwise picking an empty album would strand
+        the user with no way back.
+      -->
+      <div v-if="sources?.length" class="picker__sources">
+        <label class="picker__source">
+          <span>{{ t('adminPicker.source') }}</span>
+          <select v-model="activeSourceIndex">
+            <option v-for="(source, index) in sources" :key="source.prefix" :value="index">
+              {{ source.label }}
+            </option>
+          </select>
+        </label>
+      </div>
 
       <!-- Library -->
       <div class="picker__library">
@@ -227,7 +278,7 @@ function selectionOrder(key: string) {
     </div>
   </UiModal>
 
-  <AdminPhotoManager v-model="managerOpen" :prefix="prefix" />
+  <AdminPhotoManager v-model="managerOpen" :prefix="activePrefix" />
 </template>
 
 <style scoped>
@@ -236,6 +287,37 @@ function selectionOrder(key: string) {
   flex-direction: column;
   height: min(80svh, 760px);
 }
+
+/* ── Source switcher ── */
+.picker__sources {
+  flex-shrink: 0;
+  padding: 0.78rem 0.95rem;
+  border-bottom: 1px solid var(--subtle);
+  background: var(--body-bg);
+}
+.picker__source {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.picker__source > span {
+  font-size: 0.48rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.picker__source select {
+  min-height: 2.2rem;
+  max-width: 24rem;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.66rem;
+  padding: 0 0.55rem;
+  outline: none;
+}
+.picker__source select:focus { border-color: var(--accent); }
 
 /* ── Library ── */
 .picker__library {
@@ -490,6 +572,10 @@ function selectionOrder(key: string) {
     flex-direction: column;
   }
   .picker__sort select {
+    width: 100%;
+  }
+  .picker__source select {
+    max-width: none;
     width: 100%;
   }
   .picker__size-options {

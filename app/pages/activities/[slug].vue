@@ -43,6 +43,43 @@ const galleryImages = computed(() => (ev.value?.galleryR2Keys ?? []).map((key, i
   src: publicImageSrc(key),
   alt: t('activities.galleryFrameAlt', { title: ev.value?.title ?? '', number: index + 1 })
 })))
+const lightboxIndex = ref<number | null>(null)
+const lightboxImage = computed(() => lightboxIndex.value === null ? null : galleryImages.value[lightboxIndex.value] ?? null)
+const lightboxCloseButton = ref<HTMLButtonElement | null>(null)
+let lightboxTrigger: HTMLElement | null = null
+
+function openGalleryImage(index: number, event: MouseEvent) {
+  lightboxTrigger = event.currentTarget as HTMLElement
+  lightboxIndex.value = index
+  if (import.meta.client) document.documentElement.style.overflow = 'hidden'
+  nextTick(() => lightboxCloseButton.value?.focus())
+}
+
+function closeGalleryImage() {
+  lightboxIndex.value = null
+  if (import.meta.client) document.documentElement.style.overflow = ''
+  nextTick(() => lightboxTrigger?.focus())
+}
+
+function moveGalleryImage(direction: -1 | 1) {
+  if (lightboxIndex.value === null || !galleryImages.value.length) return
+  lightboxIndex.value = (lightboxIndex.value + direction + galleryImages.value.length) % galleryImages.value.length
+}
+
+function onGalleryKeydown(event: KeyboardEvent) {
+  if (lightboxIndex.value === null) return
+  if (event.key === 'Escape') closeGalleryImage()
+  else if (event.key === 'ArrowLeft') moveGalleryImage(-1)
+  else if (event.key === 'ArrowRight') moveGalleryImage(1)
+  else return
+  event.preventDefault()
+}
+
+onMounted(() => document.addEventListener('keydown', onGalleryKeydown))
+onUnmounted(() => {
+  document.removeEventListener('keydown', onGalleryKeydown)
+  if (lightboxIndex.value !== null) document.documentElement.style.overflow = ''
+})
 const coverUrl = computed(() => {
   if (!imageSrc.value) return undefined
   return /^https?:\/\//i.test(imageSrc.value) ? imageSrc.value : `${origin}${imageSrc.value}`
@@ -170,11 +207,67 @@ useHead(() => ({
         <span>{{ t('activities.galleryFrames', { count: galleryImages.length }) }}</span>
       </div>
       <div class="event-gallery__grid">
-        <figure v-for="image in galleryImages" :key="image.key" class="event-gallery__frame">
+        <button
+          v-for="(image, index) in galleryImages"
+          :key="image.key"
+          type="button"
+          class="event-gallery__frame"
+          :aria-label="t('activities.galleryOpenImage', { number: index + 1 })"
+          @click="openGalleryImage(index, $event)"
+        >
           <img :src="image.src" :alt="image.alt" loading="lazy">
-        </figure>
+          <span class="event-gallery__expand" aria-hidden="true">
+            <Icon name="heroicons:arrows-pointing-out" />
+          </span>
+        </button>
       </div>
     </section>
+
+    <Teleport to="body">
+      <Transition name="gallery-lightbox">
+        <div
+          v-if="lightboxImage && lightboxIndex !== null"
+          class="gallery-lightbox"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('activities.galleryViewerLabel')"
+        >
+          <button
+            type="button"
+            class="gallery-lightbox__backdrop"
+            :aria-label="t('activities.close')"
+            @click="closeGalleryImage"
+          />
+          <div class="gallery-lightbox__stage">
+            <img :src="lightboxImage.src" :alt="lightboxImage.alt">
+            <p class="gallery-lightbox__count">
+              {{ String(lightboxIndex + 1).padStart(2, '0') }} / {{ String(galleryImages.length).padStart(2, '0') }}
+            </p>
+          </div>
+          <button
+            ref="lightboxCloseButton"
+            type="button"
+            class="gallery-lightbox__control gallery-lightbox__close"
+            :aria-label="t('activities.close')"
+            @click="closeGalleryImage"
+          ><Icon name="heroicons:x-mark" aria-hidden="true" /></button>
+          <template v-if="galleryImages.length > 1">
+            <button
+              type="button"
+              class="gallery-lightbox__control gallery-lightbox__previous"
+              :aria-label="t('activities.galleryPrevious')"
+              @click="moveGalleryImage(-1)"
+            ><Icon name="heroicons:arrow-left" aria-hidden="true" /></button>
+            <button
+              type="button"
+              class="gallery-lightbox__control gallery-lightbox__next"
+              :aria-label="t('activities.galleryNext')"
+              @click="moveGalleryImage(1)"
+            ><Icon name="heroicons:arrow-right" aria-hidden="true" /></button>
+          </template>
+        </div>
+      </Transition>
+    </Teleport>
 
     <footer class="event-exit">
       <NuxtLink :to="localePath('/activities')" class="back-link">
@@ -428,29 +521,118 @@ useHead(() => ({
 }
 .event-gallery__grid {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
   margin-top: 1rem;
 }
 .event-gallery__frame {
-  grid-column: span 4;
+  position: relative;
   aspect-ratio: 4 / 3;
   min-width: 0;
+  padding: 0;
   overflow: hidden;
+  border: 0;
   background: var(--paper);
+  cursor: zoom-in;
 }
-.event-gallery__frame:nth-child(6n + 1),
-.event-gallery__frame:nth-child(6n + 5) { grid-column: span 5; }
-.event-gallery__frame:nth-child(6n + 2),
-.event-gallery__frame:nth-child(6n + 4) { grid-column: span 3; }
-.event-gallery__frame:only-child { grid-column: span 7; }
-.event-gallery__frame:first-child:nth-last-child(2) { grid-column: span 7; }
-.event-gallery__frame:first-child:nth-last-child(2) + .event-gallery__frame { grid-column: span 5; }
 .event-gallery__frame img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 450ms cubic-bezier(0.16, 1, 0.3, 1), filter 300ms ease;
+}
+.event-gallery__frame:hover img,
+.event-gallery__frame:focus-visible img { transform: scale(1.025); filter: brightness(0.82); }
+.event-gallery__frame:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.event-gallery__expand {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  background: rgba(12, 12, 10, 0.82);
+  color: #F5F4F0;
+  opacity: 0;
+  transform: translateY(0.35rem);
+  transition: opacity 220ms ease, transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.event-gallery__frame:hover .event-gallery__expand,
+.event-gallery__frame:focus-visible .event-gallery__expand { opacity: 1; transform: translateY(0); }
+.event-gallery__expand :deep(svg) { width: 0.9rem; height: 0.9rem; }
+
+/* ── Gallery viewer ── */
+.gallery-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: grid;
+  place-items: center;
+  padding: clamp(3.5rem, 7vw, 6rem);
+  color: #F5F4F0;
+}
+.gallery-lightbox__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(12, 12, 10, 0.94);
+  cursor: zoom-out;
+}
+.gallery-lightbox__stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  max-width: min(88vw, 1440px);
+  max-height: 82vh;
+  place-items: center;
+}
+.gallery-lightbox__stage img {
+  display: block;
+  max-width: 100%;
+  max-height: 78vh;
+  object-fit: contain;
+}
+.gallery-lightbox__count {
+  position: absolute;
+  right: 0;
+  bottom: -1.8rem;
+  color: rgba(245, 244, 240, 0.58);
+  font-size: 0.52rem;
+  letter-spacing: 0.18em;
+}
+.gallery-lightbox__control {
+  position: fixed;
+  z-index: 2;
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  border: 1px solid rgba(245, 244, 240, 0.28);
+  background: rgba(12, 12, 10, 0.65);
+  color: #F5F4F0;
+  cursor: pointer;
+  place-items: center;
+  transition: border-color 180ms ease, background 180ms ease;
+}
+.gallery-lightbox__control:hover,
+.gallery-lightbox__control:focus-visible { border-color: var(--accent); background: var(--accent); }
+.gallery-lightbox__control:focus-visible { outline: 2px solid #F5F4F0; outline-offset: 3px; }
+.gallery-lightbox__control :deep(svg) { width: 1.1rem; height: 1.1rem; }
+.gallery-lightbox__close { top: 1.5rem; right: 1.5rem; }
+.gallery-lightbox__previous { top: 50%; left: 1.5rem; transform: translateY(-50%); }
+.gallery-lightbox__next { top: 50%; right: 1.5rem; transform: translateY(-50%); }
+.gallery-lightbox-enter-active,
+.gallery-lightbox-leave-active { transition: opacity 220ms ease; }
+.gallery-lightbox-enter-active .gallery-lightbox__stage,
+.gallery-lightbox-leave-active .gallery-lightbox__stage { transition: opacity 220ms ease, transform 350ms cubic-bezier(0.16, 1, 0.3, 1); }
+.gallery-lightbox-enter-from,
+.gallery-lightbox-leave-to,
+.gallery-lightbox-enter-from .gallery-lightbox__stage,
+.gallery-lightbox-leave-to .gallery-lightbox__stage { opacity: 0; }
+.gallery-lightbox-enter-from .gallery-lightbox__stage,
+.gallery-lightbox-leave-to .gallery-lightbox__stage { transform: scale(0.985); }
 }
 
 /* ── Exit ── */
@@ -495,18 +677,28 @@ useHead(() => ({
   .register-link { min-height: 3.75rem; }
   .event-gallery { margin: -1.5rem auto 4rem; padding-inline: 1.25rem; }
   .event-gallery__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .event-gallery__frame,
-  .event-gallery__frame:nth-child(n),
-  .event-gallery__frame:only-child,
-  .event-gallery__frame:first-child:nth-last-child(2),
-  .event-gallery__frame:first-child:nth-last-child(2) + .event-gallery__frame { grid-column: span 1; }
-  .event-gallery__frame:nth-child(3n + 1) { grid-column: span 2; aspect-ratio: 16 / 10; }
-  .event-gallery__frame:only-child { grid-column: span 2; }
+  .event-gallery__expand { opacity: 1; transform: none; }
+  .gallery-lightbox { padding: 4.5rem 1rem 5.5rem; }
+  .gallery-lightbox__stage { max-width: 100%; }
+  .gallery-lightbox__previous,
+  .gallery-lightbox__next { top: auto; bottom: 1rem; transform: none; }
+  .gallery-lightbox__previous { left: calc(50% - 3.4rem); }
+  .gallery-lightbox__next { right: calc(50% - 3.4rem); }
   .event-exit { min-height: 6rem; padding-inline: 1.25rem; }
+}
+
+@media (max-width: 460px) {
+  .event-gallery__grid { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .hero__photo { transition: none; }
+  .event-gallery__frame img,
+  .event-gallery__expand,
+  .gallery-lightbox-enter-active,
+  .gallery-lightbox-leave-active,
+  .gallery-lightbox-enter-active .gallery-lightbox__stage,
+  .gallery-lightbox-leave-active .gallery-lightbox__stage { transition: none; }
 }
 
 /* Thai serif needs a touch more leading and weight than the Latin display. */
