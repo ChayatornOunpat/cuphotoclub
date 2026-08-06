@@ -20,6 +20,7 @@ interface EventRow {
 
 interface EventFull extends EventRow {
   body: string
+  galleryR2Keys: string[]
 }
 
 interface DayCell {
@@ -139,13 +140,15 @@ const form = reactive({
   body: '',
   registerUrl: '',
   status: 'draft' as 'draft' | 'published',
-  coverR2Key: null as string | null
+  coverR2Key: null as string | null,
+  galleryR2Keys: [] as string[]
 })
 
 function resetForm(dateKey = '') {
   Object.assign(form, {
     title: '', slug: '', eventDate: dateKey, endDate: '', location: '',
-    summary: '', body: '', registerUrl: '', status: 'draft', coverR2Key: null
+    summary: '', body: '', registerUrl: '', status: 'draft', coverR2Key: null,
+    galleryR2Keys: []
   })
 }
 
@@ -173,13 +176,45 @@ async function openEdit(ev: EventRow) {
       body: full.body ?? '',
       registerUrl: full.registerUrl ?? '',
       status: full.status,
-      coverR2Key: full.coverR2Key
+      coverR2Key: full.coverR2Key,
+      galleryR2Keys: [...(full.galleryR2Keys ?? [])]
     })
   } catch {
     formError.value = t('adminActivities.loadFailed')
   } finally {
     loadingEvent.value = false
   }
+}
+
+// ── Mini-gallery ─────────────────────────────────────────────────────────────
+// A new event has no id yet, so its uploads land in the shared events/gallery
+// folder (same trick the cover uploader uses with events/covers). Once saved,
+// edits scope uploads to the event's own folder.
+const GALLERY_MAX = 24
+const activityImagePickerOpen = ref(false)
+const postImagePickerOpen = ref(false)
+
+const galleryPrefix = computed(() =>
+  editing.value ? `events/${editing.value.id}/gallery` : 'events/gallery'
+)
+const activityLibraryPrefix = computed(() =>
+  editing.value ? `events/${editing.value.id}` : 'events'
+)
+
+function addGalleryImages(keys: string[]) {
+  form.galleryR2Keys = [...new Set([...form.galleryR2Keys, ...keys.filter(Boolean)])].slice(0, GALLERY_MAX)
+}
+
+function moveGalleryImage(index: number, direction: -1 | 1) {
+  const target = index + direction
+  if (target < 0 || target >= form.galleryR2Keys.length) return
+  const next = [...form.galleryR2Keys]
+  ;[next[index], next[target]] = [next[target]!, next[index]!]
+  form.galleryR2Keys = next
+}
+
+function removeGalleryImage(key: string) {
+  form.galleryR2Keys = form.galleryR2Keys.filter(item => item !== key)
 }
 
 function errMsg(e: unknown, fallback: string) {
@@ -198,7 +233,8 @@ async function save() {
     body: form.body,
     registerUrl: form.registerUrl.trim() || null,
     status: form.status,
-    coverR2Key: form.coverR2Key
+    coverR2Key: form.coverR2Key,
+    galleryR2Keys: form.galleryR2Keys
   }
   try {
     if (editing.value) {
@@ -415,6 +451,73 @@ function chipTitle(ev: EventRow) {
           </div>
         </div>
 
+        <section class="activity-media" :aria-label="t('adminActivities.galleryTitle')">
+          <div class="activity-media__head">
+            <div>
+              <p class="activity-media__kicker">{{ t('adminActivities.galleryKicker') }}</p>
+              <h3>{{ t('adminActivities.galleryTitle') }}</h3>
+              <p>{{ t('adminActivities.galleryHint') }}</p>
+            </div>
+            <span v-if="form.galleryR2Keys.length" class="activity-media__count">
+              {{ t('adminActivities.galleryImageCount', { count: form.galleryR2Keys.length }) }}
+            </span>
+          </div>
+
+          <AdminR2ImageUploader
+            v-model="form.galleryR2Keys"
+            :prefix="galleryPrefix"
+            :max-files="GALLERY_MAX"
+            :show-previews="false"
+          />
+
+          <div class="activity-media__library">
+            <div class="activity-media__library-actions">
+              <UiButton variant="secondary" size="sm" type="button" @click="activityImagePickerOpen = true">
+                <Icon name="heroicons:photo" class="btn-icon" />
+                {{ t('adminActivities.chooseActivityImages') }}
+              </UiButton>
+              <UiButton variant="secondary" size="sm" type="button" @click="postImagePickerOpen = true">
+                <Icon name="heroicons:photo" class="btn-icon" />
+                {{ t('adminActivities.choosePostImages') }}
+              </UiButton>
+            </div>
+            <span>{{ t('adminActivities.galleryOrderHint') }}</span>
+          </div>
+
+          <div v-if="form.galleryR2Keys.length" class="activity-media__tray">
+            <article v-for="(key, index) in form.galleryR2Keys" :key="key" class="activity-media__item">
+              <div class="activity-media__thumb">
+                <img :src="`/images/${key}`" alt="">
+                <span>{{ String(index + 1).padStart(2, '0') }}</span>
+              </div>
+              <div class="activity-media__item-body">
+                <code>{{ key.split('/').at(-1) }}</code>
+                <div class="activity-media__controls">
+                  <button
+                    type="button"
+                    :disabled="index === 0"
+                    :aria-label="t('adminActivities.moveEarlier')"
+                    @click="moveGalleryImage(index, -1)"
+                  ><Icon name="heroicons:arrow-left" /></button>
+                  <button
+                    type="button"
+                    :disabled="index === form.galleryR2Keys.length - 1"
+                    :aria-label="t('adminActivities.moveLater')"
+                    @click="moveGalleryImage(index, 1)"
+                  ><Icon name="heroicons:arrow-right" /></button>
+                  <button
+                    type="button"
+                    class="activity-media__remove"
+                    :aria-label="t('adminActivities.removeFromGallery')"
+                    @click="removeGalleryImage(key)"
+                  ><Icon name="heroicons:x-mark" /></button>
+                </div>
+              </div>
+            </article>
+          </div>
+          <p v-else class="activity-media__empty">{{ t('adminActivities.galleryEmpty') }}</p>
+        </section>
+
         <div class="form-actions">
           <UiButton
             v-if="editing"
@@ -440,6 +543,22 @@ function chipTitle(ev: EventRow) {
         <UiButton variant="danger" :loading="deleting" @click="doDelete">{{ t('adminActivities.delete') }}</UiButton>
       </div>
     </UiModal>
+
+    <AdminImagePickerModal
+      v-model="activityImagePickerOpen"
+      :prefix="activityLibraryPrefix"
+      multiple
+      :title="t('adminActivities.chooseActivityImages')"
+      @select="addGalleryImages"
+    />
+
+    <AdminImagePickerModal
+      v-model="postImagePickerOpen"
+      prefix="content-posts"
+      multiple
+      :title="t('adminActivities.choosePostImages')"
+      @select="addGalleryImages"
+    />
   </div>
 </template>
 
@@ -800,6 +919,141 @@ function chipTitle(ev: EventRow) {
   font-size: 0.72rem;
 }
 
+/* ── Mini-gallery ── */
+.activity-media {
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--subtle);
+}
+
+.activity-media__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.1rem;
+}
+.activity-media__head > div { max-width: 38rem; }
+.activity-media__kicker {
+  margin-bottom: 0.45rem;
+  color: var(--accent);
+  font-size: 0.5rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.activity-media__head h3 {
+  color: var(--dark);
+  font-family: var(--font-serif);
+  font-size: 1.45rem;
+  font-weight: 300;
+  line-height: 1.15;
+}
+.activity-media__head p:last-child {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.65;
+}
+.activity-media__count {
+  flex: 0 0 auto;
+  padding-bottom: 0.25rem;
+  color: var(--muted);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.activity-media__library {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.8rem;
+}
+.activity-media__library-actions { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+.activity-media__library > span {
+  color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1.5;
+}
+
+.activity-media__tray {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.7rem;
+  margin-top: 1.25rem;
+}
+.activity-media__item {
+  min-width: 0;
+  border: 1px solid var(--subtle);
+  background: var(--body-bg);
+}
+.activity-media__thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--paper);
+}
+.activity-media__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.activity-media__thumb span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 0.32rem 0.48rem;
+  background: var(--dark);
+  color: #F5F4F0;
+  font-size: 0.43rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.activity-media__item-body { padding: 0.7rem; }
+.activity-media__item code {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.55rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-media__controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin-top: 0.65rem;
+  background: var(--subtle);
+}
+.activity-media__controls button {
+  display: grid;
+  min-height: 2rem;
+  place-items: center;
+  border: 0;
+  background: var(--body-bg);
+  color: var(--muted);
+  cursor: pointer;
+}
+.activity-media__controls button:hover:not(:disabled),
+.activity-media__controls button:focus-visible { color: var(--accent); }
+.activity-media__controls button:disabled { cursor: default; opacity: 0.28; }
+.activity-media__controls button:focus-visible { outline: 1px solid var(--accent); outline-offset: -2px; }
+.activity-media__controls :deep(svg) { width: 0.9rem; height: 0.9rem; }
+.activity-media__controls .activity-media__remove:hover,
+.activity-media__controls .activity-media__remove:focus-visible { color: #b42318; }
+
+.activity-media__empty {
+  margin-top: 1.25rem;
+  padding: 1.25rem;
+  border: 1px dashed var(--subtle);
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
 .form-error {
   border: 1px solid color-mix(in srgb, #b0243c 36%, var(--subtle));
   color: #b0243c;
@@ -864,5 +1118,12 @@ function chipTitle(ev: EventRow) {
   .fields {
     grid-template-columns: 1fr;
   }
+
+  .activity-media__head,
+  .activity-media__library {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .activity-media__tray { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>
