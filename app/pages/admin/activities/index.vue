@@ -532,33 +532,41 @@ function chipTitle(ev: EventRow) {
           <UiButton type="submit" :loading="saving">{{ t('admin.save') }}</UiButton>
         </div>
       </form>
+
+      <!--
+        These live inside the event modal on purpose. HeadlessUI tracks child
+        dialogs through provide/inject, so a modal rendered as a *sibling* is
+        invisible to this one: its clicks read as an outside click and close
+        the form, throwing away unsaved edits. Nesting them registers their
+        portal with the parent, which also suspends the parent's outside-click
+        and Escape handling while a child is open.
+      -->
+      <AdminImagePickerModal
+        v-model="activityImagePickerOpen"
+        :prefix="activityLibraryPrefix"
+        multiple
+        :title="t('adminActivities.chooseActivityImages')"
+        @select="addGalleryImages"
+      />
+
+      <AdminImagePickerModal
+        v-model="postImagePickerOpen"
+        prefix="content-posts"
+        multiple
+        :title="t('adminActivities.choosePostImages')"
+        @select="addGalleryImages"
+      />
+
+      <UiModal v-model="confirmDelete" :title="t('adminActivities.deleteTitle')">
+        <p class="confirm-text">
+          {{ t('adminActivities.deleteConfirm') }} <strong>{{ editing?.title }}</strong>
+        </p>
+        <div class="form-actions form-actions--confirm">
+          <UiButton variant="secondary" @click="confirmDelete = false">{{ t('admin.cancel') }}</UiButton>
+          <UiButton variant="danger" :loading="deleting" @click="doDelete">{{ t('adminActivities.delete') }}</UiButton>
+        </div>
+      </UiModal>
     </UiModal>
-
-    <UiModal v-model="confirmDelete" :title="t('adminActivities.deleteTitle')">
-      <p class="confirm-text">
-        {{ t('adminActivities.deleteConfirm') }} <strong>{{ editing?.title }}</strong>
-      </p>
-      <div class="form-actions form-actions--confirm">
-        <UiButton variant="secondary" @click="confirmDelete = false">{{ t('admin.cancel') }}</UiButton>
-        <UiButton variant="danger" :loading="deleting" @click="doDelete">{{ t('adminActivities.delete') }}</UiButton>
-      </div>
-    </UiModal>
-
-    <AdminImagePickerModal
-      v-model="activityImagePickerOpen"
-      :prefix="activityLibraryPrefix"
-      multiple
-      :title="t('adminActivities.chooseActivityImages')"
-      @select="addGalleryImages"
-    />
-
-    <AdminImagePickerModal
-      v-model="postImagePickerOpen"
-      prefix="content-posts"
-      multiple
-      :title="t('adminActivities.choosePostImages')"
-      @select="addGalleryImages"
-    />
   </div>
 </template>
 
