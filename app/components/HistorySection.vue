@@ -23,7 +23,7 @@ defineProps<{
         :alt="history.imageAlt"
         width="1800"
         height="1200"
-        sizes="100vw"
+        sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw"
         optimize
       />
     </div>
@@ -80,7 +80,7 @@ defineProps<{
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(12, 12, 10, 0.97) 0%, rgba(12, 12, 10, 0.8) 42%, rgba(12, 12, 10, 0.18) 100%);
+  background: linear-gradient(90deg, rgba(12, 12, 10, 0.9) 0%, rgba(12, 12, 10, 0.64) 46%, rgba(12, 12, 10, 0.1) 100%);
 }
 
 .history__photo :deep(img) {
@@ -88,7 +88,7 @@ defineProps<{
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: grayscale(0.85) sepia(0.18) contrast(1.12) brightness(0.58);
+  filter: grayscale(0.72) sepia(0.14) contrast(1.08) brightness(0.72);
 }
 
 .history__layout {
@@ -217,7 +217,7 @@ defineProps<{
 @media (max-width: 680px) {
   .history { min-height: 880px; }
   .history__photo::after {
-    background: linear-gradient(90deg, rgba(12, 12, 10, 0.96) 0%, rgba(12, 12, 10, 0.84) 72%, rgba(12, 12, 10, 0.46) 100%);
+    background: linear-gradient(90deg, rgba(12, 12, 10, 0.9) 0%, rgba(12, 12, 10, 0.72) 72%, rgba(12, 12, 10, 0.35) 100%);
   }
   .history__layout {
     grid-template-columns: 54px minmax(0, 1fr);
