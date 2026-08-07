@@ -31,6 +31,7 @@
     "featuredWorkInfoBody": "รับชมภาพผลงานของชมรม คลิกที่ภาพเพื่อเปิดอัลบั้ม",
     "latest": "ล่าสุด",
     "activitiesEyebrow": "บนปฏิทินชมรม",
+    "activitiesNextLabel": "กิจกรรมถัดไปบนปฏิทิน",
     "activitiesHeadingLead": "ต่อไปมี",
     "activitiesHeadingAccent": "อะไร",
     "activitiesFrame": "เฟรม {current} / {total}",

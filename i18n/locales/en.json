@@ -31,6 +31,7 @@
     "featuredWorkInfoBody": "Enjoy a random selection of images from the club's history. Click any image to view the album it belongs to.",
     "latest": "Latest",
     "activitiesEyebrow": "On the calendar",
+    "activitiesNextLabel": "Next on the calendar",
     "activitiesHeadingLead": "See what's",
     "activitiesHeadingAccent": "next.",
     "activitiesFrame": "Frame {current} / {total}",
