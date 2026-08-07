@@ -35,7 +35,7 @@ defineProps<{
 
       <div class="history__content">
         <div class="eyebrow history__eyebrow">
-          <span class="num">03</span> {{ history.eyebrow }}
+          <span class="num">04</span> {{ history.eyebrow }}
         </div>
 
         <blockquote class="history__quote">

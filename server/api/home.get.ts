@@ -1,5 +1,5 @@
 import { alias } from 'drizzle-orm/sqlite-core'
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, sql } from 'drizzle-orm'
 
 // Aggregated data for the home page: featured albums, latest posts, recent events.
 export default defineEventHandler(async () => {
@@ -23,6 +23,15 @@ export default defineEventHandler(async () => {
     .orderBy(desc(schema.albums.eventDate), desc(schema.albums.createdAt))
     .limit(10)
 
+  // The home page presents these as what's coming next, so a finished event must
+  // never appear. Keep anything whose last day is today or later — endDate covers
+  // multi-day events that are already under way — and order soonest-first rather
+  // than newest-first. Undated "TBA" events can't be sequenced, so they live on
+  // /activities only. Timestamps are unixepoch seconds, matching the column type.
+  const todayStart = new Date()
+  todayStart.setUTCHours(0, 0, 0, 0)
+  const todayEpoch = Math.floor(todayStart.getTime() / 1000)
+
   const eventsQuery = db
     .select({
       id: schema.events.id,
@@ -35,8 +44,11 @@ export default defineEventHandler(async () => {
       location: schema.events.location
     })
     .from(schema.events)
-    .where(eq(schema.events.status, 'published'))
-    .orderBy(desc(schema.events.eventDate), desc(schema.events.createdAt))
+    .where(and(
+      eq(schema.events.status, 'published'),
+      sql`coalesce(${schema.events.endDate}, ${schema.events.eventDate}) >= ${todayEpoch}`
+    ))
+    .orderBy(asc(schema.events.eventDate), asc(schema.events.createdAt))
     .limit(3)
 
   const [albumRows, contentAlbumList, postList, events] = await Promise.all([
@@ -51,6 +63,13 @@ export default defineEventHandler(async () => {
   // always uses the published database rows above.
   const landingEvents = import.meta.dev && !events.length
     ? devMockEvents()
+        // Same upcoming-only rule as the query above, so dev exercises the real
+        // shape instead of whichever three happen to come first in the array.
+        .filter((event) => {
+          const lastDay = event.endDate ?? event.eventDate
+          return lastDay ? lastDay.getTime() >= todayStart.getTime() : false
+        })
+        .sort((a, b) => (a.eventDate?.getTime() ?? 0) - (b.eventDate?.getTime() ?? 0))
         .slice(0, 3)
         .map(({ body, publishedAt, registerUrl, ...event }) => event)
     : events

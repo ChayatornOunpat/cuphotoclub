@@ -37,7 +37,7 @@ defineProps<{
       </div>
 
       <div class="about__content">
-        <div class="eyebrow about__eyebrow"><span class="num">04</span> {{ about.eyebrow }}</div>
+        <div class="eyebrow about__eyebrow"><span class="num">05</span> {{ about.eyebrow }}</div>
         <h2 class="about__heading">
           <template v-for="(line, i) in about.heading" :key="i">
             <em v-if="line.em">{{ line.text }}</em><template v-else>{{ line.text }}</template><br v-if="i < about.heading.length - 1">

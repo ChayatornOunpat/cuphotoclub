@@ -95,12 +95,16 @@ const clubroomWithImage = computed(() => {
   return { ...base, image: archivePhoto.cover, imageAlt: archivePhoto.title }
 })
 
-// ── Activities: a dedicated, compact landing strip. Events deliberately stay
+// ── Activities: its own numbered chapter after Featured Work. The API already
+//    returns the cover and summary, so the section can present the next event
+//    the way Featured Work and Latest present theirs. Events deliberately stay
 //    out of the editorial "Latest" feed below.
 const activityItems = computed(() =>
   (home.value?.events ?? [])
     .map(event => ({
       title: event.title,
+      summary: event.summary ?? '',
+      image: imageSrc(event.coverR2Key),
       date: event.eventDate ? new Date(event.eventDate).toISOString() : '',
       endDate: event.endDate ? new Date(event.endDate).toISOString() : '',
       location: event.location ?? '',
@@ -310,7 +314,7 @@ useSeoMeta({
 
     <FeaturedWork :albums="featuredAlbums" :seed="featuredSeed" :data-chapter="t('home.featuredWork')" />
 
-    <ActivitiesStrip :items="activityItems" />
+    <ActivitiesSection :items="activityItems" :data-chapter="t('home.activitiesEyebrow')" />
 
     <StoriesSection :lead="leadStory" :items="smallStories" :data-chapter="t('home.latest')" />
 
