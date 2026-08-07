@@ -95,7 +95,7 @@ const clubroomWithImage = computed(() => {
   return { ...base, image: archivePhoto.cover, imageAlt: archivePhoto.title }
 })
 
-// ── Activities: its own numbered chapter after Featured Work. The API already
+// ── Activities: its own numbered chapter after Latest. The API already
 //    returns the cover and summary, so the section can present the next event
 //    the way Featured Work and Latest present theirs. Events deliberately stay
 //    out of the editorial "Latest" feed below.
@@ -314,9 +314,9 @@ useSeoMeta({
 
     <FeaturedWork :albums="featuredAlbums" :seed="featuredSeed" :data-chapter="t('home.featuredWork')" />
 
-    <ActivitiesSection :items="activityItems" :data-chapter="t('home.activitiesEyebrow')" />
-
     <StoriesSection :lead="leadStory" :items="smallStories" :data-chapter="t('home.latest')" />
+
+    <ActivitiesSection :items="activityItems" :data-chapter="t('home.activitiesEyebrow')" />
 
     <HistorySection :history="historyWithImage ?? localizedSite.history" :data-chapter="t('nav.history')" />
 

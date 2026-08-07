@@ -20,7 +20,7 @@ const localePath = useLocalePath()
 <template>
   <section id="stories" class="stories">
     <div class="wrap">
-      <div class="eyebrow"><span class="num">03</span> {{ t('home.latest') }}</div>
+      <div class="eyebrow"><span class="num">02</span> {{ t('home.latest') }}</div>
       <div class="stories__layout">
         <!-- Lead: newest item, album or post -->
         <NuxtLink v-if="lead" :to="lead.path" class="scard-lead">

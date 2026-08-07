@@ -45,7 +45,7 @@ function formatActivityDate(item: ActivityItem) {
 <template>
   <section v-if="nextEvent" id="activities-preview" class="section-pad activities">
     <div class="wrap">
-      <div class="eyebrow"><span class="num">02</span> {{ t('home.activitiesEyebrow') }}</div>
+      <div class="eyebrow"><span class="num">03</span> {{ t('home.activitiesEyebrow') }}</div>
 
       <NuxtLink
         :to="nextEvent.path"
