@@ -96,7 +96,7 @@ function formatActivityDate(item: ActivityItem) {
 
 .afeature {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
   margin-top: 3rem;
   border-top: 1px solid var(--subtle);
   border-bottom: 1px solid var(--subtle);
@@ -106,17 +106,23 @@ function formatActivityDate(item: ActivityItem) {
 
 .afeature--text-only { grid-template-columns: minmax(0, 1fr); }
 
+/* The image is taken out of flow (the same device .scard-lead uses in Latest) so
+   a tall poster cover can't drive the row height — the frame sets its own size
+   and the image fills it. Without this, a portrait cover renders at its natural
+   aspect ratio and dwarfs the type beside it. */
 .afeature__media {
   position: relative;
-  min-height: 20rem;
+  min-height: clamp(15rem, 24vw, 19rem);
   overflow: hidden;
 }
 
 .afeature__media :deep(img) {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
   transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -249,7 +255,7 @@ function formatActivityDate(item: ActivityItem) {
 
 @media (max-width: 860px) {
   .afeature { grid-template-columns: minmax(0, 1fr); margin-top: 2.25rem; }
-  .afeature__media { min-height: 14rem; }
+  .afeature__media { min-height: 13rem; }
   .afeature__body { padding: 2rem 0 2.2rem; }
 }
 
