@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ALBUM_FONT_VALUES } from '~~/shared/albumFonts'
 
 const STYLES = ['essay', 'sticky', 'contact', 'darkroom', 'chapters']
 const VISIBILITY = ['draft', 'link-only', 'public']
@@ -21,7 +22,7 @@ const cellSchema = z.object({
   label: z.string().optional(),
   content: z.string().optional(),
   align: z.enum(['left', 'center', 'right']).optional(),
-  font: z.enum(['serif', 'sans']).optional()
+  font: z.enum(ALBUM_FONT_VALUES).optional()
 })
 const rowsSchema = z.array(z.object({ cells: z.array(cellSchema) }))
 

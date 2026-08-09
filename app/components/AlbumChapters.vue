@@ -8,6 +8,7 @@ interface Album {
   dateEnd?: string
   excerpt: string
   coverSrc: string
+  dark?: boolean
   rows: AlbumRow[]
 }
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number }>()
@@ -152,9 +153,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <article ref="rootEl">
+  <!-- data-chrome-header normally lives on just the header (dark), since the
+       chapters below are light and the nav should hand off once it's scrolled
+       past. When `dark`, the whole page stays dark, so the marker moves to the
+       root article instead — same handoff AlbumEssay/AlbumDarkroom use. -->
+  <article ref="rootEl" :class="{ 'is-dark': album.dark }" :data-chrome-header="album.dark ? true : undefined">
     <!-- COMPACT HEADER -->
-    <header class="head" :class="`head--${coverOrientation}`" data-chrome-header>
+    <header class="head" :class="`head--${coverOrientation}`" :data-chrome-header="album.dark ? undefined : true">
       <div class="head__bg" data-parallax data-hero-dim>
         <AppImg :src="cover" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="head__img" eager optimize />
       </div>
@@ -481,6 +486,38 @@ onUnmounted(() => {
 .exit__back:hover { color: var(--accent); }
 .exit__back.is-disabled { cursor: default; pointer-events: none; }
 .exit__meta { font-size: 0.52rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+
+/* ── Dark variant — same chapter flow, Darkroom's black-wall palette ──
+   Locally-scoped vars (not the global theme), so only this article's subtree
+   goes dark; the rest of the site stays on its normal light theme. The
+   lightbox is already dark, so it needs no overrides. */
+.is-dark {
+  --dk-bg: #0C0C0A;
+  --dk-ink: #F5F4F0;
+  --dk-dim: rgba(245, 244, 240, 0.55);
+  --dk-line: rgba(245, 244, 240, 0.14);
+  background: var(--dk-bg);
+  color: var(--dk-ink);
+}
+/* The chapter bar is sticky and translucent, so it has to blur over the black
+   wall rather than --body-bg, or it reads as a light strip mid-scroll. */
+.is-dark .chbar {
+  background: color-mix(in srgb, var(--dk-bg) 88%, transparent);
+  border-bottom-color: var(--dk-line);
+}
+.is-dark .chbar__counter,
+.is-dark .chbar__hint,
+.is-dark .chbar__link { color: var(--dk-dim); }
+.is-dark .chbar__link .n { color: var(--dk-line); }
+.is-dark .chbar__link:hover,
+.is-dark .chbar__link.is-active { color: var(--dk-ink); }
+.is-dark .chapter__title { color: var(--dk-ink); }
+.is-dark .chapter__range { color: var(--dk-dim); }
+.is-dark .chapter__rule { background: var(--dk-line); }
+.is-dark .jcell { background: rgba(245, 244, 240, 0.04); }
+.is-dark .exit { border-top-color: var(--dk-line); }
+.is-dark .exit__back { color: var(--dk-ink); }
+.is-dark .exit__meta { color: var(--dk-dim); }
 
 /* ── Lightbox (same treatment as the contact sheet) ── */
 .lb {

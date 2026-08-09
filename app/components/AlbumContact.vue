@@ -8,6 +8,7 @@ interface Album {
   dateEnd?: string
   excerpt: string
   coverSrc: string
+  dark?: boolean
   rows: AlbumRow[]
 }
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number }>()
@@ -84,9 +85,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <article>
+  <!-- data-chrome-header normally lives on just the header (dark), since the
+       sheet below is light and the nav should hand off once it's scrolled past.
+       When `dark`, the whole page stays dark, so the marker moves to the root
+       article instead — same handoff AlbumEssay/AlbumDarkroom use. -->
+  <article :class="{ 'is-dark': album.dark }" :data-chrome-header="album.dark ? true : undefined">
     <!-- COMPACT HEADER -->
-    <header class="head" :class="`head--${coverOrientation}`" data-chrome-header>
+    <header class="head" :class="`head--${coverOrientation}`" :data-chrome-header="album.dark ? undefined : true">
       <div class="head__bg" data-parallax data-hero-dim>
         <AppImg :src="cover" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="head__img" eager optimize />
       </div>
@@ -249,6 +254,22 @@ onUnmounted(() => {
 .cell:hover :deep(img) { opacity: 0.82; transform: scale(1.025); }
 .cell__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.4rem 0.45rem 0.4rem; background: linear-gradient(transparent, rgba(12, 12, 10, 0.84)); font-size: 0.48rem; letter-spacing: 0.08em; color: rgba(245, 244, 240, 0.85); text-align: left; opacity: 0; transition: opacity 0.18s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cell:hover .cell__cap { opacity: 1; }
+
+/* ── Dark variant — same filmstrip sheet, Darkroom's black-wall palette ──
+   Locally-scoped vars (not the global theme), so only this article's subtree
+   goes dark; the rest of the site stays on its normal light theme. The
+   lightbox is already dark, so it needs no overrides. */
+.is-dark {
+  --dk-bg: #0C0C0A;
+  --dk-ink: #F5F4F0;
+  --dk-dim: rgba(245, 244, 240, 0.55);
+  --dk-line: rgba(245, 244, 240, 0.14);
+  background: var(--dk-bg);
+  color: var(--dk-ink);
+}
+.is-dark .eyebrow,
+.is-dark .sheet__hint { color: var(--dk-dim); }
+.is-dark .cell { border-color: var(--dk-line); background: rgba(245, 244, 240, 0.04); }
 
 .lb {
   position: fixed;

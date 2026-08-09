@@ -9,8 +9,12 @@ const confirmTarget = ref<{ id: string; title: string } | null>(null)
 const deleteError = ref('')
 const query = ref('')
 const SORT_STORAGE_KEY = 'admin-albums-sort'
+const PAGE_SIZE_STORAGE_KEY = 'admin-albums-page-size'
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const
 const sortBy = ref('newest')
 const viewMode = ref<'list' | 'cards'>('list')
+const pageSize = ref<number>(25)
+const page = ref(1)
 
 function visibilityLabel(value?: string) {
   if (value === 'draft') return t('adminForm.visDraft')
@@ -79,6 +83,30 @@ const visibleAlbums = computed(() => {
   })
 })
 
+// Client-side paging: the whole list is already fetched, so search/sort still
+// run across every album — only the rendered slice is capped. Without this the
+// table rendered all ~130 rows at once, which made it easy to read one row and
+// click another row's actions.
+const totalPages = computed(() => Math.max(1, Math.ceil(visibleAlbums.value.length / pageSize.value)))
+const pagedAlbums = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return visibleAlbums.value.slice(start, start + pageSize.value)
+})
+const pageStart = computed(() => (visibleAlbums.value.length ? (page.value - 1) * pageSize.value + 1 : 0))
+const pageEnd = computed(() => Math.min(visibleAlbums.value.length, page.value * pageSize.value))
+
+// Searching, re-sorting or deleting can shrink the list out from under the
+// current page — clamp instead of showing an empty slice.
+watch([totalPages], () => {
+  if (page.value > totalPages.value) page.value = totalPages.value
+})
+watch([query, sortBy], () => { page.value = 1 })
+
+function goToPage(n: number) {
+  page.value = Math.min(Math.max(1, n), totalPages.value)
+  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 function coverFor(album: NonNullable<typeof albums.value>[number]) {
   return album.coverSrc || album.rows.flatMap(r => r.cells).find(c => c.type === 'image' && c.src)?.src || ''
 }
@@ -112,6 +140,13 @@ if (import.meta.client) {
   const storedSort = localStorage.getItem(SORT_STORAGE_KEY)
   if (storedSort) sortBy.value = storedSort
   watch(sortBy, (value) => localStorage.setItem(SORT_STORAGE_KEY, value))
+
+  const storedPageSize = Number(localStorage.getItem(PAGE_SIZE_STORAGE_KEY))
+  if (PAGE_SIZE_OPTIONS.includes(storedPageSize as typeof PAGE_SIZE_OPTIONS[number])) pageSize.value = storedPageSize
+  watch(pageSize, (value) => {
+    localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(value))
+    page.value = 1
+  })
 }
 
 async function confirmDelete() {
@@ -166,15 +201,24 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
       </div>
     </div>
 
-    <p v-if="albums && albums.length" class="result-count">{{ t('admin.showingCount', { shown: visibleAlbums.length, total: albums.length }) }}</p>
+    <p v-if="albums && albums.length" class="result-count">
+      {{ t('admin.showingRange', { from: pageStart, to: pageEnd, total: visibleAlbums.length }) }}
+      <span v-if="query.trim()"> · {{ t('admin.showingCount', { shown: visibleAlbums.length, total: albums.length }) }}</span>
+    </p>
 
     <table v-if="albums && albums.length && visibleAlbums.length && viewMode === 'list'" class="tbl">
       <thead>
         <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableCategory') }}</th><th>{{ t('admin.tableVisibility') }}</th><th>{{ t('admin.tableStyle') }}</th><th>{{ t('admin.tableFrames') }}</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
       </thead>
       <tbody>
-        <tr v-for="a in visibleAlbums" :key="a.id">
-          <td class="t-title" :class="{ 't-title--draft': !a.title }">{{ a.title || t('admin.untitledDraft') }}</td>
+        <tr v-for="a in pagedAlbums" :key="a.id">
+          <td class="t-title" :class="{ 't-title--draft': !a.title }">
+            {{ a.title || t('admin.untitledDraft') }}
+            <!-- The slug is what Preview/Edit actually open. Showing it makes a
+                 row self-identifying, so a link that opens an unexpected album
+                 is traceable to the row rather than guesswork. -->
+            <span class="t-slug">{{ a.slug }}</span>
+          </td>
           <td>{{ a.category }}</td>
           <td>
             <span class="pill-row">
@@ -207,7 +251,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
     </table>
 
     <section v-else-if="albums && albums.length && visibleAlbums.length" class="cards">
-      <article v-for="a in visibleAlbums" :key="a.id" class="card">
+      <article v-for="a in pagedAlbums" :key="a.id" class="card">
         <img v-if="coverFor(a)" :src="coverFor(a) as string" :alt="a.title">
         <div class="card__body">
           <p class="card__meta">{{ a.category }} · {{ albumDateDisplay(a) }}</p>
@@ -244,6 +288,20 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 
     <p v-else-if="albums && albums.length" class="empty">{{ t('admin.noMatches') }}</p>
     <p v-else class="empty">{{ t('admin.noAlbums') }} <NuxtLink :to="localePath('/admin/albums/new')">{{ t('admin.createFirst') }}</NuxtLink></p>
+
+    <nav v-if="albums && albums.length && visibleAlbums.length" class="pager" :aria-label="t('admin.pagination')">
+      <label class="pager__size">
+        <span>{{ t('admin.perPage') }}</span>
+        <select v-model.number="pageSize">
+          <option v-for="size in PAGE_SIZE_OPTIONS" :key="size" :value="size">{{ size }}</option>
+        </select>
+      </label>
+      <div v-if="totalPages > 1" class="pager__nav">
+        <button type="button" :disabled="page === 1" @click="goToPage(page - 1)">← {{ t('admin.prevPage') }}</button>
+        <span>{{ t('admin.pageOf', { page, total: totalPages }) }}</span>
+        <button type="button" :disabled="page === totalPages" @click="goToPage(page + 1)">{{ t('admin.nextPage') }} →</button>
+      </div>
+    </nav>
   </div>
 
   <Teleport to="body">
@@ -295,6 +353,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 .tbl th { text-align: left; font-size: 0.5rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); font-weight: 500; padding: 0 0.75rem 0.85rem; border-bottom: 1px solid var(--subtle); }
 .tbl td { padding: 0.9rem 0.75rem; border-bottom: 1px solid var(--subtle); vertical-align: middle; }
 .t-title { font-weight: 500; }
+.t-slug { display: block; margin-top: 0.2rem; font-weight: 400; font-size: 0.62rem; letter-spacing: 0.04em; color: var(--muted); word-break: break-all; }
 .t-title--draft,
 .card__title--draft { color: var(--muted); font-style: italic; font-weight: 400; }
 .t-muted { color: var(--muted); }
@@ -354,6 +413,14 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 .link { font-family: var(--font-sans); font-size: 0.7rem; letter-spacing: 0.05em; background: none; border: none; cursor: pointer; color: var(--dark); text-decoration: none; margin-left: 1rem; transition: color 0.2s; }
 .link:hover { color: var(--accent); }
 .link--del { color: var(--muted); }
+.pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding: 1.4rem 0 0.2rem; }
+.pager__size { display: inline-flex; align-items: center; gap: 0.55rem; color: var(--muted); font-size: 0.55rem; letter-spacing: 0.16em; text-transform: uppercase; }
+.pager__size select { min-height: 2.1rem; border: 1px solid var(--subtle); background: #fff; color: var(--dark); padding: 0 0.6rem; font-family: var(--font-sans); font-size: 0.72rem; }
+.pager__size select:focus { border-color: var(--accent); outline: none; }
+.pager__nav { display: inline-flex; align-items: center; gap: 1.1rem; color: var(--muted); font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; }
+.pager__nav button { font-family: var(--font-sans); font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; border: 1px solid var(--subtle); background: #fff; color: var(--dark); padding: 0.55rem 0.95rem; cursor: pointer; transition: border-color 0.2s, color 0.2s; }
+.pager__nav button:hover:not(:disabled) { border-color: var(--dark); color: var(--accent); }
+.pager__nav button:disabled { opacity: 0.45; cursor: default; }
 .empty { color: var(--muted); font-size: 0.9rem; }
 .empty a { color: var(--accent); }
 .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }

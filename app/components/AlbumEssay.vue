@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { albumFontClass } from '~~/shared/albumFonts'
+
 interface AlbumCell {
   type: string
   span: number
@@ -6,7 +8,8 @@ interface AlbumCell {
   caption?: string
   content?: string
   align?: 'left' | 'center' | 'right'
-  font?: 'serif' | 'sans'
+  /** One of shared/albumFonts.ts; undefined = inherit the album default. */
+  font?: string
 }
 interface AlbumRow { cells: AlbumCell[] }
 interface Album {
@@ -19,7 +22,7 @@ interface Album {
   coverSrc: string
   dark?: boolean
   rows: AlbumRow[]
-  textDefaults?: { align?: 'left' | 'center' | 'right', font?: 'serif' | 'sans' }
+  textDefaults?: { align?: 'left' | 'center' | 'right', font?: string }
 }
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number, draggableCells?: boolean }>()
 const { t } = useI18n()
@@ -55,17 +58,19 @@ function imgSizes(span: number): string {
   return 'xs:100vw sm:33vw lg:460px'
 }
 
+// Face comes from a class rather than an inline style: the class rules in
+// album-fonts.css are what tell @nuxt/fonts which families to self-host.
+const albumFace = computed(() => albumFontClass(props.album.textDefaults?.font))
+
 function textCellStyle(cell: AlbumCell) {
-  const align = cell.align ?? props.album.textDefaults?.align ?? 'left'
-  const font = cell.font ?? props.album.textDefaults?.font ?? 'serif'
-  return { textAlign: align, fontFamily: font === 'sans' ? 'var(--font-sans)' : 'var(--font-serif)' }
+  return { textAlign: cell.align ?? props.album.textDefaults?.align ?? 'left' }
 }
 
-const excerptStyle = computed(() => {
-  const align = props.album.textDefaults?.align ?? 'left'
-  const font = props.album.textDefaults?.font ?? 'serif'
-  return { textAlign: align, fontFamily: font === 'sans' ? 'var(--font-sans)' : 'var(--font-serif)' }
-})
+function textCellFace(cell: AlbumCell) {
+  return albumFontClass(cell.font ?? props.album.textDefaults?.font)
+}
+
+const excerptStyle = computed(() => ({ textAlign: props.album.textDefaults?.align ?? 'left' }))
 
 </script>
 
@@ -88,7 +93,7 @@ const excerptStyle = computed(() => {
       <NuxtLink v-else :to="localePath('/albums')" class="cover__back">{{ t('albums.coverBack') }}</NuxtLink>
       <div class="cover__body">
         <p class="cover__kicker" :lang="textLang(album.category)">{{ t('albums.albumKicker', { category: album.category }) }}</p>
-        <h1 class="cover__title" :lang="textLang(album.title)">{{ album.title }}</h1>
+        <h1 class="cover__title" :class="albumFace" :lang="textLang(album.title)">{{ album.title }}</h1>
         <div class="cover__meta">
           <span>{{ dateDisplay }}</span><span class="dot" />
           <span>{{ t('albums.metaFrames', { count: totalImages }) }}</span>
@@ -100,7 +105,7 @@ const excerptStyle = computed(() => {
 
     <!-- INTRO -->
     <section class="intro">
-      <p class="intro__lead" :style="excerptStyle" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
+      <p class="intro__lead" :class="albumFace" :style="excerptStyle" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
     </section>
 
     <!-- ESSAY FLOW — Lego grid -->
@@ -142,7 +147,7 @@ const excerptStyle = computed(() => {
             :draggable="draggableCells ? true : undefined"
             :class="{ 'is-admin-selected': selectedRow === ri && selectedCell === ci }"
           >
-            <p class="text-block" :style="textCellStyle(cell)" :lang="textLang(cell.content)">{{ cell.content }}</p>
+            <p class="text-block" :class="textCellFace(cell)" :style="textCellStyle(cell)" :lang="textLang(cell.content)">{{ cell.content }}</p>
           </div>
 
           <!-- PAD cell — empty spacer -->
@@ -239,12 +244,15 @@ const excerptStyle = computed(() => {
 .albnav__back.is-disabled:hover { color: var(--muted); }
 .cover__body { position: relative; z-index: 2; padding: 0 3rem 3.5rem; max-width: 1380px; margin: 0 auto; width: 100%; }
 .cover__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.5rem; }
-.cover__title { font-family: var(--font-serif); font-size: clamp(3.5rem, 9vw, 9rem); font-weight: 200; line-height: 0.9; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; overflow-wrap: break-word; }
+/* No font-family on the three text surfaces below: the album's chosen face
+   arrives as an `afont--*` class (see album-fonts.css), and a rule here would
+   be an equal-specificity fight decided by <style> block order. */
+.cover__title { font-size: clamp(3.5rem, 9vw, 9rem); font-weight: 200; line-height: 0.9; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; overflow-wrap: break-word; }
 .cover__meta { margin-top: 2rem; display: flex; gap: 1.5rem; align-items: center; font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(245, 244, 240, 0.5); }
 .cover__meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
 
 .intro { padding: 6rem 3rem 2rem; max-width: 880px; margin: 0 auto; }
-.intro__lead { font-family: var(--font-serif); font-size: clamp(1.6rem, 3vw, 2.6rem); font-weight: 200; line-height: 1.4; letter-spacing: -0.01em; white-space: pre-line; }
+.intro__lead { font-size: clamp(1.6rem, 3vw, 2.6rem); font-weight: 200; line-height: 1.4; letter-spacing: -0.01em; white-space: pre-line; }
 
 .essay { padding: 3rem 3rem 6rem; max-width: 1380px; margin: 0 auto; }
 
@@ -265,7 +273,7 @@ figure { margin: 0; }
 figcaption { display: flex; gap: 1rem; align-items: baseline; margin-top: 0.9rem; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 figcaption .n { color: var(--accent); font-weight: 500; flex-shrink: 0; }
 
-.text-block { font-family: var(--font-serif); font-size: clamp(1.1rem, 2vw, 1.4rem); font-weight: 200; line-height: 1.75; color: var(--dark); }
+.text-block { font-size: clamp(1.1rem, 2vw, 1.4rem); font-weight: 200; line-height: 1.75; color: var(--dark); }
 
 .albnav { background: var(--paper); border-top: 1px solid var(--subtle); border-bottom: 1px solid var(--subtle); padding: 3.5rem 3rem; }
 .albnav__inner { max-width: 1380px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 2rem; flex-wrap: wrap; }
@@ -350,3 +358,7 @@ figcaption .n { color: var(--accent); font-weight: 500; flex-shrink: 0; }
   .cell--image, .cell--text { grid-column: 1 / -1; }
 }
 </style>
+
+<!-- The `afont--*` faces the album can be set in. Loaded here rather than
+     globally so the @font-face declarations ship with album pages only. -->
+<style scoped src="~/assets/css/album-fonts.css"></style>

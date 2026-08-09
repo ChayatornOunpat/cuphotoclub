@@ -9,6 +9,7 @@ interface Album {
   location?: string
   excerpt: string
   coverSrc: string
+  dark?: boolean
   rows: AlbumRow[]
 }
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number }>()
@@ -63,7 +64,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <article ref="rootEl">
+  <!-- Sticky has no dark hero, so normally there's no [data-chrome-header] and
+       the nav stays light. When `dark`, the whole page is a black wall, so the
+       marker goes on the article root to keep the nav in its over-dark mode
+       for the entire scroll (same handoff AlbumEssay/AlbumDarkroom use). -->
+  <article ref="rootEl" :class="{ 'is-dark': album.dark }" :data-chrome-header="album.dark ? true : undefined">
     <div class="split">
       <!-- STICKY META -->
       <aside class="meta">
@@ -138,6 +143,29 @@ figure { margin: 0; }
 .frame :deep(img) { width: 100%; display: block; object-fit: cover; }
 .frame__num { position: absolute; top: 1rem; left: 1rem; z-index: 2; font-size: 0.5rem; letter-spacing: 0.18em; color: #F5F4F0; background: rgba(12, 12, 10, 0.5); backdrop-filter: blur(4px); padding: 0.4rem 0.6rem; }
 figcaption { margin-top: 0.85rem; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+/* ── Dark variant — same sticky-split layout, Darkroom's black-wall palette ──
+   Locally-scoped vars (not the global theme), so only this article's subtree
+   goes dark; the rest of the site stays on its normal light theme. */
+.is-dark {
+  --dk-bg: #0C0C0A;
+  --dk-ink: #F5F4F0;
+  --dk-dim: rgba(245, 244, 240, 0.55);
+  --dk-line: rgba(245, 244, 240, 0.14);
+  background: var(--dk-bg);
+  color: var(--dk-ink);
+}
+.is-dark .crumb :deep(a),
+.is-dark .crumb__link { color: var(--dk-dim); }
+.is-dark .crumb span { color: var(--dk-line); }
+.is-dark .crumb .here { color: var(--dk-ink); }
+.is-dark .meta__excerpt { color: var(--dk-dim); }
+.is-dark .meta__facts { border-top-color: var(--dk-line); }
+.is-dark .meta__fact { border-bottom-color: var(--dk-line); }
+.is-dark .meta__fact .k { color: var(--dk-dim); }
+.is-dark .meta__fact .v { color: var(--dk-ink); }
+.is-dark .meta__count { color: var(--dk-dim); }
+.is-dark figcaption { color: var(--dk-dim); }
 
 @media (max-width: 880px) {
   .split { grid-template-columns: 1fr; gap: 2.5rem; padding: 6rem 1.5rem 5rem; }

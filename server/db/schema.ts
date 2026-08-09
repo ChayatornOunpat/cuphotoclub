@@ -149,7 +149,7 @@ export const settings = sqliteTable('settings', {
 // albumStore / postStore. Separate from the relational `albums` / `posts` tables
 // above, which model the photo-gallery domain (integer ids, R2 photos, FKs).
 
-import type { AlbumRow, AlbumStyle, ContentStatus, HeroStyle, Placement, PostBlock } from '~~/shared/types'
+import type { AlbumRow, AlbumStyle, ContentStatus, HeroStyle, Placement, PostBlock, TextAlign, TextFont } from '~~/shared/types'
 
 // Lego-grid albums seeded from content/albums/*.md.
 export const contentAlbums = sqliteTable('content_albums', {
@@ -170,7 +170,7 @@ export const contentAlbums = sqliteTable('content_albums', {
   placement: text('placement').$type<Placement>().notNull(),
   coverSrc: text('cover_src').notNull().default(''),
   rows: text('rows_json', { mode: 'json' }).$type<AlbumRow[]>().notNull().default(sql`'[]'`),
-  textDefaults: text('text_defaults_json', { mode: 'json' }).$type<{ align?: 'left' | 'center' | 'right', font?: 'serif' | 'sans' }>(),
+  textDefaults: text('text_defaults_json', { mode: 'json' }).$type<{ align?: TextAlign, font?: TextFont }>(),
   createdAt,
   updatedAt
 })

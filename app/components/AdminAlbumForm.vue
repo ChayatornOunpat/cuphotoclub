@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeRouteLeave } from 'vue-router'
 import type { AlbumCell, AlbumRow, AlbumInput, CellType, CellSpan, ContentStatus, TextAlign, TextFont } from '~~/shared/types'
+import { DEFAULT_ALBUM_FONT } from '~~/shared/albumFonts'
 import AlbumEssay from '~/components/AlbumEssay.vue'
 import AlbumSticky from '~/components/AlbumSticky.vue'
 import AlbumContact from '~/components/AlbumContact.vue'
@@ -989,7 +990,10 @@ function setDefaultAlign(value: TextAlign) {
   form.textDefaults.align = value
 }
 
-function setDefaultFont(value: TextFont) {
+// The album default has nothing to inherit from, so the picker never offers
+// `auto` here — the signature just keeps it assignable to the shared emit.
+function setDefaultFont(value: TextFont | 'auto') {
+  if (value === 'auto') return
   if (!form.textDefaults) form.textDefaults = {}
   form.textDefaults.font = value
 }
@@ -1343,6 +1347,8 @@ const SPANS: CellSpan[] = [2, 3, 4, 6]
 const isEssay = computed(() => form.style === 'essay')
 const isChapters = computed(() => form.style === 'chapters')
 const isSticky = computed(() => form.style === 'sticky')
+// Darkroom already renders on a black wall, so the dark toggle is meaningless there.
+const supportsDark = computed(() => form.style !== 'darkroom')
 
 // Essay palette — compact "Add cell" popover: pick the type once, then the
 // width, instead of a 3×4 grid of pre-multiplied chips. Collapses to a single
@@ -1399,10 +1405,8 @@ const ALIGN_OPTIONS: { value: TextAlign, key: string }[] = [
   { value: 'center', key: 'adminForm.cellAlignCenter' },
   { value: 'right', key: 'adminForm.cellAlignRight' }
 ]
-const FONT_OPTIONS: { value: TextFont, key: string }[] = [
-  { value: 'serif', key: 'adminForm.cellFontSerif' },
-  { value: 'sans', key: 'adminForm.cellFontSans' }
-]
+// The catalogue itself lives in shared/albumFonts.ts and is rendered by
+// admin/FontSelect.vue — nothing here needs to know which faces exist.
 </script>
 
 <template>
@@ -1436,11 +1440,12 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
             <Icon name="heroicons:squares-2x2" class="style-trigger__icon" />
           </button>
           <p v-if="form.style === 'chapters'" class="field__hint">{{ t('adminForm.styleChaptersHint') }}</p>
-          <label v-if="isEssay" class="dark-toggle">
+          <!-- Every style but Darkroom, which is a black wall by definition. -->
+          <label v-if="supportsDark" class="dark-toggle">
             <input v-model="form.dark" type="checkbox">
             <span>
-              <strong>{{ t('adminForm.essayDark') }}</strong>
-              <small>{{ t('adminForm.essayDarkHint') }}</small>
+              <strong>{{ t('adminForm.albumDark') }}</strong>
+              <small>{{ t('adminForm.albumDarkHint') }}</small>
             </span>
           </label>
         </div>
@@ -1525,17 +1530,11 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
           </div>
           <div class="field">
             <label>{{ t('adminForm.cellFont') }}</label>
-            <div class="font-selector">
-              <button
-                v-for="opt in FONT_OPTIONS"
-                :key="opt.value"
-                type="button"
-                class="font-btn"
-                :class="{ active: (form.textDefaults?.font ?? 'serif') === opt.value }"
-                :title="t(opt.key)"
-                @click="setDefaultFont(opt.value)"
-              >{{ t(opt.key) }}</button>
-            </div>
+            <AdminFontSelect
+              :model-value="form.textDefaults?.font ?? DEFAULT_ALBUM_FONT"
+              :label="t('adminForm.cellFont')"
+              @update:model-value="setDefaultFont"
+            />
           </div>
         </div>
       </div>
@@ -2110,24 +2109,13 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 
         <section v-if="!isChapters" class="cell-control cell-control--font">
           <p class="cell-control__label">{{ t('adminForm.cellFont') }}</p>
-          <div class="font-selector">
-            <button
-              type="button"
-              class="font-btn"
-              :class="{ active: !selectedCellData.font }"
-              :title="t('adminForm.cellFontAuto')"
-              @click="setCellFont('auto')"
-            >{{ t('adminForm.cellFontAuto') }}</button>
-            <button
-              v-for="opt in FONT_OPTIONS"
-              :key="opt.value"
-              type="button"
-              class="font-btn"
-              :class="{ active: selectedCellData.font === opt.value }"
-              :title="t(opt.key)"
-              @click="setCellFont(opt.value)"
-            >{{ t(opt.key) }}</button>
-          </div>
+          <AdminFontSelect
+            :model-value="selectedCellData.font ?? 'auto'"
+            :label="t('adminForm.cellFont')"
+            allow-auto
+            :inherited-font="form.textDefaults?.font ?? DEFAULT_ALBUM_FONT"
+            @update:model-value="setCellFont"
+          />
         </section>
 
         <section class="cell-control cell-control--text">
@@ -3379,14 +3367,14 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
 }
 .prop-textarea:focus { border-color: var(--accent); }
 
-/* Span / align / font selectors */
-.span-selector, .align-selector, .font-selector {
+/* Span / align selectors — the font picker is AdminFontSelect. */
+.span-selector, .align-selector {
   display: flex;
   gap: 0.25rem;
   min-width: 0;
   flex-wrap: wrap;
 }
-.span-btn, .align-btn, .font-btn {
+.span-btn, .align-btn {
   display: grid;
   place-items: center;
   border: 1px solid var(--subtle);
@@ -3402,9 +3390,9 @@ const FONT_OPTIONS: { value: TextFont, key: string }[] = [
   line-height: 1;
 }
 .span-btn { width: 2.15rem; height: 2.15rem; }
-.align-btn, .font-btn { height: 2.15rem; padding: 0 0.6rem; }
-.span-btn:hover, .align-btn:hover, .font-btn:hover { border-color: var(--accent); color: var(--accent); }
-.span-btn.active, .align-btn.active, .font-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.align-btn { height: 2.15rem; padding: 0 0.6rem; }
+.span-btn:hover, .align-btn:hover { border-color: var(--accent); color: var(--accent); }
+.span-btn.active, .align-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .span-btn.disabled { opacity: 0.35; cursor: not-allowed; }
 .span-btn.disabled:hover { border-color: var(--subtle); color: var(--muted); }
 

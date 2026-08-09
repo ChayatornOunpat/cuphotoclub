@@ -1,5 +1,7 @@
 // Shared types used by both the Nuxt app (client) and the Nitro server.
 
+import type { AlbumFontValue } from './albumFonts'
+
 export type Role = 'owner' | 'admin' | 'editor'
 export type ContentStatus = 'draft' | 'link-only' | 'public'
 
@@ -13,7 +15,8 @@ export function canManageUsers(role: Role): boolean {
 export type CellSpan = 2 | 3 | 4 | 6
 export type CellType = 'image' | 'text' | 'pad'
 export type TextAlign = 'left' | 'center' | 'right'
-export type TextFont = 'serif' | 'sans'
+/** One of the faces catalogued in shared/albumFonts.ts. */
+export type TextFont = AlbumFontValue
 
 export interface AlbumCell {
   type: CellType
@@ -45,7 +48,7 @@ export interface Album {
   location?: string
   excerpt: string
   style: AlbumStyle
-  dark?: boolean       // essay style only: renders on a black wall like darkroom, same grid
+  dark?: boolean       // any style but darkroom (already black): renders on a black wall, same layout
   placement: Placement
   coverSrc: string       // URL of the cover/hero image
   rows: AlbumRow[]       // ordered content rows

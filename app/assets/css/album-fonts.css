@@ -1,0 +1,85 @@
+/* ─── Album text faces ─────────────────────────────────────────────────────
+   One rule per entry in shared/albumFonts.ts, named `afont--` + that entry's
+   `value` (which is also what the database stores).
+
+   This file is the only place these family names appear in CSS, and that is
+   deliberate: @nuxt/fonts decides what to self-host by scanning real CSS, so
+   the rule below is what makes the family exist at all. Weights/subsets come
+   from `fonts.defaults` in nuxt.config.ts.
+
+   Imported by AlbumEssay.vue (renders albums) and admin/FontSelect.vue (shows
+   the specimens), so the cost lands on album pages and the editor rather than
+   on the whole site.
+
+   Latin-only faces name a Thai companion before the generic keyword so a
+   bilingual line falls through to Noto instead of the browser default. Thai
+   families all carry Latin of their own and need no such partner. */
+
+/* ── The site's own pairing ───────────────────────────────────────────────
+   Kept as var() so these two keep following the Thai swap main.css applies
+   under html:lang(th) — that is the behaviour every existing album has. */
+.afont--serif { font-family: var(--font-serif); }
+.afont--sans { font-family: var(--font-sans); }
+
+/* ── Thai ─────────────────────────────────────────────────────────────── */
+.afont--noto-serif-thai { font-family: 'Noto Serif Thai', serif; }
+.afont--noto-sans-thai { font-family: 'Noto Sans Thai', sans-serif; }
+.afont--noto-sans-thai-looped { font-family: 'Noto Sans Thai Looped', 'Noto Sans Thai', sans-serif; }
+.afont--ibm-plex-sans-thai { font-family: 'IBM Plex Sans Thai', 'Noto Sans Thai', sans-serif; }
+.afont--ibm-plex-sans-thai-looped { font-family: 'IBM Plex Sans Thai Looped', 'Noto Sans Thai', sans-serif; }
+.afont--sarabun { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; }
+.afont--anuphan { font-family: 'Anuphan', 'Noto Sans Thai', sans-serif; }
+.afont--bai-jamjuree { font-family: 'Bai Jamjuree', 'Noto Sans Thai', sans-serif; }
+.afont--chakra-petch { font-family: 'Chakra Petch', 'Noto Sans Thai', sans-serif; }
+.afont--kanit { font-family: 'Kanit', 'Noto Sans Thai', sans-serif; }
+.afont--krub { font-family: 'Krub', 'Noto Sans Thai', sans-serif; }
+.afont--prompt { font-family: 'Prompt', 'Noto Sans Thai', sans-serif; }
+.afont--mitr { font-family: 'Mitr', 'Noto Sans Thai', sans-serif; }
+.afont--niramit { font-family: 'Niramit', 'Noto Sans Thai', sans-serif; }
+.afont--pridi { font-family: 'Pridi', 'Noto Serif Thai', serif; }
+.afont--maitree { font-family: 'Maitree', 'Noto Serif Thai', serif; }
+.afont--taviraj { font-family: 'Taviraj', 'Noto Serif Thai', serif; }
+.afont--trirong { font-family: 'Trirong', 'Noto Serif Thai', serif; }
+.afont--athiti { font-family: 'Athiti', 'Noto Sans Thai', sans-serif; }
+.afont--fahkwang { font-family: 'Fahkwang', 'Noto Sans Thai', sans-serif; }
+.afont--kodchasan { font-family: 'Kodchasan', 'Noto Sans Thai', sans-serif; }
+.afont--koho { font-family: 'KoHo', 'Noto Sans Thai', sans-serif; }
+.afont--k2d { font-family: 'K2D', 'Noto Sans Thai', sans-serif; }
+.afont--thasadith { font-family: 'Thasadith', 'Noto Sans Thai', sans-serif; }
+.afont--mali { font-family: 'Mali', 'Noto Sans Thai', cursive; }
+.afont--itim { font-family: 'Itim', 'Noto Sans Thai', cursive; }
+.afont--sriracha { font-family: 'Sriracha', 'Noto Sans Thai', cursive; }
+.afont--charm { font-family: 'Charm', 'Noto Serif Thai', cursive; }
+.afont--charmonman { font-family: 'Charmonman', 'Noto Serif Thai', cursive; }
+.afont--chonburi { font-family: 'Chonburi', 'Noto Serif Thai', serif; }
+.afont--pattaya { font-family: 'Pattaya', 'Noto Sans Thai', sans-serif; }
+.afont--srisakdi { font-family: 'Srisakdi', 'Noto Serif Thai', cursive; }
+
+/* ── Latin ────────────────────────────────────────────────────────────── */
+.afont--playfair { font-family: 'Playfair Display', 'Noto Serif Thai', serif; }
+.afont--libre-baskerville { font-family: 'Libre Baskerville', 'Noto Serif Thai', serif; }
+.afont--eb-garamond { font-family: 'EB Garamond', 'Noto Serif Thai', serif; }
+.afont--cormorant { font-family: 'Cormorant Garamond', 'Noto Serif Thai', serif; }
+.afont--lora { font-family: 'Lora', 'Noto Serif Thai', serif; }
+.afont--crimson-pro { font-family: 'Crimson Pro', 'Noto Serif Thai', serif; }
+.afont--source-serif { font-family: 'Source Serif 4', 'Noto Serif Thai', serif; }
+.afont--dm-sans { font-family: 'DM Sans', 'Noto Sans Thai', sans-serif; }
+.afont--work-sans { font-family: 'Work Sans', 'Noto Sans Thai', sans-serif; }
+.afont--space-grotesk { font-family: 'Space Grotesk', 'Noto Sans Thai', sans-serif; }
+.afont--manrope { font-family: 'Manrope', 'Noto Sans Thai', sans-serif; }
+.afont--archivo { font-family: 'Archivo', 'Noto Sans Thai', sans-serif; }
+.afont--jetbrains-mono { font-family: 'JetBrains Mono', 'Noto Sans Thai', monospace; }
+.afont--courier-prime { font-family: 'Courier Prime', 'Noto Serif Thai', monospace; }
+
+/* ── System ───────────────────────────────────────────────────────────────
+   Zero bytes over the wire, but the reader's machine decides how they look.
+   The Thai three name the faces Windows, macOS/iOS and Android actually ship;
+   `system-thai-classic` is the Angsana family Thai print work has used for
+   decades, and is Windows-only in practice. */
+.afont--system-ui { font-family: system-ui, sans-serif; }
+.afont--system-sans { font-family: Arial, Helvetica, sans-serif; }
+.afont--system-serif { font-family: Georgia, 'Times New Roman', serif; }
+.afont--system-mono { font-family: ui-monospace, Consolas, Menlo, monospace; }
+.afont--system-thai { font-family: 'Leelawadee UI', 'Sukhumvit Set', Thonburi, sans-serif; }
+.afont--system-thai-ui { font-family: Tahoma, 'Leelawadee UI', sans-serif; }
+.afont--system-thai-classic { font-family: 'Angsana New', AngsanaUPC, serif; }

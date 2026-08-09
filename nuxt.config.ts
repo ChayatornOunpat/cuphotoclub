@@ -141,7 +141,35 @@ export default defineNuxtConfig({
   },
 
   // Editorial type pairing — @nuxt/fonts provisions these from Google automatically.
+  //
+  // Only the site's own faces are pinned here. The album picker's catalogue
+  // (app/assets/css/album-fonts.css) is left to auto-resolution against
+  // `defaults` below, so adding a face there needs no config change.
   fonts: {
+    defaults: {
+      // Album text renders at weight 200–300, so a light cut has to be
+      // available or every face lands on regular.
+      weights: [300, 400],
+      // Italic doubles the download for faces that are only ever set upright.
+      styles: ['normal'],
+      // `thai` is NOT in @nuxt/fonts' default subset list — without it the Thai
+      // families resolve to their Latin glyphs only and Thai text silently
+      // falls back to the OS font. Cyrillic/Greek/Vietnamese/latin-ext are
+      // dropped because the site is English/Thai — `latin` already carries the
+      // accented characters (é, ü, ñ) that show up in names.
+      subsets: ['latin', 'thai'],
+      // One metric-matched fallback per generic instead of the stock three to
+      // five. Every family in the album catalogue gets a size-adjusted
+      // @font-face per entry here, and at ~50 families the default lists were
+      // most of the album stylesheet — this trades a little cross-platform
+      // reach in the anti-CLS shim for a much smaller CSS payload.
+      fallbacks: {
+        'serif': ['Georgia'],
+        'sans-serif': ['Arial'],
+        'monospace': ['Courier New'],
+        'cursive': ['Arial']
+      }
+    },
     families: [
       { name: 'Spectral', provider: 'google', weights: [200, 300, 400, 500, 600], styles: ['normal', 'italic'] },
       { name: 'Inter', provider: 'google', weights: [300, 400, 500] },
@@ -149,7 +177,23 @@ export default defineNuxtConfig({
       { name: 'Noto Sans Thai', provider: 'google', weights: [300, 400, 500, 600] },
       { name: 'IBM Plex Sans Thai Looped', provider: 'google', weights: [300, 400, 500, 600] },
       { name: 'Sarabun', provider: 'google', weights: [300, 400, 500, 600] },
-      { name: 'Anuphan', provider: 'google', weights: [300, 400, 500, 600] }
+      { name: 'Anuphan', provider: 'google', weights: [300, 400, 500, 600] },
+
+      // System faces from the album picker: named so no provider goes looking
+      // for them (Arial and Roboto do exist on Google Fonts — self-hosting
+      // them would defeat the point of a system stack).
+      { name: 'Arial', provider: 'none' },
+      { name: 'Helvetica', provider: 'none' },
+      { name: 'Georgia', provider: 'none' },
+      { name: 'Times New Roman', provider: 'none' },
+      { name: 'Consolas', provider: 'none' },
+      { name: 'Menlo', provider: 'none' },
+      { name: 'Tahoma', provider: 'none' },
+      { name: 'Leelawadee UI', provider: 'none' },
+      { name: 'Sukhumvit Set', provider: 'none' },
+      { name: 'Thonburi', provider: 'none' },
+      { name: 'Angsana New', provider: 'none' },
+      { name: 'AngsanaUPC', provider: 'none' }
     ]
   },
 
