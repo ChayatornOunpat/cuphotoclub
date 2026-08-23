@@ -278,23 +278,25 @@ function downloadCompressed() {
       @pointercancel="onViewerPointerUp"
       @wheel="onWheel"
     >
-      <!-- Original (full, behind) -->
-      <div class="viewer__layer">
+      <!-- Compressed (full, behind) — revealed on the right of the divider. -->
+      <div class="viewer__layer viewer__layer--base">
         <img
-          :src="original.url"
-          alt="Original"
+          :src="compressed.url"
+          alt="Compressed"
           class="viewer__img"
           :class="{ 'is-pixelated': pixelated }"
           :style="{ transform: imgTransform }"
         >
       </div>
 
-      <!-- Compressed (clipped left of divider). The clip sits on the layer, not
-           the image, so zooming never drags the split line with it. -->
-      <div class="viewer__layer" :style="{ clipPath: `inset(0 ${100 - dividerPct}% 0 0)` }">
+      <!-- Original on top, clipped to the LEFT of the divider so the sides match
+           the labels. inset(0 R 0 0) pulls the *right* edge in, so whatever sits
+           in this layer is what you see on the left. The clip is on the layer,
+           not the image, so zooming never drags the split line with it. -->
+      <div class="viewer__layer viewer__layer--top" :style="{ clipPath: `inset(0 ${100 - dividerPct}% 0 0)` }">
         <img
-          :src="compressed.url"
-          alt="Compressed"
+          :src="original.url"
+          alt="Original"
           class="viewer__img"
           :class="{ 'is-pixelated': pixelated }"
           :style="{ transform: imgTransform }"
@@ -524,8 +526,8 @@ function downloadCompressed() {
   inset: 0;
   overflow: hidden;
 }
-.viewer__layer:first-of-type { z-index: 1; }
-.viewer__layer:nth-of-type(2) { z-index: 2; }
+.viewer__layer--base { z-index: 1; }
+.viewer__layer--top  { z-index: 2; }
 
 .viewer__img {
   display: block;
