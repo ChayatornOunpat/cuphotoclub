@@ -226,6 +226,24 @@ function uniqueUncompleted(files: File[]) {
   return out
 }
 
+// WebP is roughly 30% smaller than JPEG at the same visual quality, which is
+// the only compression the album walls ever get (they're excluded from
+// /cdn-cgi/image transforms by the free-tier quota). Encoders that can't
+// produce it must fall back to JPEG rather than to toBlob's silent PNG, which
+// would be *larger* than the JPEG it replaced — so probe once with a 1x1
+// canvas and cache the answer for the session.
+let webpEncodeProbe: Promise<boolean> | null = null
+function supportsWebpEncode() {
+  if (!webpEncodeProbe) {
+    webpEncodeProbe = new Promise<boolean>((resolve) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 1
+      canvas.toBlob(blob => resolve(blob?.type === 'image/webp'), 'image/webp', COMPRESS_QUALITY)
+    })
+  }
+  return webpEncodeProbe
+}
+
 async function compressImage(file: File): Promise<File> {
   const bmp = await createImageBitmap(file)
   let w = bmp.width, h = bmp.height
@@ -237,13 +255,17 @@ async function compressImage(file: File): Promise<File> {
   canvas.width = w; canvas.height = h
   canvas.getContext('2d')!.drawImage(bmp, 0, 0, w, h)
   bmp.close()
+  const type = (await supportsWebpEncode()) ? 'image/webp' : 'image/jpeg'
   const compressed = await new Promise<Blob>((res, rej) =>
-    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/jpeg', COMPRESS_QUALITY)
+    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), type, COMPRESS_QUALITY)
   )
-  // Never ship a result larger than the original
-  const final = compressed.size < file.size ? compressed : file
-  const name = file.name.replace(/\.[^.]+$/, '') + '.jpg'
-  return new File([final], name, { type: 'image/jpeg' })
+  // Never ship a result larger than the original. When the original wins, hand
+  // it back untouched: re-wrapping it under the encoder's name and MIME type
+  // would store a wrong content-type on the R2 object (a PNG that compresses
+  // badly used to be saved as "image/jpeg").
+  if (compressed.size >= file.size) return file
+  const name = file.name.replace(/[.][^.]+$/, '') + (type === 'image/webp' ? '.webp' : '.jpg')
+  return new File([compressed], name, { type })
 }
 
 const canAddMore = computed(() => !props.maxFiles || model.value.length < props.maxFiles)
