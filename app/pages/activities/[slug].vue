@@ -26,7 +26,8 @@ if (error.value || !ev.value) {
   throw createError({ statusCode: 404, statusMessage: t('activities.notFound'), fatal: true })
 }
 
-const origin = useRequestURL().origin
+const origin = useSiteOrigin()
+const fallbackDescription = useSeoFallbackDescription()
 const imageSrc = computed(() => {
   const key = ev.value?.coverR2Key?.trim()
   if (!key) return ''
@@ -114,8 +115,10 @@ const dateDay = computed(() => ev.value?.eventDate ? formatEventDate(ev.value.ev
 
 useSeoMeta({
   title: () => ev.value!.title,
-  description: () => ev.value!.summary || ev.value!.title,
+  description: () => ev.value!.summary || fallbackDescription.value,
+  ogDescription: () => ev.value!.summary || fallbackDescription.value,
   ogImage: () => coverUrl.value,
+  twitterImage: () => coverUrl.value,
   ogType: 'article',
   twitterCard: () => (coverUrl.value ? 'summary_large_image' : 'summary')
 })

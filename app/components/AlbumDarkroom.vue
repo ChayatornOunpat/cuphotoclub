@@ -1,5 +1,15 @@
 <script setup lang="ts">
-interface AlbumCell { type: string, span: number, src?: string, caption?: string, content?: string }
+import { albumFontClass } from '~~/shared/albumFonts'
+
+interface AlbumCell {
+  type: string
+  span: number
+  src?: string
+  caption?: string
+  content?: string
+  /** One of shared/albumFonts.ts; undefined = inherit the album default. */
+  font?: string
+}
 interface AlbumRow { cells: AlbumCell[] }
 interface Album {
   title: string
@@ -10,16 +20,22 @@ interface Album {
   excerpt: string
   coverSrc: string
   rows: AlbumRow[]
+  textDefaults?: { align?: 'left' | 'center' | 'right', font?: string }
 }
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
 const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.album.dateEnd))
 
+// The album's own editorial text (title, excerpt) takes the album default face;
+// notes take their cell's face, falling back to the same default. Metadata
+// chrome and plate captions stay on the site's UI type.
+const albumFace = computed(() => albumFontClass(props.album.textDefaults?.font))
+
 // Flatten rows/cells in canvas order, keeping row/cell coordinates for the
 // admin preview selection and the cell span for print sizing.
 interface PlateItem { kind: 'image', src: string, caption?: string, span: number, n: number, row: number, cell: number }
-interface NoteItem { kind: 'text', content: string, row: number, cell: number }
+interface NoteItem { kind: 'text', content: string, face: string, row: number, cell: number }
 interface SpacerItem { kind: 'spacer', row: number, cell: number }
 const sequence = computed<(PlateItem | NoteItem | SpacerItem)[]>(() => {
   const out: (PlateItem | NoteItem | SpacerItem)[] = []
@@ -30,7 +46,15 @@ const sequence = computed<(PlateItem | NoteItem | SpacerItem)[]>(() => {
       if (cell.type === 'image') {
         out.push({ kind: 'image', src: cell.src ?? '', caption: cell.caption, span: cell.span, n: ++n, row: ri, cell: ci })
       } else if (cell.type === 'text' && cell.content?.trim()) {
-        out.push({ kind: 'text', content: cell.content, row: ri, cell: ci })
+        // The face arrives as a class, not an inline style: the rules in
+        // album-fonts.css are what tell @nuxt/fonts which families to self-host.
+        out.push({
+          kind: 'text',
+          content: cell.content,
+          face: albumFontClass(cell.font ?? props.album.textDefaults?.font),
+          row: ri,
+          cell: ci
+        })
       } else if (cell.type === 'pad') {
         out.push({ kind: 'spacer', row: ri, cell: ci })
       }
@@ -69,8 +93,8 @@ function plateSizes(span: number) {
       <NuxtLink v-else :to="localePath('/albums')" class="dk-head__back">{{ t('albums.coverBack') }}</NuxtLink>
 
       <p class="dk-head__kicker" :lang="textLang(album.category)">{{ t('albums.albumKicker', { category: album.category }) }}</p>
-      <h1 class="dk-head__title" :lang="textLang(album.title)">{{ album.title }}</h1>
-      <p v-if="album.excerpt" class="dk-head__excerpt" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
+      <h1 class="dk-head__title" :class="albumFace" :lang="textLang(album.title)">{{ album.title }}</h1>
+      <p v-if="album.excerpt" class="dk-head__excerpt" :class="albumFace" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
       <div class="dk-head__meta">
         <span>{{ dateDisplay }}</span><span class="dot" />
         <span>{{ t('albums.metaFrames', { count: totalImages }) }}</span>
@@ -111,7 +135,7 @@ function plateSizes(span: number) {
           :data-cell-n="item.cell"
           :class="{ 'is-admin-selected': selectedRow === item.row && (selectedCell === item.cell || selectedCell === undefined) }"
         >
-          <p :lang="textLang(item.content)">{{ item.content }}</p>
+          <p :class="item.face" :lang="textLang(item.content)">{{ item.content }}</p>
         </div>
 
         <div
@@ -177,8 +201,8 @@ function plateSizes(span: number) {
   margin-bottom: 1.75rem;
 }
 
+/* No font-family — the face arrives as an `afont--*` class (album-fonts.css). */
 .dk-head__title {
-  font-family: var(--font-serif);
   font-size: clamp(3rem, 7vw, 6.5rem);
   font-weight: 200;
   line-height: 0.95;
@@ -191,7 +215,6 @@ function plateSizes(span: number) {
 .dk-head__excerpt {
   margin-top: 1.75rem;
   max-width: 34rem;
-  font-family: var(--font-serif);
   font-size: clamp(0.95rem, 1.6vw, 1.15rem);
   font-weight: 300;
   line-height: 1.8;
@@ -269,8 +292,9 @@ function plateSizes(span: number) {
   padding: 0 1rem;
   text-align: center;
 }
+/* No font-family here on purpose — the face arrives as an `afont--*` class
+   (see album-fonts.css) and a rule here would outrank it on source order. */
 .dk-note p {
-  font-family: var(--font-serif);
   font-size: clamp(1.05rem, 1.9vw, 1.35rem);
   font-weight: 200;
   line-height: 1.85;
@@ -318,3 +342,7 @@ function plateSizes(span: number) {
   .dk-head__print :deep(img) { max-height: 40svh; }
 }
 </style>
+
+<!-- The `afont--*` faces the album can be set in. Loaded here rather than
+     globally so the @font-face declarations ship with album pages only. -->
+<style scoped src="~/assets/css/album-fonts.css"></style>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { albumFontClass } from '~~/shared/albumFonts'
+
 interface AlbumCell { type: string, span: number, src?: string, caption?: string, content?: string }
 interface AlbumRow { cells: AlbumCell[] }
 interface Album {
@@ -11,6 +13,7 @@ interface Album {
   coverSrc: string
   dark?: boolean
   rows: AlbumRow[]
+  textDefaults?: { align?: 'left' | 'center' | 'right', font?: string }
 }
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number }>()
 const { t } = useI18n()
@@ -18,6 +21,13 @@ const localePath = useLocalePath()
 const cover = computed(() => props.album.coverSrc)
 const categoryAlbumsPath = computed(() => `${localePath('/albums')}?category=${encodeURIComponent(props.album.category)}`)
 const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.album.dateEnd))
+
+// This style drops text cells (only image cells are rendered), so the album
+// face applies to its editorial text only — the sticky panel's title and
+// excerpt. Breadcrumb, fact rows and frame captions stay on the site's UI type.
+// The face arrives as a class, not an inline style, because the rules in
+// album-fonts.css are what tell @nuxt/fonts which families to self-host.
+const albumFace = computed(() => albumFontClass(props.album.textDefaults?.font))
 
 // Flat list of image cells with their row/cell coordinates for admin selection
 const imageCells = computed(() => {
@@ -81,8 +91,8 @@ onUnmounted(() => {
         </div>
         <div class="meta__thumb"><AppImg :src="cover" :alt="album.title" sizes="sm:100vw lg:360px" optimize /></div>
         <p class="meta__cat" :lang="textLang(album.category)">{{ album.category }}</p>
-        <h1 class="meta__title" :lang="textLang(album.title)">{{ album.title }}</h1>
-        <p class="meta__excerpt" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
+        <h1 class="meta__title" :class="albumFace" :lang="textLang(album.title)">{{ album.title }}</h1>
+        <p class="meta__excerpt" :class="albumFace" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
         <div class="meta__facts">
           <div class="meta__fact"><span class="k">{{ t('albums.category') }}</span><span class="v" :lang="textLang(album.category)">{{ album.category }}</span></div>
           <div class="meta__fact"><span class="k">{{ t('albums.date') }}</span><span class="v">{{ dateDisplay }}</span></div>
@@ -127,7 +137,8 @@ onUnmounted(() => {
 .meta__thumb { width: 100%; overflow: hidden; margin-bottom: 1.75rem; background: var(--hero-bg); }
 .meta__thumb :deep(img) { width: 100%; height: auto; display: block; object-fit: contain; }
 .meta__cat { font-size: 0.54rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); margin-bottom: 1rem; }
-.meta__title { font-family: var(--font-serif); font-size: clamp(2rem, 3vw, 3rem); font-weight: 200; line-height: 1; letter-spacing: -0.02em; margin-bottom: 1.5rem; white-space: pre-line; overflow-wrap: break-word; }
+/* No font-family — the face arrives as an `afont--*` class (album-fonts.css). */
+.meta__title { font-size: clamp(2rem, 3vw, 3rem); font-weight: 200; line-height: 1; letter-spacing: -0.02em; margin-bottom: 1.5rem; white-space: pre-line; overflow-wrap: break-word; }
 .meta__excerpt { font-size: 0.82rem; color: var(--muted); line-height: 1.85; margin-bottom: 2rem; white-space: pre-line; }
 .meta__facts { border-top: 1px solid var(--subtle); }
 .meta__fact { display: flex; justify-content: space-between; padding: 0.85rem 0; border-bottom: 1px solid var(--subtle); font-size: 0.62rem; letter-spacing: 0.08em; }
@@ -172,3 +183,7 @@ figcaption { margin-top: 0.85rem; font-size: 0.6rem; letter-spacing: 0.12em; tex
   .meta { position: static; }
 }
 </style>
+
+<!-- The `afont--*` faces the album can be set in. Loaded here rather than
+     globally so the @font-face declarations ship with album pages only. -->
+<style scoped src="~/assets/css/album-fonts.css"></style>

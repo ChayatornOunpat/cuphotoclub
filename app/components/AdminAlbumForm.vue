@@ -68,7 +68,11 @@ function blank(): AlbumInput {
 }
 
 const form = reactive<AlbumInput>(props.initial ? normalizeInitialAlbum(props.initial) : blank())
-const publishedMatchesEvent = ref(!!form.date && form.published === form.date)
+// New albums default to sorting by their event date — the usual intent, and the
+// watcher below fills `published` the moment a date is picked. An existing album
+// keeps whatever relationship its stored dates already have, so opening one for
+// an unrelated edit never silently rewrites its publish date.
+const publishedMatchesEvent = ref(props.initial ? (!!form.date && form.published === form.date) : true)
 
 // Auto date detection. When photos are uploaded, the uploader reads their EXIF
 // capture dates (from the originals, before compression strips them) and reports
@@ -1349,6 +1353,12 @@ const isChapters = computed(() => form.style === 'chapters')
 const isSticky = computed(() => form.style === 'sticky')
 // Darkroom already renders on a black wall, so the dark toggle is meaningless there.
 const supportsDark = computed(() => form.style !== 'darkroom')
+// Every style renders the album's title and excerpt, so the album-wide face
+// always applies. What differs is per-cell faces: sticky and contact drop text
+// cells (contact turns them into row breaks) and chapters turns one into a
+// chapter heading, so only essay and darkroom draw a text cell as body copy.
+const isDarkroom = computed(() => form.style === 'darkroom')
+const supportsCellFont = computed(() => isEssay.value || isDarkroom.value)
 
 // Essay palette — compact "Add cell" popover: pick the type once, then the
 // width, instead of a 3×4 grid of pre-multiplied chips. Collapses to a single
@@ -1511,10 +1521,12 @@ const ALIGN_OPTIONS: { value: TextAlign, key: string }[] = [
       </div>
 
       <!-- Story settings — album-wide text defaults -->
-      <div v-if="isEssay" class="tray__section">
+      <div class="tray__section">
         <p class="tray__label">{{ t('adminEditor.storySettings') }}</p>
         <div class="story-defaults-grid">
-          <div class="field">
+          <!-- Alignment is only honoured by the essay's body copy; every other
+               style positions its text from its own layout. -->
+          <div v-if="isEssay" class="field">
             <label>{{ t('adminForm.cellAlign') }}</label>
             <div class="align-selector">
               <button
@@ -2107,7 +2119,7 @@ const ALIGN_OPTIONS: { value: TextAlign, key: string }[] = [
           </div>
         </section>
 
-        <section v-if="!isChapters" class="cell-control cell-control--font">
+        <section v-if="supportsCellFont" class="cell-control cell-control--font">
           <p class="cell-control__label">{{ t('adminForm.cellFont') }}</p>
           <AdminFontSelect
             :model-value="selectedCellData.font ?? 'auto'"
@@ -3429,7 +3441,9 @@ const ALIGN_OPTIONS: { value: TextAlign, key: string }[] = [
 
 /* Fields shared */
 .dock-fields { display: grid; gap: 0.5rem; }
-.story-defaults-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+/* auto-fit, not a fixed 1fr 1fr: chapters/darkroom show the font field without
+   the align one, and a fixed two-column track would squeeze it to half width. */
+.story-defaults-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 0.5rem; }
 .field { display: flex; flex-direction: column; gap: 0.28rem; }
 .field label { font-size: 0.46rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .field__hint { font-size: 0.58rem; color: var(--muted); line-height: 1.55; }

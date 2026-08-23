@@ -240,7 +240,7 @@ onUnmounted(() => {
 
 // The homepage sets its own full title, so opt out of app.vue's titleTemplate
 // (which would append a second "· CU Photo Club").
-const origin = useRequestURL().origin
+const origin = useSiteOrigin()
 useHead({
   titleTemplate: null,
   title: () => `${t('nav.logo')} — Chulalongkorn University`,

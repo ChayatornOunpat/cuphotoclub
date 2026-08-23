@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { albumFontClass } from '~~/shared/albumFonts'
+
 interface AlbumCell { type: string, span: number, src?: string, caption?: string, content?: string }
 interface AlbumRow { cells: AlbumCell[] }
 interface Album {
@@ -10,6 +12,7 @@ interface Album {
   coverSrc: string
   dark?: boolean
   rows: AlbumRow[]
+  textDefaults?: { align?: 'left' | 'center' | 'right', font?: string }
 }
 const props = defineProps<{ album: Album, disableNavigation?: boolean, selectedRow?: number, selectedCell?: number }>()
 const { t } = useI18n()
@@ -17,6 +20,14 @@ const localePath = useLocalePath()
 const cover = computed(() => props.album.coverSrc)
 const dateDisplay = computed(() => formatAlbumDateRange(props.album.date, props.album.dateEnd))
 const { coverOrientation } = useCoverOrientation(() => cover.value)
+
+// The album face covers its editorial text — title, excerpt, and the chapter
+// headings text cells become. Metadata chrome (kicker, counters, captions)
+// stays on the site's UI type. A text cell here is a heading rather than body
+// copy, so there's no per-cell font in this style. The face arrives as a class,
+// not an inline style, because the rules in album-fonts.css are what tell
+// @nuxt/fonts which families to self-host.
+const albumFace = computed(() => albumFontClass(props.album.textDefaults?.font))
 
 // ── Chapters: each text cell starts a new chapter titled by its content; the
 // images that follow belong to it. Albums without text cells render as one
@@ -170,8 +181,8 @@ onUnmounted(() => {
       <NuxtLink v-else :to="localePath('/albums')" class="head__back">{{ t('albums.coverBack') }}</NuxtLink>
       <div class="head__body">
         <p class="head__kicker"><span :lang="textLang(album.category)">{{ t('albums.albumKicker', { category: album.category }) }}</span> · <span>{{ dateDisplay }}</span> · <span>{{ t('albums.metaFrames', { count: totalImages }) }}</span></p>
-        <h1 class="head__title" :lang="textLang(album.title)">{{ album.title }}</h1>
-        <p class="head__sub" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
+        <h1 class="head__title" :class="albumFace" :lang="textLang(album.title)">{{ album.title }}</h1>
+        <p class="head__sub" :class="albumFace" :lang="textLang(album.excerpt)">{{ album.excerpt }}</p>
       </div>
     </header>
     <div class="cut-line" />
@@ -213,7 +224,7 @@ onUnmounted(() => {
             :class="{ 'is-admin-selected': selectedRow === ch.row && (selectedCell === ch.cell || selectedCell === undefined) }"
           >
             <span class="chapter__num">{{ String(i + 1).padStart(2, '0') }}</span>
-            <h2 class="chapter__title" :lang="textLang(ch.title)">{{ ch.title }}</h2>
+            <h2 class="chapter__title" :class="albumFace" :lang="textLang(ch.title)">{{ ch.title }}</h2>
             <span v-if="ch.images.length" class="chapter__range">{{ t('albums.frameRange', { from: pad(ch.start), to: pad(ch.end) }) }}</span>
           </div>
           <div class="chapter__rule" />
@@ -366,7 +377,8 @@ onUnmounted(() => {
   padding-right: min(42vw, 520px);
 }
 .head__kicker { font-size: 0.56rem; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(245, 244, 240, 0.6); margin-bottom: 1.25rem; }
-.head__title { font-family: var(--font-serif); font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; overflow-wrap: break-word; }
+/* No font-family — the face arrives as an `afont--*` class (album-fonts.css). */
+.head__title { font-size: clamp(3rem, 7vw, 7rem); font-weight: 200; line-height: 0.92; letter-spacing: -0.03em; color: #F5F4F0; white-space: pre-line; overflow-wrap: break-word; }
 .head__sub { margin-top: 1.5rem; max-width: 520px; font-size: 0.82rem; color: rgba(245, 244, 240, 0.5); line-height: 1.8; white-space: pre-line; }
 .cut-line { height: 2px; background: var(--accent); }
 
@@ -417,7 +429,9 @@ onUnmounted(() => {
 .chapter:first-of-type { padding-top: 3rem; }
 .chapter__head { display: flex; align-items: baseline; gap: 1.25rem; margin-bottom: 0.9rem; padding: 0 0.15rem; }
 .chapter__num { font-size: 0.56rem; letter-spacing: 0.24em; color: var(--accent); font-weight: 500; }
-.chapter__title { font-family: var(--font-serif); font-size: clamp(1.5rem, 2.6vw, 2.2rem); font-weight: 200; color: var(--dark); white-space: pre-line; }
+/* No font-family here on purpose — the face arrives as an `afont--*` class
+   (see album-fonts.css) and a rule here would outrank it on source order. */
+.chapter__title { font-size: clamp(1.5rem, 2.6vw, 2.2rem); font-weight: 200; color: var(--dark); white-space: pre-line; }
 .chapter__range { margin-left: auto; flex-shrink: 0; font-size: 0.52rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
 .chapter__rule { height: 1px; background: var(--subtle); margin-bottom: 1.4rem; }
 
@@ -734,3 +748,7 @@ onUnmounted(() => {
   .lb__thumb { flex-basis: 3.45rem; }
 }
 </style>
+
+<!-- The `afont--*` faces the album can be set in. Loaded here rather than
+     globally so the @font-face declarations ship with album pages only. -->
+<style scoped src="~/assets/css/album-fonts.css"></style>

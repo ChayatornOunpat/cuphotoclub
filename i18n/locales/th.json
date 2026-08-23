@@ -385,6 +385,8 @@
     "viewCards": "การ์ด",
     "showingCount": "แสดง {shown} จาก {total}",
     "showingRange": "แสดง {from}–{to} จาก {total}",
+    "ofTotal": "ทั้งหมด {total}",
+    "clearSearch": "ล้างการค้นหา",
     "pagination": "การแบ่งหน้า",
     "perPage": "ต่อหน้า",
     "pageOf": "หน้า {page} จาก {total}",

@@ -59,7 +59,8 @@ useHead(() => ({
 
 // Social link previews: og:image must be an absolute URL or scrapers ignore it.
 // app.vue's titleTemplate appends "· CU Photo Club" — don't add a suffix here.
-const origin = useRequestURL().origin
+const origin = useSiteOrigin()
+const fallbackDescription = useSeoFallbackDescription()
 const coverUrl = computed(() => {
   const src = post.value?.image
   if (!src) return undefined
@@ -69,9 +70,10 @@ const coverUrl = computed(() => {
 useSeoMeta({
   title: () => post.value?.title?.replace(/\n+/g, ' '),
   ogTitle: () => post.value?.title?.replace(/\n+/g, ' '),
-  description: () => (post.value?.excerpt || post.value?.title || '').replace(/\n+/g, ' '),
-  ogDescription: () => (post.value?.excerpt || post.value?.title || '').replace(/\n+/g, ' '),
+  description: () => post.value?.excerpt?.replace(/\n+/g, ' ') || fallbackDescription.value,
+  ogDescription: () => post.value?.excerpt?.replace(/\n+/g, ' ') || fallbackDescription.value,
   ogImage: () => coverUrl.value,
+  twitterImage: () => coverUrl.value,
   ogType: 'article',
   twitterCard: () => (coverUrl.value ? 'summary_large_image' : 'summary')
 })

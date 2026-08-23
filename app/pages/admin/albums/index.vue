@@ -183,7 +183,23 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
     <div v-if="albums && albums.length" class="tools">
       <label class="search">
         <span>{{ t('admin.search') }}</span>
-        <input v-model="query" type="search" :placeholder="t('admin.searchAlbums')">
+        <!-- The UA's own search-cancel button is un-themable, so it's hidden in
+             CSS and replaced with this one (same approach as the public album
+             archive). A button is interactive content, so clicking it doesn't
+             trigger the wrapping label. -->
+        <span class="search__field">
+          <input v-model="query" type="search" :placeholder="t('admin.searchAlbums')">
+          <button
+            v-if="query"
+            type="button"
+            class="search__clear"
+            :aria-label="t('admin.clearSearch')"
+            :title="t('admin.clearSearch')"
+            @click="query = ''"
+          >
+            <Icon name="heroicons:x-mark" class="search__clear-icon" />
+          </button>
+        </span>
       </label>
       <label class="sort">
         <span>{{ t('admin.sortBy') }}</span>
@@ -203,7 +219,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 
     <p v-if="albums && albums.length" class="result-count">
       {{ t('admin.showingRange', { from: pageStart, to: pageEnd, total: visibleAlbums.length }) }}
-      <span v-if="query.trim()"> · {{ t('admin.showingCount', { shown: visibleAlbums.length, total: albums.length }) }}</span>
+      <span v-if="query.trim()"> · {{ t('admin.ofTotal', { total: albums.length }) }}</span>
     </p>
 
     <table v-if="albums && albums.length && visibleAlbums.length && viewMode === 'list'" class="tbl">
@@ -344,6 +360,28 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
 .search span, .sort span { font-size: 0.52rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
 .search input, .sort select { min-height: 2.35rem; border: 1px solid var(--subtle); background: #fff; color: var(--dark); font-family: var(--font-sans); font-size: 0.82rem; padding: 0 0.7rem; outline: none; }
 .search input:focus, .sort select:focus { border-color: var(--accent); }
+.search__field { position: relative; display: block; }
+.search__field input { width: 100%; padding-right: 2.2rem; }
+.search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.search__clear {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  background: none;
+  color: var(--muted);
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.search__clear:hover { color: var(--accent); }
+.search__clear-icon { width: 0.85rem; height: 0.85rem; }
 .toggle { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--subtle); background: #fff; min-height: 2.35rem; }
 .toggle button { border: 0; background: transparent; padding: 0 0.85rem; color: var(--muted); font-family: var(--font-sans); font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
 .toggle button + button { border-left: 1px solid var(--subtle); }

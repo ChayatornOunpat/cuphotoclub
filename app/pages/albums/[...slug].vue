@@ -31,7 +31,8 @@ const styleComponent = computed(() => styles[album.value!.style] ?? AlbumEssay)
 
 // Social link previews: without og:description/og:image scrapers fall back to
 // scraping the nav text and the favicon. Image URLs must be absolute.
-const origin = useRequestURL().origin
+const origin = useSiteOrigin()
+const fallbackDescription = useSeoFallbackDescription()
 const coverUrl = computed(() => {
   const src = album.value?.coverSrc
     || album.value?.rows?.flatMap(r => r.cells).find(c => c.type === 'image' && c.src)?.src
@@ -43,9 +44,10 @@ const coverUrl = computed(() => {
 useSeoMeta({
   title: () => album.value?.title?.replace(/\n+/g, ' '),
   ogTitle: () => album.value?.title?.replace(/\n+/g, ' '),
-  description: () => album.value?.excerpt || album.value?.title?.replace(/\n+/g, ' '),
-  ogDescription: () => album.value?.excerpt || album.value?.title?.replace(/\n+/g, ' '),
+  description: () => album.value?.excerpt || fallbackDescription.value,
+  ogDescription: () => album.value?.excerpt || fallbackDescription.value,
   ogImage: () => coverUrl.value,
+  twitterImage: () => coverUrl.value,
   ogType: 'article',
   twitterCard: () => (coverUrl.value ? 'summary_large_image' : 'summary')
 })

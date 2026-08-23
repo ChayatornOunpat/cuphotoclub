@@ -385,6 +385,8 @@
     "viewCards": "Cards",
     "showingCount": "Showing {shown} of {total}",
     "showingRange": "Showing {from}–{to} of {total}",
+    "ofTotal": "{total} total",
+    "clearSearch": "Clear search",
     "pagination": "Pagination",
     "perPage": "Per page",
     "pageOf": "Page {page} of {total}",
