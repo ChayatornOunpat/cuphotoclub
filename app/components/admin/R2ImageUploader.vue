@@ -41,8 +41,12 @@ const pendingQueue = ref<File[]>([])
 const failedUploads = ref<Array<{ file: File, name: string, reason: string }>>([])
 const completedSignatures = new Set<string>()
 
+// Tuned in /admin/image-lab against real camera files: 3040 clears a
+// full-width album cell (~1284 CSS px) on a 2x display with headroom for
+// full-bleed covers, and WebP at 85 holds up at 1:1 while costing roughly half
+// the bytes per pixel of the old JPEG at 90.
 const COMPRESS_MAX_DIM = 3040
-const COMPRESS_QUALITY = 0.90
+const COMPRESS_QUALITY = 0.85
 const COMPRESS_MIN_BYTES = 200_000
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 const UPLOAD_CONCURRENCY = 3
