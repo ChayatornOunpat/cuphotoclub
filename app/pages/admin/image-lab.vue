@@ -31,6 +31,99 @@ function onDividerPointerMove(e: PointerEvent) {
 }
 function onDividerPointerUp() { draggingDivider.value = false }
 
+// ── Zoom & pan ───────────────────────────────────────────────────────────
+// Both layers share one transform so the two images stay pixel-aligned; the
+// clip-path that splits them lives on the wrapper, which is never transformed,
+// so the divider stays put in screen space while the images zoom underneath.
+const MIN_ZOOM = 1
+const MAX_ZOOM = 12
+const zoom = ref(1)
+const panX = ref(0)
+const panY = ref(0)
+const panning = ref(false)
+let panStart = { x: 0, y: 0, panX: 0, panY: 0 }
+
+const imgTransform = computed(() => `translate(${panX.value}px, ${panY.value}px) scale(${zoom.value})`)
+const zoomPct = computed(() => Math.round(zoom.value * 100))
+// Past a couple of stops, browser smoothing hides exactly the JPEG/WebP
+// artefacts this page exists to show. Render real pixels instead.
+const pixelated = computed(() => zoom.value >= 2)
+
+// The scale object-fit:contain already applies at zoom 1 — the bridge between
+// on-screen pixels and the image's own pixels.
+function fitScale() {
+  const el = viewerEl.value
+  if (!el || !original.value) return 1
+  const r = el.getBoundingClientRect()
+  return Math.min(r.width / original.value.w, r.height / original.value.h)
+}
+
+// Never let the image be dragged clear of the frame; at fit there is no slack.
+function clampPan() {
+  const el = viewerEl.value
+  if (!el || !original.value) return
+  const r = el.getBoundingClientRect()
+  const s = fitScale() * zoom.value
+  const maxX = Math.max(0, (original.value.w * s - r.width) / 2)
+  const maxY = Math.max(0, (original.value.h * s - r.height) / 2)
+  panX.value = Math.min(maxX, Math.max(-maxX, panX.value))
+  panY.value = Math.min(maxY, Math.max(-maxY, panY.value))
+}
+
+// Zoom about a point given relative to the viewer centre, so whatever sits
+// under the cursor stays under the cursor.
+function setZoom(next: number, originX = 0, originY = 0) {
+  const z0 = zoom.value
+  const z1 = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next))
+  if (z1 === z0) return
+  panX.value = originX - (z1 / z0) * (originX - panX.value)
+  panY.value = originY - (z1 / z0) * (originY - panY.value)
+  zoom.value = z1
+  clampPan()
+}
+
+function resetView() {
+  zoom.value = 1
+  panX.value = 0
+  panY.value = 0
+}
+
+// 1:1 — one image pixel per screen pixel, the level worth judging artefacts at.
+function zoomToActual() {
+  const s = fitScale()
+  if (s > 0) setZoom(1 / s)
+}
+
+function onWheel(e: WheelEvent) {
+  if (!viewerEl.value) return
+  e.preventDefault()
+  const r = viewerEl.value.getBoundingClientRect()
+  setZoom(
+    zoom.value * (e.deltaY < 0 ? 1.15 : 1 / 1.15),
+    e.clientX - r.left - r.width / 2,
+    e.clientY - r.top - r.height / 2
+  )
+}
+
+function onViewerPointerDown(e: PointerEvent) {
+  // The divider's own handler runs first and bubbles here; don't also pan.
+  if (draggingDivider.value || zoom.value <= 1) return
+  panning.value = true
+  panStart = { x: e.clientX, y: e.clientY, panX: panX.value, panY: panY.value }
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+}
+function onViewerPointerMove(e: PointerEvent) {
+  if (draggingDivider.value) { onDividerPointerMove(e); return }
+  if (!panning.value) return
+  panX.value = panStart.panX + (e.clientX - panStart.x)
+  panY.value = panStart.panY + (e.clientY - panStart.y)
+  clampPan()
+}
+function onViewerPointerUp() {
+  onDividerPointerUp()
+  panning.value = false
+}
+
 // ── Compress ─────────────────────────────────────────────────────────────
 async function compress(src: Blob): Promise<{ blob: Blob; url: string; w: number; h: number }> {
   const bmp = await createImageBitmap(src)
@@ -65,6 +158,7 @@ async function loadFile(file: File) {
   original.value = { blob: file, url: URL.createObjectURL(file), w: bmp.width, h: bmp.height }
   bmp.close()
   dividerPct.value = 50
+  resetView()
   await runCompress()
 }
 
@@ -177,22 +271,46 @@ function downloadCompressed() {
       v-if="original && compressed"
       ref="viewerEl"
       class="lab__viewer"
-      :class="{ 'is-dragging': draggingDivider }"
-      @pointermove="onDividerPointerMove"
-      @pointerup="onDividerPointerUp"
-      @pointercancel="onDividerPointerUp"
+      :class="{ 'is-dragging': draggingDivider, 'is-zoomed': zoom > 1, 'is-panning': panning }"
+      @pointerdown="onViewerPointerDown"
+      @pointermove="onViewerPointerMove"
+      @pointerup="onViewerPointerUp"
+      @pointercancel="onViewerPointerUp"
+      @wheel="onWheel"
     >
       <!-- Original (full, behind) -->
-      <img :src="original.url" alt="Original" class="viewer__img viewer__img--base">
+      <div class="viewer__layer">
+        <img
+          :src="original.url"
+          alt="Original"
+          class="viewer__img"
+          :class="{ 'is-pixelated': pixelated }"
+          :style="{ transform: imgTransform }"
+        >
+      </div>
 
-      <!-- Compressed (clipped left of divider) -->
-      <img
-        :src="compressed.url"
-        alt="Compressed"
-        class="viewer__img viewer__img--comp"
-        :style="{ clipPath: `inset(0 ${100 - dividerPct}% 0 0)` }"
-      >
+      <!-- Compressed (clipped left of divider). The clip sits on the layer, not
+           the image, so zooming never drags the split line with it. -->
+      <div class="viewer__layer" :style="{ clipPath: `inset(0 ${100 - dividerPct}% 0 0)` }">
+        <img
+          :src="compressed.url"
+          alt="Compressed"
+          class="viewer__img"
+          :class="{ 'is-pixelated': pixelated }"
+          :style="{ transform: imgTransform }"
+        >
+      </div>
       <div v-if="compressing" class="viewer__compressing">Compressing…</div>
+
+      <!-- Zoom controls -->
+      <div class="viewer__zoom" @pointerdown.stop>
+        <button type="button" class="zoom-btn" title="Zoom out" @click="setZoom(zoom / 1.4)">−</button>
+        <span class="zoom-pct">{{ zoomPct }}%</span>
+        <button type="button" class="zoom-btn" title="Zoom in" @click="setZoom(zoom * 1.4)">+</button>
+        <span class="zoom-sep" />
+        <button type="button" class="zoom-btn zoom-btn--wide" :class="{ active: zoom === 1 }" @click="resetView">Fit</button>
+        <button type="button" class="zoom-btn zoom-btn--wide" @click="zoomToActual">1:1</button>
+      </div>
 
       <!-- Labels -->
       <span class="viewer__label viewer__label--left">Original</span>
@@ -396,6 +514,18 @@ function downloadCompressed() {
   max-height: 72vh;
 }
 .lab__viewer.is-dragging { cursor: col-resize; }
+.lab__viewer.is-zoomed { cursor: grab; }
+.lab__viewer.is-panning { cursor: grabbing; }
+
+/* Untransformed wrapper: carries the clip-path that splits the comparison, so
+   the divider holds its screen position while the image zooms inside it. */
+.viewer__layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.viewer__layer:first-of-type { z-index: 1; }
+.viewer__layer:nth-of-type(2) { z-index: 2; }
 
 .viewer__img {
   display: block;
@@ -404,9 +534,59 @@ function downloadCompressed() {
   object-fit: contain;
   position: absolute;
   inset: 0;
+  transform-origin: center center;
+  will-change: transform;
 }
-.viewer__img--base { z-index: 1; }
-.viewer__img--comp { z-index: 2; }
+/* Browser smoothing at high zoom hides the very artefacts under test. */
+.viewer__img.is-pixelated { image-rendering: pixelated; }
+
+.viewer__zoom {
+  position: absolute;
+  right: 0.65rem;
+  bottom: 0.65rem;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.2rem;
+  background: rgba(26, 25, 24, 0.72);
+  cursor: default;
+}
+.zoom-btn {
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.3rem;
+  border: none;
+  background: transparent;
+  color: #F5F4F0;
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.zoom-btn:hover { background: rgba(245, 244, 240, 0.16); }
+.zoom-btn.active { color: var(--accent); }
+.zoom-btn--wide {
+  font-size: 0.42rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.zoom-pct {
+  min-width: 2.6rem;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 0.42rem;
+  letter-spacing: 0.1em;
+  color: #F5F4F0;
+  font-variant-numeric: tabular-nums;
+}
+.zoom-sep {
+  width: 1px;
+  height: 0.9rem;
+  margin: 0 0.2rem;
+  background: rgba(245, 244, 240, 0.28);
+}
 
 .viewer__compressing {
   position: absolute;
