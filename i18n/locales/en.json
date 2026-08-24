@@ -1155,8 +1155,6 @@
     "deleteFailed": "Could not delete those.",
     "anonymous": "Anonymous",
     "empty": "Nothing in the pool yet.",
-    "imageLabPre": "Want to compare how compression affects a photo?",
-    "imageLab": "Open the Image Lab.",
     "prev": "Previous",
     "next": "Next",
     "pageOf": "Page {page} of {total}"

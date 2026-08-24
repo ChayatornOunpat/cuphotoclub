@@ -1155,8 +1155,6 @@
     "deleteFailed": "ลบไม่สำเร็จ",
     "anonymous": "ไม่ระบุชื่อ",
     "empty": "ยังไม่มีรูปในคลัง",
-    "imageLabPre": "อยากเทียบผลของการบีบอัดรูป?",
-    "imageLab": "เปิด Image Lab",
     "prev": "ก่อนหน้า",
     "next": "ถัดไป",
     "pageOf": "หน้า {page} จาก {total}"

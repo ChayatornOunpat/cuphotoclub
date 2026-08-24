@@ -209,7 +209,7 @@ function dateInput(value: string | null) {
         <span class="f__label">{{ t('adminUploadLinks.quality') }}</span>
         <select v-model="form.preset" class="f__input">
           <option v-for="p in PRESETS" :key="p.key" :value="p.key">
-            {{ t(`adminUploadLinks.preset_${p.key}`) }} · {{ p.dim }}px · {{ p.quality }}% · {{ mb(p.bytes) }}MB
+            {{ t(`adminUploadLinks.preset_${p.key}`) }} · {{ p.dim }}px · {{ p.quality }}%
           </option>
         </select>
       </label>
@@ -391,7 +391,7 @@ function dateInput(value: string | null) {
 }
 .eul__notice {
   font-family: var(--font-sans);
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   color: var(--muted);
   border-left: 2px solid var(--accent);
   padding-left: 0.6rem;
@@ -401,11 +401,11 @@ function dateInput(value: string | null) {
   border-left: 2px solid var(--accent);
   padding: 0.5rem 0.7rem;
   font-family: var(--font-sans);
-  font-size: 0.72rem;
+  font-size: 0.84rem;
   color: var(--dark);
   background: #fff;
 }
-.eul__empty { font-family: var(--font-sans); font-size: 0.72rem; color: var(--muted); }
+.eul__empty { font-family: var(--font-sans); font-size: 0.84rem; color: var(--muted); }
 
 .eul__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.8rem; }
 .row {
@@ -417,16 +417,16 @@ function dateInput(value: string | null) {
   gap: 0.5rem;
 }
 .row__main { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.row__label { font-family: var(--font-serif); font-size: 0.95rem; color: var(--dark); }
+.row__label { font-family: var(--font-serif); font-size: 1.1rem; color: var(--dark); }
 .row__desc {
   font-family: var(--font-sans);
-  font-size: 0.72rem;
+  font-size: 0.84rem;
   color: var(--muted);
   margin: 0;
 }
 .row__pill {
   font-family: var(--font-sans);
-  font-size: 0.42rem;
+  font-size: 0.56rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   padding: 0.15rem 0.4rem;
@@ -434,18 +434,18 @@ function dateInput(value: string | null) {
 }
 .row__pill--open { color: var(--accent); border-color: var(--accent); }
 .row__pill--closed { color: var(--muted); }
-.row__stat { font-family: var(--font-sans); font-size: 0.62rem; color: var(--muted); }
+.row__stat { font-family: var(--font-sans); font-size: 0.74rem; color: var(--muted); }
 
 .row__url { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .row__code {
   font-family: var(--font-latin-sans);
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   color: var(--dark);
   background: var(--paper);
   padding: 0.2rem 0.4rem;
   overflow-wrap: anywhere;
 }
-.row__meta { font-family: var(--font-sans); font-size: 0.62rem; color: var(--muted); }
+.row__meta { font-family: var(--font-sans); font-size: 0.74rem; color: var(--muted); }
 .row__actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .row__edit {
   display: grid;
@@ -470,13 +470,13 @@ function dateInput(value: string | null) {
 .f--cover { grid-column: 1 / -1; max-width: 320px; }
 .f__hint {
   font-family: var(--font-sans);
-  font-size: 0.6rem;
+  font-size: 0.72rem;
   color: var(--muted);
   line-height: 1.5;
 }
 .f__label {
   font-family: var(--font-sans);
-  font-size: 0.46rem;
+  font-size: 0.62rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
@@ -486,7 +486,7 @@ function dateInput(value: string | null) {
   background: #fff;
   padding: 0.4rem 0.5rem;
   font-family: var(--font-sans);
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   color: var(--dark);
 }
 .f__input:focus { outline: none; border-color: var(--accent); }
@@ -496,7 +496,7 @@ function dateInput(value: string | null) {
   background: transparent;
   padding: 0.32rem 0.6rem;
   font-family: var(--font-sans);
-  font-size: 0.46rem;
+  font-size: 0.62rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--dark);

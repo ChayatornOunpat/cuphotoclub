@@ -18,6 +18,7 @@ const linkId = computed(() => String(route.params.linkId || ''))
 interface PoolItem {
   id: string
   caption: string | null
+  size: number
   publishedTo: string | null
   createdAt: string
   displayName: string | null
@@ -127,6 +128,10 @@ async function consolidate() {
 // round trips, against a 50-subrequest ceiling.
 const CONSOLIDATE_MAX = 15
 const overBatch = computed(() => selected.value.size > CONSOLIDATE_MAX)
+
+function kb(bytes: number) {
+  return bytes >= 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.round(bytes / 1000)} KB`
+}
 </script>
 
 <template>
@@ -137,14 +142,7 @@ const overBatch = computed(() => selected.value.size > CONSOLIDATE_MAX)
       </NuxtLink>
       <h1 class="pool__title">{{ link?.label || t('adminUploadLinks.untitled') }}</h1>
       <p v-if="link?.description" class="pool__desc">{{ link.description }}</p>
-      <p class="pool__sub">
-        {{ t('adminPool.sub') }}
-        <!-- Sizes are not shown per photo: the stored size is the compressed
-             upload, which reads as wrong next to the original. Point at the
-             Image Lab instead of pretending the number is useful here. -->
-        {{ t('adminPool.imageLabPre') }}
-        <NuxtLink :to="localePath('/admin/image-lab')" class="pool__lab">{{ t('adminPool.imageLab') }}</NuxtLink>
-      </p>
+      <p class="pool__sub">{{ t('adminPool.sub') }}</p>
     </header>
 
     <div class="pool__filters">
@@ -221,6 +219,7 @@ const overBatch = computed(() => selected.value.size > CONSOLIDATE_MAX)
         </button>
         <div class="tile__foot">
           <span class="tile__by">{{ item.displayName || t('adminPool.anonymous') }}</span>
+          <span class="tile__meta">{{ kb(item.size) }}</span>
           <span v-if="item.publishedTo" class="tile__used">{{ item.publishedTo }}</span>
           <p v-if="item.caption" class="tile__caption">{{ item.caption }}</p>
           <a class="btn tile__dl" :href="item.downloadUrl">{{ t('adminPool.download') }}</a>
@@ -272,8 +271,6 @@ const overBatch = computed(() => selected.value.size > CONSOLIDATE_MAX)
 }
 .pool__sub { font-family: var(--font-sans); font-size: 0.72rem; color: var(--muted); max-width: 62ch; }
 .pool__desc { font-family: var(--font-sans); font-size: 0.8rem; color: var(--dark); max-width: 62ch; margin: 0; }
-.pool__lab { color: var(--accent); text-decoration: none; }
-.pool__lab:hover { text-decoration: underline; }
 
 .pool__filters { display: flex; gap: 0.9rem; align-items: end; flex-wrap: wrap; }
 .pool__count { font-family: var(--font-sans); font-size: 0.62rem; color: var(--muted); padding-bottom: 0.4rem; }
