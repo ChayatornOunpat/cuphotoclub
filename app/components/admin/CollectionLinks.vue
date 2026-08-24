@@ -12,6 +12,8 @@ interface CollectionLink {
   label: string
   description: string | null
   coverR2Key: string | null
+  eventDate: string | null
+  location: string | null
   status: 'open' | 'closed'
   open: boolean
   requireName: boolean
@@ -102,6 +104,33 @@ async function createLink() {
   }
 }
 
+const confirmDeleteId = ref('')
+const notice = ref('')
+
+// Deleting takes the link, its contributors and every submission row with it.
+// The photo *files* stay in R2 and become unreferenced — same as deleting an
+// album — so say so afterwards and point at where they get cleared, otherwise
+// the storage quietly fills up with nobody knowing why.
+async function deleteLink(link: CollectionLink) {
+  if (busy.value) return
+  busy.value = true
+  error.value = ''
+  notice.value = ''
+  try {
+    const res = await $fetch<{ photoCount: number }>(`${endpoint}/${link.id}`, { method: 'DELETE' })
+    confirmDeleteId.value = ''
+    if (editingId.value === link.id) editingId.value = ''
+    notice.value = res.photoCount > 0
+      ? t('adminUploadLinks.deletedWithPhotos', { label: link.label, count: res.photoCount })
+      : t('adminUploadLinks.deleted', { label: link.label })
+    await refresh()
+  } catch (e) {
+    error.value = errMsg(e, t('adminUploadLinks.deleteFailed'))
+  } finally {
+    busy.value = false
+  }
+}
+
 async function patchLink(link: CollectionLink, body: Record<string, unknown>) {
   busy.value = true
   error.value = ''
@@ -148,6 +177,15 @@ async function copyLink(link: CollectionLink) {
 function mb(bytes: number) {
   return Math.round(bytes / (1024 * 1024))
 }
+
+// <input type="date"> only accepts yyyy-MM-dd, but the API returns ISO. Slice
+// in UTC to match how the contribute page formats it — using the local date
+// parts would shift the day either side of midnight.
+function dateInput(value: string | null) {
+  if (!value) return ''
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
+}
 </script>
 
 <template>
@@ -181,6 +219,7 @@ function mb(bytes: number) {
     </div>
 
     <p v-if="error" class="eul__error">{{ error }}</p>
+    <p v-if="notice" class="eul__notice">{{ notice }}</p>
 
     <ul v-if="links?.length" class="eul__list">
       <li v-for="link in links" :key="link.id" class="row">
@@ -227,6 +266,27 @@ function mb(bytes: number) {
           <NuxtLink class="btn" :to="localePath(`/admin/submissions/${link.id}`)">
             {{ t('adminUploadLinks.viewPool') }}
           </NuxtLink>
+          <!-- Two-step rather than a one-tap delete: the row it sits in is a
+               list, and the neighbouring buttons are all harmless. -->
+          <button
+            v-if="confirmDeleteId !== link.id"
+            type="button"
+            class="btn btn--danger"
+            :disabled="busy"
+            @click="confirmDeleteId = link.id"
+          >
+            {{ t('adminUploadLinks.delete') }}
+          </button>
+          <template v-else>
+            <button type="button" class="btn btn--danger" :disabled="busy" @click="deleteLink(link)">
+              {{ link.photoCount > 0
+                ? t('adminUploadLinks.deleteConfirmPhotos', { count: link.photoCount })
+                : t('adminUploadLinks.deleteConfirm') }}
+            </button>
+            <button type="button" class="btn" :disabled="busy" @click="confirmDeleteId = ''">
+              {{ t('adminUploadLinks.deleteCancel') }}
+            </button>
+          </template>
         </div>
 
         <div v-if="editingId === link.id" class="row__edit">
@@ -248,6 +308,26 @@ function mb(bytes: number) {
               maxlength="500"
               :value="link.description ?? ''"
               @change="patchLink(link, { description: String(($event.target as HTMLInputElement).value).trim() || null })"
+            >
+          </label>
+          <label class="f">
+            <span class="f__label">{{ t('adminUploadLinks.date') }}</span>
+            <input
+              class="f__input"
+              type="date"
+              :value="dateInput(link.eventDate)"
+              @change="patchLink(link, { eventDate: String(($event.target as HTMLInputElement).value) || null })"
+            >
+          </label>
+          <label class="f">
+            <span class="f__label">{{ t('adminUploadLinks.location') }}</span>
+            <input
+              class="f__input"
+              type="text"
+              maxlength="200"
+              :value="link.location ?? ''"
+              :placeholder="t('adminUploadLinks.locationPlaceholder')"
+              @change="patchLink(link, { location: String(($event.target as HTMLInputElement).value).trim() || null })"
             >
           </label>
           <!-- Optional. Collections are standalone, so there is no event cover
@@ -308,6 +388,14 @@ function mb(bytes: number) {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+.eul__notice {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  color: var(--muted);
+  border-left: 2px solid var(--accent);
+  padding-left: 0.6rem;
+  margin-bottom: 0.75rem;
 }
 .eul__error {
   border-left: 2px solid var(--accent);
@@ -420,6 +508,8 @@ function mb(bytes: number) {
 }
 .btn:hover { border-color: var(--accent); color: var(--accent); }
 .btn:disabled { opacity: 0.5; cursor: default; }
+.btn--danger { color: var(--accent); border-color: var(--accent); }
+.btn--danger:hover { background: var(--accent); color: var(--body-bg); border-color: var(--accent); }
 .btn--primary { border-color: var(--dark); }
 /* The create button sits in a grid row with label+input columns; without this
    its smaller height leaves it floating above the inputs' shared bottom line. */

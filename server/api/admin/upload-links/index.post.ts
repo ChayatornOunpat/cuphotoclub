@@ -6,6 +6,10 @@ const bodySchema = z.object({
   label: z.string().trim().min(1).max(200),
   description: z.string().trim().max(500).optional(),
   coverR2Key: z.string().nullable().optional(),
+  // Display-only context for the contribute page. Accepts a bare date string
+  // ("2026-11-24") from a date input, like the events endpoints do.
+  eventDate: z.string().nullable().optional(),
+  location: z.string().trim().max(200).nullable().optional(),
   requireName: z.boolean().optional(),
   maxPerContributor: z.number().int().min(1).max(1000).optional(),
   maxTotal: z.number().int().min(1).max(20000).optional(),
@@ -41,6 +45,8 @@ export default defineEventHandler(async (event) => {
       label: input.label,
       description: input.description || null,
       coverR2Key: input.coverR2Key ?? null,
+      eventDate: input.eventDate ? new Date(input.eventDate) : null,
+      location: input.location ?? null,
       requireName: input.requireName ?? false,
       maxPerContributor: input.maxPerContributor ?? 100,
       maxTotal: input.maxTotal ?? 2000,

@@ -5,7 +5,7 @@
 // decided by the admin on the link (see docs/event-photo-submissions.md).
 definePageMeta({ layout: 'site' })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const token = computed(() => String(route.params.token || ''))
 
@@ -14,6 +14,8 @@ interface LinkState {
     label: string | null
     description: string | null
     coverKey: string | null
+    eventDate: string | null
+    location: string | null
     open: boolean
     requireName: boolean
     maxPerContributor: number
@@ -225,6 +227,21 @@ const coverSrc = computed(() => {
   return key ? `/images/${key.replace(/^\/+/, '')}` : ''
 })
 
+// Date and place, when the admin filled them in. Formatted in the reader's
+// locale and pinned to UTC, matching the activities pages — a date stored as
+// midnight UTC would otherwise render as the previous day west of Greenwich.
+const intlLocale = computed(() => (locale.value === 'th' ? 'th-TH' : 'en-GB'))
+const eventDateText = computed(() => {
+  const raw = link.value.eventDate
+  if (!raw) return ''
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return ''
+  return new Intl.DateTimeFormat(intlLocale.value, {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'
+  }).format(d)
+})
+const metaParts = computed(() => [eventDateText.value, link.value.location || ''].filter(Boolean))
+
 useSeoMeta({
   title: () => t('contribute.title'),
   // An upload link is not something to index or preview socially.
@@ -248,6 +265,11 @@ useSeoMeta({
       <div class="contrib__head-body">
         <p class="contrib__eyebrow">{{ t('contribute.eyebrow') }}</p>
         <h1 class="contrib__title">{{ heading }}</h1>
+        <p v-if="metaParts.length" class="contrib__meta">
+          <span v-for="(part, i) in metaParts" :key="part">
+            <span v-if="i" class="contrib__meta-sep" aria-hidden="true"> · </span>{{ part }}
+          </span>
+        </p>
         <p v-if="description" class="contrib__desc">{{ description }}</p>
         <p v-if="open" class="contrib__lead">{{ t('contribute.lead') }}</p>
         <p v-else class="contrib__closed">{{ t('contribute.closed') }}</p>
@@ -450,7 +472,16 @@ useSeoMeta({
   gap: 0.6rem;
   padding: 7rem 1.5rem 1.75rem;
 }
+.contrib__meta {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.contrib__meta-sep { color: var(--accent); }
+
 .contrib__head--cover .contrib__title { color: #F5F4F0; }
+.contrib__head--cover .contrib__meta { color: rgba(245, 244, 240, 0.7); }
 .contrib__head--cover .contrib__desc,
 .contrib__head--cover .contrib__lead { color: rgba(245, 244, 240, 0.82); }
 .contrib__head--cover .contrib__closed { color: #F5F4F0; }

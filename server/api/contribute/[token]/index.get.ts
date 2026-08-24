@@ -18,6 +18,10 @@ export default defineEventHandler(async (event) => {
       // Null for most collections — the page draws its own header treatment
       // rather than substituting a stand-in image.
       coverKey: link.coverR2Key,
+      // Display-only. Serialised as ISO so the page can format it in the
+      // visitor's locale rather than the server's.
+      eventDate: link.eventDate ? link.eventDate.toISOString() : null,
+      location: link.location,
       open,
       requireName: link.requireName,
       maxPerContributor: link.maxPerContributor,

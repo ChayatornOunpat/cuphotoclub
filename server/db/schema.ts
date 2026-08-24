@@ -119,6 +119,12 @@ export const collectionLinks = sqliteTable('collection_links', {
   // there is no event to borrow an image from — an admin uploads one per
   // collection, and the page falls back to a gradient when it is null.
   coverR2Key: text('cover_r2_key'),
+  // When and where the thing being photographed happened. Both optional, both
+  // display-only — they name the occasion for the participant, nothing reads
+  // them as data. Same column names as `events` for familiarity; there is still
+  // no reference between the two tables.
+  eventDate: integer('event_date', { mode: 'timestamp' }),
+  location: text('location'),
   status: text('status', { enum: ['open', 'closed'] }).notNull().default('open'),
   // Optional second factor. No admin UI ships for this yet — a link's token is
   // the credential; this exists so adding one later is not a migration.
