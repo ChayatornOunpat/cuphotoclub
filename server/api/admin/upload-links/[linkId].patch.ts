@@ -5,6 +5,7 @@ const bodySchema = z.object({
   status: z.enum(['open', 'closed']).optional(),
   label: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(500).nullable().optional(),
+  coverR2Key: z.string().nullable().optional(),
   requireName: z.boolean().optional(),
   maxPerContributor: z.number().int().min(1).max(1000).optional(),
   maxTotal: z.number().int().min(1).max(20000).optional(),
@@ -47,6 +48,7 @@ export default defineEventHandler(async (event) => {
       ...(input.status !== undefined ? { status: input.status } : {}),
       ...(input.label !== undefined ? { label: input.label } : {}),
       ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.coverR2Key !== undefined ? { coverR2Key: input.coverR2Key } : {}),
       ...(input.requireName !== undefined ? { requireName: input.requireName } : {}),
       ...(input.maxPerContributor !== undefined ? { maxPerContributor: input.maxPerContributor } : {}),
       ...(input.maxTotal !== undefined ? { maxTotal: input.maxTotal } : {}),
@@ -61,6 +63,13 @@ export default defineEventHandler(async (event) => {
     .returning()
 
   if (!updated) throw createError({ statusCode: 500, message: 'บันทึกไม่สำเร็จ' })
+
+  // Replacing or clearing the cover leaves the old object with nothing pointing
+  // at it. Delete after the row is committed, so a failed write never orphans
+  // the image that is still in use. Same order as the events cover.
+  if (input.coverR2Key !== undefined && existing.coverR2Key && existing.coverR2Key !== input.coverR2Key) {
+    await blob.delete(existing.coverR2Key).catch(() => {})
+  }
 
   await recordAdminAudit(actor, {
     action: 'update',

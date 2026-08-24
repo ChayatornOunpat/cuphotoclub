@@ -11,6 +11,7 @@ interface CollectionLink {
   id: string
   label: string
   description: string | null
+  coverR2Key: string | null
   status: 'open' | 'closed'
   open: boolean
   requireName: boolean
@@ -249,6 +250,18 @@ function mb(bytes: number) {
               @change="patchLink(link, { description: String(($event.target as HTMLInputElement).value).trim() || null })"
             >
           </label>
+          <!-- Optional. Collections are standalone, so there is no event cover
+               to inherit — without one the contribute page draws a gradient. -->
+          <div class="f f--cover">
+            <span class="f__label">{{ t('adminUploadLinks.cover') }}</span>
+            <AdminCoverUploader
+              :model-value="link.coverR2Key"
+              prefix="covers/collections"
+              aspect="aspect-[3/2]"
+              @update:model-value="value => patchLink(link, { coverR2Key: value ?? null })"
+            />
+            <span class="f__hint">{{ t('adminUploadLinks.coverHint') }}</span>
+          </div>
           <label class="f">
             <span class="f__label">{{ t('adminUploadLinks.perPerson') }}</span>
             <input
@@ -364,6 +377,15 @@ function mb(bytes: number) {
 }
 .f { display: flex; flex-direction: column; gap: 0.25rem; }
 .f--check { flex-direction: row; align-items: center; gap: 0.4rem; }
+/* The cover preview is far taller than a text input — give it the full row so
+   it does not stretch the whole auto-fit grid to its height. */
+.f--cover { grid-column: 1 / -1; max-width: 320px; }
+.f__hint {
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
 .f__label {
   font-family: var(--font-sans);
   font-size: 0.46rem;

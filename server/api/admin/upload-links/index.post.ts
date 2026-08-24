@@ -5,6 +5,7 @@ const bodySchema = z.object({
   // exist, and the label is the title participants see on the contribute page.
   label: z.string().trim().min(1).max(200),
   description: z.string().trim().max(500).optional(),
+  coverR2Key: z.string().nullable().optional(),
   requireName: z.boolean().optional(),
   maxPerContributor: z.number().int().min(1).max(1000).optional(),
   maxTotal: z.number().int().min(1).max(20000).optional(),
@@ -39,6 +40,7 @@ export default defineEventHandler(async (event) => {
       id: generateLinkToken(),
       label: input.label,
       description: input.description || null,
+      coverR2Key: input.coverR2Key ?? null,
       requireName: input.requireName ?? false,
       maxPerContributor: input.maxPerContributor ?? 100,
       maxTotal: input.maxTotal ?? 2000,

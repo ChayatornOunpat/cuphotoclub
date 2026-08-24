@@ -115,6 +115,10 @@ export const collectionLinks = sqliteTable('collection_links', {
   // Free-form context shown on the contribute page under the title — what the
   // collection is for, what kind of photos are wanted.
   description: text('description'),
+  // Optional cover shown on the contribute page. Collections are standalone, so
+  // there is no event to borrow an image from — an admin uploads one per
+  // collection, and the page falls back to a gradient when it is null.
+  coverR2Key: text('cover_r2_key'),
   status: text('status', { enum: ['open', 'closed'] }).notNull().default('open'),
   // Optional second factor. No admin UI ships for this yet — a link's token is
   // the credential; this exists so adding one later is not a migration.

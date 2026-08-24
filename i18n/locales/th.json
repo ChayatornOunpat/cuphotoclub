@@ -1102,6 +1102,8 @@
     "newLabelPlaceholder": "เช่น Photowalk 2026",
     "newDescription": "คำอธิบาย (ไม่บังคับ)",
     "newDescriptionPlaceholder": "แสดงบนหน้าส่งรูป — คอลเลกชันนี้สำหรับอะไร",
+    "cover": "ภาพหน้าปก",
+    "coverHint": "ไม่บังคับ แสดงที่ด้านบนของหน้าส่งรูป หากไม่มีระบบจะใช้พื้นหลังไล่สีแทน",
     "quality": "คุณภาพ",
     "preset_small": "เล็ก",
     "preset_balanced": "สมดุล",

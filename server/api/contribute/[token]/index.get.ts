@@ -15,6 +15,9 @@ export default defineEventHandler(async (event) => {
     link: {
       label: link.label,
       description: link.description,
+      // Null for most collections — the page draws its own header treatment
+      // rather than substituting a stand-in image.
+      coverKey: link.coverR2Key,
       open,
       requireName: link.requireName,
       maxPerContributor: link.maxPerContributor,

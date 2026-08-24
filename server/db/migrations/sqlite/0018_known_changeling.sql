@@ -1,0 +1,1 @@
+ALTER TABLE `collection_links` ADD `cover_r2_key` text;

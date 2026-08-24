@@ -13,6 +13,7 @@ interface LinkState {
   link: {
     label: string | null
     description: string | null
+    coverKey: string | null
     open: boolean
     requireName: boolean
     maxPerContributor: number
@@ -215,6 +216,15 @@ async function removePhoto(item: MineItem) {
 const heading = computed(() => link.value.label || t('contribute.title'))
 const description = computed(() => link.value.description || '')
 
+// Collections are standalone, so there is no event to inherit a cover from —
+// most links will not have one. With a cover the header sits on the photo; with
+// none it sits on a gradient built from the club's own accent, which is a
+// deliberate treatment rather than a placeholder for a missing image.
+const coverSrc = computed(() => {
+  const key = link.value.coverKey?.trim()
+  return key ? `/images/${key.replace(/^\/+/, '')}` : ''
+})
+
 useSeoMeta({
   title: () => t('contribute.title'),
   // An upload link is not something to index or preview socially.
@@ -224,12 +234,24 @@ useSeoMeta({
 
 <template>
   <div class="contrib">
-    <header class="contrib__head">
-      <p class="contrib__eyebrow">{{ t('contribute.eyebrow') }}</p>
-      <h1 class="contrib__title">{{ heading }}</h1>
-      <p v-if="description" class="contrib__desc">{{ description }}</p>
-      <p v-if="open" class="contrib__lead">{{ t('contribute.lead') }}</p>
-      <p v-else class="contrib__closed">{{ t('contribute.closed') }}</p>
+    <header class="contrib__head" :class="{ 'contrib__head--cover': coverSrc }">
+      <!-- One bounded image per page load, so the transform budget applies. -->
+      <AppImg
+        v-if="coverSrc"
+        class="contrib__cover"
+        :src="coverSrc"
+        :alt="heading"
+        sizes="100vw md:720px"
+        eager
+        optimize
+      />
+      <div class="contrib__head-body">
+        <p class="contrib__eyebrow">{{ t('contribute.eyebrow') }}</p>
+        <h1 class="contrib__title">{{ heading }}</h1>
+        <p v-if="description" class="contrib__desc">{{ description }}</p>
+        <p v-if="open" class="contrib__lead">{{ t('contribute.lead') }}</p>
+        <p v-else class="contrib__closed">{{ t('contribute.closed') }}</p>
+      </div>
     </header>
 
     <p v-if="errorMessage" class="contrib__error">{{ errorMessage }}</p>
@@ -389,7 +411,54 @@ useSeoMeta({
   gap: 2rem;
 }
 
+/* Two header treatments. Without a cover the page keeps its plain editorial
+   stack on paper; with one the same stack moves onto the photo, over a scrim
+   that keeps the type legible whatever the admin uploaded. */
 .contrib__head { display: flex; flex-direction: column; gap: 0.6rem; }
+.contrib__head-body { display: contents; }
+
+.contrib__head--cover {
+  position: relative;
+  display: block;
+  margin: -5rem -1.5rem 0;
+  padding: 0;
+  min-height: 260px;
+  background:
+    linear-gradient(135deg, var(--dark) 0%, #2A1A24 55%, var(--accent) 220%);
+  overflow: hidden;
+}
+/* AppImg's root element is the <img> itself, so this targets it directly. */
+.contrib__head--cover .contrib__cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.contrib__head--cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(12, 12, 10, 0.15) 0%, rgba(12, 12, 10, 0.82) 100%);
+}
+.contrib__head--cover .contrib__head-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 7rem 1.5rem 1.75rem;
+}
+.contrib__head--cover .contrib__title { color: #F5F4F0; }
+.contrib__head--cover .contrib__desc,
+.contrib__head--cover .contrib__lead { color: rgba(245, 244, 240, 0.82); }
+.contrib__head--cover .contrib__closed { color: #F5F4F0; }
+
+@media (min-width: 760px) {
+  .contrib__head--cover { min-height: 320px; border-radius: 0; }
+  .contrib__head--cover .contrib__head-body { padding: 8rem 2.25rem 2.25rem; }
+}
 .contrib__eyebrow {
   font-family: var(--font-sans);
   font-size: 0.5rem;

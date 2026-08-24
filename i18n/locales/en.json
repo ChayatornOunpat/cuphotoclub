@@ -1102,6 +1102,8 @@
     "newLabelPlaceholder": "e.g. Photowalk 2026",
     "newDescription": "Description (optional)",
     "newDescriptionPlaceholder": "Shown on the contribute page — what is this collection for?",
+    "cover": "Cover image",
+    "coverHint": "Optional. Shown at the top of the contribute page. Without one the page uses a gradient.",
     "quality": "Quality",
     "preset_small": "Small",
     "preset_balanced": "Balanced",
