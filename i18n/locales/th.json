@@ -1098,8 +1098,10 @@
     "perPerson": "จำนวนรูปต่อคน",
     "perTotal": "จำนวนรูปทั้งหมด",
     "requireName": "บังคับให้ระบุชื่อ",
-    "newLabel": "ชื่อลิงก์",
-    "newLabelPlaceholder": "ไม่บังคับ — ใช้แยกลิงก์",
+    "newLabel": "ชื่อคอลเลกชัน",
+    "newLabelPlaceholder": "เช่น Photowalk 2026",
+    "newDescription": "คำอธิบาย (ไม่บังคับ)",
+    "newDescriptionPlaceholder": "แสดงบนหน้าส่งรูป — คอลเลกชันนี้สำหรับอะไร",
     "quality": "คุณภาพ",
     "preset_small": "เล็ก",
     "preset_balanced": "สมดุล",
@@ -1108,6 +1110,7 @@
     "createFailed": "สร้างลิงก์ไม่สำเร็จ",
     "saveFailed": "บันทึกการเปลี่ยนแปลงไม่สำเร็จ",
     "none": "ยังไม่มีลิงก์รับรูป",
+    "needsName": "กรอกชื่อคอลเลกชันก่อน",
     "needsNumber": "กรอกตัวเลขตั้งแต่ 1 ขึ้นไป"
   },
   "adminPool": {
@@ -1140,6 +1143,8 @@
     "deleteFailed": "ลบไม่สำเร็จ",
     "anonymous": "ไม่ระบุชื่อ",
     "empty": "ยังไม่มีรูปในคลัง",
+    "imageLabPre": "อยากเทียบผลของการบีบอัดรูป?",
+    "imageLab": "เปิด Image Lab",
     "prev": "ก่อนหน้า",
     "next": "ถัดไป",
     "pageOf": "หน้า {page} จาก {total}"

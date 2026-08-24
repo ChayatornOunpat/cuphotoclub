@@ -111,7 +111,10 @@ export const events = sqliteTable('events', {
 // closing it ends both uploading and contributor editing.
 export const collectionLinks = sqliteTable('collection_links', {
   id: text('id').primaryKey(), // url-safe random token, ~22 chars
-  label: text('label'),
+  label: text('label').notNull(),
+  // Free-form context shown on the contribute page under the title — what the
+  // collection is for, what kind of photos are wanted.
+  description: text('description'),
   status: text('status', { enum: ['open', 'closed'] }).notNull().default('open'),
   // Optional second factor. No admin UI ships for this yet — a link's token is
   // the credential; this exists so adding one later is not a migration.

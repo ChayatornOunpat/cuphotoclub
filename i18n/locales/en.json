@@ -1098,8 +1098,10 @@
     "perPerson": "Photos per person",
     "perTotal": "Photos in total",
     "requireName": "Require a name",
-    "newLabel": "Label",
-    "newLabelPlaceholder": "Optional — helps you tell links apart",
+    "newLabel": "Name",
+    "newLabelPlaceholder": "e.g. Photowalk 2026",
+    "newDescription": "Description (optional)",
+    "newDescriptionPlaceholder": "Shown on the contribute page — what is this collection for?",
     "quality": "Quality",
     "preset_small": "Small",
     "preset_balanced": "Balanced",
@@ -1108,6 +1110,7 @@
     "createFailed": "Could not create the link.",
     "saveFailed": "Could not save that change.",
     "none": "No collection link yet.",
+    "needsName": "Give the collection a name.",
     "needsNumber": "Enter a number of 1 or more."
   },
   "adminPool": {
@@ -1140,6 +1143,8 @@
     "deleteFailed": "Could not delete those.",
     "anonymous": "Anonymous",
     "empty": "Nothing in the pool yet.",
+    "imageLabPre": "Want to compare how compression affects a photo?",
+    "imageLab": "Open the Image Lab.",
     "prev": "Previous",
     "next": "Next",
     "pageOf": "Page {page} of {total}"

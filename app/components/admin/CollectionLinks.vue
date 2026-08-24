@@ -9,7 +9,8 @@ const localePath = useLocalePath()
 
 interface CollectionLink {
   id: string
-  label: string | null
+  label: string
+  description: string | null
   status: 'open' | 'closed'
   open: boolean
   requireName: boolean
@@ -46,6 +47,7 @@ const PRESETS = [
 
 const form = reactive({
   label: '',
+  description: '',
   requireName: false,
   maxPerContributor: 100,
   maxTotal: 2000,
@@ -58,6 +60,13 @@ function presetValues(key: string) {
 
 async function createLink() {
   if (busy.value) return
+  // The label is the collection's name — required. Without it the overview
+  // becomes unfindable once several links exist, and it is the title
+  // participants see on the contribute page.
+  if (!form.label.trim()) {
+    error.value = t('adminUploadLinks.needsName')
+    return
+  }
   // Same guard as patchNumber: clearing a number input yields NaN via
   // v-model.number, which the server would reject — or worse, read as 0.
   if (!Number.isFinite(form.maxPerContributor) || form.maxPerContributor < 1
@@ -71,7 +80,8 @@ async function createLink() {
     await $fetch(endpoint, {
       method: 'POST',
       body: {
-        label: form.label || undefined,
+        label: form.label.trim(),
+        description: form.description.trim() || undefined,
         requireName: form.requireName,
         maxPerContributor: Math.trunc(form.maxPerContributor),
         maxTotal: Math.trunc(form.maxTotal),
@@ -82,6 +92,7 @@ async function createLink() {
       }
     })
     form.label = ''
+    form.description = ''
     await refresh()
   } catch (e) {
     error.value = errMsg(e, t('adminUploadLinks.createFailed'))
@@ -145,7 +156,11 @@ function mb(bytes: number) {
     <div class="eul__create">
       <label class="f">
         <span class="f__label">{{ t('adminUploadLinks.newLabel') }}</span>
-        <input v-model="form.label" class="f__input" type="text" maxlength="200" :placeholder="t('adminUploadLinks.newLabelPlaceholder')">
+        <input v-model="form.label" class="f__input" type="text" maxlength="200" required :placeholder="t('adminUploadLinks.newLabelPlaceholder')">
+      </label>
+      <label class="f f--wide">
+        <span class="f__label">{{ t('adminUploadLinks.newDescription') }}</span>
+        <input v-model="form.description" class="f__input" type="text" maxlength="500" :placeholder="t('adminUploadLinks.newDescriptionPlaceholder')">
       </label>
       <label class="f">
         <span class="f__label">{{ t('adminUploadLinks.perPerson') }}</span>
@@ -169,7 +184,7 @@ function mb(bytes: number) {
     <ul v-if="links?.length" class="eul__list">
       <li v-for="link in links" :key="link.id" class="row">
         <div class="row__main">
-          <span class="row__label">{{ link.label || t('adminUploadLinks.untitled') }}</span>
+          <span class="row__label">{{ link.label }}</span>
           <span class="row__pill" :class="link.open ? 'row__pill--open' : 'row__pill--closed'">
             {{ link.open ? t('adminUploadLinks.open') : t('adminUploadLinks.closed') }}
           </span>
@@ -178,6 +193,7 @@ function mb(bytes: number) {
           </span>
         </div>
 
+        <p v-if="link.description" class="row__desc">{{ link.description }}</p>
         <div class="row__url">
           <code class="row__code">{{ publicUrl(link) }}</code>
           <button type="button" class="btn" @click="copyLink(link)">
@@ -213,6 +229,26 @@ function mb(bytes: number) {
         </div>
 
         <div v-if="editingId === link.id" class="row__edit">
+          <label class="f f--wide">
+            <span class="f__label">{{ t('adminUploadLinks.newLabel') }}</span>
+            <input
+              class="f__input"
+              type="text"
+              maxlength="200"
+              :value="link.label"
+              @change="patchLink(link, { label: String(($event.target as HTMLInputElement).value).trim() || undefined })"
+            >
+          </label>
+          <label class="f f--wide">
+            <span class="f__label">{{ t('adminUploadLinks.newDescription') }}</span>
+            <input
+              class="f__input"
+              type="text"
+              maxlength="500"
+              :value="link.description ?? ''"
+              @change="patchLink(link, { description: String(($event.target as HTMLInputElement).value).trim() || null })"
+            >
+          </label>
           <label class="f">
             <span class="f__label">{{ t('adminUploadLinks.perPerson') }}</span>
             <input
@@ -281,6 +317,12 @@ function mb(bytes: number) {
 }
 .row__main { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .row__label { font-family: var(--font-serif); font-size: 0.95rem; color: var(--dark); }
+.row__desc {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin: 0;
+}
 .row__pill {
   font-family: var(--font-sans);
   font-size: 0.42rem;
@@ -314,7 +356,7 @@ function mb(bytes: number) {
 
 .eul__create {
   display: grid;
-  grid-template-columns: 2fr 1fr 2fr auto;
+  grid-template-columns: 2fr 2fr 1fr 2fr auto;
   gap: 0.6rem;
   align-items: end;
   padding-bottom: 1rem;
@@ -357,6 +399,12 @@ function mb(bytes: number) {
 .btn:hover { border-color: var(--accent); color: var(--accent); }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .btn--primary { border-color: var(--dark); }
+/* The create button sits in a grid row with label+input columns; without this
+   its smaller height leaves it floating above the inputs' shared bottom line. */
+.eul__create .btn--primary {
+  align-self: end;
+  padding: 0.62rem 1.1rem;
+}
 
 @media (max-width: 820px) {
   .eul__create { grid-template-columns: 1fr; }

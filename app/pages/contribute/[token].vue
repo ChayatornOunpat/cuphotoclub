@@ -12,6 +12,7 @@ const token = computed(() => String(route.params.token || ''))
 interface LinkState {
   link: {
     label: string | null
+    description: string | null
     open: boolean
     requireName: boolean
     maxPerContributor: number
@@ -21,7 +22,6 @@ interface LinkState {
     maxBytesPerPhoto: number
     expiresAt: string | null
   }
-  event: { title: string, slug: string, eventDate: string | null } | null
   me: {
     displayName: string | null
     contact: string | null
@@ -212,7 +212,8 @@ async function removePhoto(item: MineItem) {
   }
 }
 
-const heading = computed(() => state.value?.event?.title || link.value.label || t('contribute.title'))
+const heading = computed(() => link.value.label || t('contribute.title'))
+const description = computed(() => link.value.description || '')
 
 useSeoMeta({
   title: () => t('contribute.title'),
@@ -226,6 +227,7 @@ useSeoMeta({
     <header class="contrib__head">
       <p class="contrib__eyebrow">{{ t('contribute.eyebrow') }}</p>
       <h1 class="contrib__title">{{ heading }}</h1>
+      <p v-if="description" class="contrib__desc">{{ description }}</p>
       <p v-if="open" class="contrib__lead">{{ t('contribute.lead') }}</p>
       <p v-else class="contrib__closed">{{ t('contribute.closed') }}</p>
     </header>
@@ -400,6 +402,14 @@ useSeoMeta({
   font-size: clamp(1.9rem, 4vw, 3rem);
   line-height: 1.08;
   color: var(--dark);
+}
+.contrib__desc {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--dark);
+  max-width: 52ch;
+  margin: 0 auto;
 }
 .contrib__lead,
 .contrib__closed {

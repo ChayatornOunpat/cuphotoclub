@@ -14,6 +14,7 @@ export default defineEventHandler(async (event) => {
   return {
     link: {
       label: link.label,
+      description: link.description,
       open,
       requireName: link.requireName,
       maxPerContributor: link.maxPerContributor,
