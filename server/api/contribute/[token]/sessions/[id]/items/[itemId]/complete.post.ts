@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
     item.status = 'failed'
     item.error = 'Link closed before the upload was confirmed.'
     await saveUploadSessionItem(session, item)
-    throw createError({ statusCode: 403, message: 'ปิดรับรูปภาพสำหรับกิจกรรมนี้แล้ว' })
+    throw createError({ statusCode: 403, message: 'ปิดรับรูปภาพสำหรับลิงก์นี้แล้ว' })
   }
 
   const maxBytes = linkMaxBytes(link)
@@ -88,11 +88,10 @@ export default defineEventHandler(async (event) => {
   }
 
   await db
-    .insert(schema.eventSubmissions)
+    .insert(schema.collectionSubmissions)
     .values({
       id: crypto.randomUUID(),
       linkId: link.id,
-      eventId: link.eventId,
       contributorId: contributor.id,
       r2Key: item.key,
       hash: item.hash,

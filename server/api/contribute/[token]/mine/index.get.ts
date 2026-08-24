@@ -14,16 +14,16 @@ export default defineEventHandler(async (event) => {
 
   const rows = await db
     .select({
-      id: schema.eventSubmissions.id,
-      caption: schema.eventSubmissions.caption,
-      size: schema.eventSubmissions.size,
-      type: schema.eventSubmissions.type,
-      createdAt: schema.eventSubmissions.createdAt,
-      publishedTo: schema.eventSubmissions.publishedTo
+      id: schema.collectionSubmissions.id,
+      caption: schema.collectionSubmissions.caption,
+      size: schema.collectionSubmissions.size,
+      type: schema.collectionSubmissions.type,
+      createdAt: schema.collectionSubmissions.createdAt,
+      publishedTo: schema.collectionSubmissions.publishedTo
     })
-    .from(schema.eventSubmissions)
-    .where(eq(schema.eventSubmissions.contributorId, contributor.id))
-    .orderBy(desc(schema.eventSubmissions.createdAt))
+    .from(schema.collectionSubmissions)
+    .where(eq(schema.collectionSubmissions.contributorId, contributor.id))
+    .orderBy(desc(schema.collectionSubmissions.createdAt))
 
   return {
     open: isLinkOpen(link),

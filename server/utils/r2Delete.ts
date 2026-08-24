@@ -92,7 +92,7 @@ export async function getR2DeleteReferences(keys: string[]) {
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'clubroomImage')),
     albumStore.list(),
-    selectChunked(normalizedKeys, c => db.select({ r2Key: schema.eventSubmissions.r2Key }).from(schema.eventSubmissions).where(inArray(schema.eventSubmissions.r2Key, c)))
+    selectChunked(normalizedKeys, c => db.select({ r2Key: schema.collectionSubmissions.r2Key }).from(schema.collectionSubmissions).where(inArray(schema.collectionSubmissions.r2Key, c)))
   ])
 
   for (const item of submissions) {
@@ -174,7 +174,7 @@ export async function scrubR2DeleteReferences(keys: string[]) {
   }
 
   await Promise.all([
-    ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.delete(schema.eventSubmissions).where(inArray(schema.eventSubmissions.r2Key, c))),
+    ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.delete(schema.collectionSubmissions).where(inArray(schema.collectionSubmissions.r2Key, c))),
     ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.posts).set({ coverR2Key: null }).where(inArray(schema.posts.coverR2Key, c))),
     ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.events).set({ coverR2Key: null }).where(inArray(schema.events.coverR2Key, c))),
     ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.members).set({ photoR2Key: null }).where(inArray(schema.members.photoR2Key, c)))

@@ -12,7 +12,8 @@ const router = useRouter()
 
 interface PoolItem {
   id: string
-  eventId: number
+  linkId: string
+  linkLabel: string | null
   caption: string | null
   size: number
   publishedTo: string | null
@@ -29,18 +30,18 @@ interface Pool {
   pageCount: number
   items: PoolItem[]
 }
-interface EventOption { id: number, title: string }
+interface LinkOption { id: string, label: string | null }
 
 useHead(() => ({ title: t('adminPool.title') }))
 
-const eventId = computed(() => Number(route.query.eventId) || 0)
+const linkId = computed(() => String(route.query.linkId || ''))
 const usedFilter = computed(() => String(route.query.used || 'all'))
 const page = computed(() => Number(route.query.page) || 1)
 
-const { data: events } = await useFetch<EventOption[]>('/api/admin/events')
+const { data: links } = await useFetch<LinkOption[]>('/api/admin/upload-links')
 
 const query = computed(() => ({
-  ...(eventId.value ? { eventId: eventId.value } : {}),
+  ...(linkId.value ? { linkId: linkId.value } : {}),
   used: usedFilter.value,
   page: page.value
 }))
@@ -137,16 +138,22 @@ function kb(bytes: number) {
       <p class="pool__sub">{{ t('adminPool.sub') }}</p>
     </header>
 
+    <!-- Create and manage collection links here — the pool is the home of the
+         whole submissions workflow. -->
+    <AdminCollectionLinks />
+
     <div class="pool__filters">
       <label class="f">
-        <span class="f__label">{{ t('adminPool.event') }}</span>
+        <span class="f__label">{{ t('adminPool.collection') }}</span>
         <select
           class="f__input"
-          :value="eventId || ''"
-          @change="setQuery({ eventId: Number(($event.target as HTMLSelectElement).value) || undefined })"
+          :value="linkId"
+          @change="setQuery({ linkId: String(($event.target as HTMLSelectElement).value) || undefined })"
         >
-          <option value="">{{ t('adminPool.allEvents') }}</option>
-          <option v-for="ev in events" :key="ev.id" :value="ev.id">{{ ev.title }}</option>
+          <option value="">{{ t('adminPool.allCollections') }}</option>
+          <option v-for="link in links" :key="link.id" :value="link.id">
+            {{ link.label || t('adminUploadLinks.untitled') }}
+          </option>
         </select>
       </label>
       <label class="f">
@@ -222,6 +229,7 @@ function kb(bytes: number) {
         </button>
         <div class="tile__foot">
           <span class="tile__by">{{ item.displayName || t('adminPool.anonymous') }}</span>
+          <span v-if="item.linkLabel" class="tile__meta">{{ item.linkLabel }}</span>
           <span class="tile__meta">{{ kb(item.size) }}</span>
           <span v-if="item.publishedTo" class="tile__used">{{ item.publishedTo }}</span>
           <p v-if="item.caption" class="tile__caption">{{ item.caption }}</p>

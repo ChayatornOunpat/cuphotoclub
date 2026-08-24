@@ -34,13 +34,13 @@ export default defineEventHandler(async (event) => {
   const contact = result.data.contact?.trim() || null
 
   if (link.requireName && !displayName) {
-    throw createError({ statusCode: 400, message: 'กิจกรรมนี้ต้องระบุชื่อผู้ถ่าย' })
+    throw createError({ statusCode: 400, message: 'ลิงก์นี้ต้องระบุชื่อผู้ถ่าย' })
   }
 
   await db
-    .update(schema.eventContributors)
+    .update(schema.collectionContributors)
     .set({ displayName, contact, lastSeenAt: new Date() })
-    .where(eq(schema.eventContributors.id, contributor.id))
+    .where(eq(schema.collectionContributors.id, contributor.id))
 
   const code = await sessionClaimCode(event, link.id)
   return {

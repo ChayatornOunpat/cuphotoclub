@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
 
   const contributor = await ensureContributor(event, link)
   if (link.requireName && !contributor.displayName) {
-    throw createError({ statusCode: 400, message: 'กิจกรรมนี้ต้องระบุชื่อผู้ถ่ายก่อนอัปโหลด' })
+    throw createError({ statusCode: 400, message: 'ลิงก์นี้ต้องระบุชื่อผู้ถ่ายก่อนอัปโหลด' })
   }
 
   // Friendly early stop. The authoritative cap is re-checked in complete.post —

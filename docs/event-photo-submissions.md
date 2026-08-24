@@ -1,7 +1,13 @@
 # Event Photo Submissions
 
-Let participants at a club event upload the photos they took, with or without their name
-attached. Admins open collection on an event, share a link, and collect what comes in.
+Let participants upload photos from an occasion with or without their name attached. Admins
+open a **photo collection**, share a link, and collect what comes in.
+
+**Collections are standalone.** A collection is its own thing in the dashboard — no foreign
+key into events/activities, nothing created or managed from an activity page. An event often
+*has* a collection, but that relationship lives in the admin's head, not in the schema. This
+keeps the two lifecycles independent: activities have dates, venues and publication states
+that a photo link neither needs nor wants.
 
 **Everything lands in an admin-only pool.** There is no review queue and no accept/reject
 step — a pool that is never public has nothing to moderate *for*. The only editorial decision
@@ -129,7 +135,8 @@ photos and leave.
 
 ## 3. Data model
 
-Three new tables.
+Three new tables. **None of them references `events`** — see the intro: a collection is
+standalone, identified by its own token and label.
 
 **Why the pool is its own table rather than a draft legacy gallery.** The legacy
 `albums` + `photos` tables look tempting — `photos.photographer` already exists for
@@ -139,18 +146,17 @@ attribution, `/admin/galleries/[id]` already has a working PhotoManager, and the
 only on `status = 'published'`. Staging raw participant submissions there puts the whole pool
 one mis-clicked toggle away from the front page.
 
-`event_submissions` has no public read route at all. That is a structural guarantee rather
+`collection_submissions` has no public read route at all. That is a structural guarantee rather
 than a flag someone has to remember, which is the right trade for content we do not control.
 Publishing then writes *out* of the pool into whichever real surface the admin picks, leaving
 every public read path exactly as it is today — no new query on any hot page.
 
 ```ts
-export const eventUploadLinks = sqliteTable('event_upload_links', {
-  id: text('id').primaryKey(),              // url-safe random token, ~22 chars
-  eventId: integer('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
-  label: text('label'),
+export const collectionLinks = sqliteTable('collection_links', {
+  id: text('id').primaryKey(),             // url-safe random token, ~22 chars
+  label: text('label'),                    // free-form; shown on the contribute page
   status: text('status', { enum: ['open', 'closed'] }).notNull().default('open'),
-  passcodeHash: text('passcode_hash'),      // optional second factor on the link
+  passcodeHash: text('passcode_hash'),     // optional second factor on the link
   requireName: integer('require_name', { mode: 'boolean' }).notNull().default(false),
 
   // Per-link limits the admin sets when opening collection (§10).
@@ -172,7 +178,7 @@ export const eventUploadLinks = sqliteTable('event_upload_links', {
   createdAt, updatedAt
 })
 
-export const eventContributors = sqliteTable('event_contributors', {
+export const collectionContributors = sqliteTable('collection_contributors', {
   id: text('id').primaryKey(),              // uuid; what the cookie holds
   linkId: text('link_id').notNull().references(() => eventUploadLinks.id, { onDelete: 'cascade' }),
   // SHA-256 of the Crockford-base32 claim code. Never the plaintext — the
@@ -184,15 +190,14 @@ export const eventContributors = sqliteTable('event_contributors', {
   lastSeenAt: integer('last_seen_at', { mode: 'timestamp' })
 }, table => [
   // Redeem looks up by hash alone; scoping the uniqueness to the link keeps two
-  // events from ever colliding on one code.
-  unique('event_contributors_link_code_unq').on(table.linkId, table.codeHash),
-  index('event_contributors_code_idx').on(table.codeHash)
+  // collections from ever colliding on one code.
+  unique('collection_contributors_link_code_unq').on(table.linkId, table.codeHash),
+  index('collection_contributors_code_idx').on(table.codeHash)
 ])
 
-export const eventSubmissions = sqliteTable('event_submissions', {
+export const collectionSubmissions = sqliteTable('collection_submissions', {
   id: text('id').primaryKey(),              // uuid
-  linkId: text('link_id').notNull().references(() => eventUploadLinks.id, { onDelete: 'cascade' }),
-  eventId: integer('event_id').notNull(),
+  linkId: text('link_id').notNull().references(() => collectionLinks.id, { onDelete: 'cascade' }),
   contributorId: text('contributor_id').notNull()
     .references(() => eventContributors.id, { onDelete: 'cascade' }),
   caption: text('caption'),                 // contributor-editable while the link is open
@@ -208,10 +213,9 @@ export const eventSubmissions = sqliteTable('event_submissions', {
   publishedAt: integer('published_at', { mode: 'timestamp' }),
   createdAt
 }, table => [
-  index('event_submissions_link_idx').on(table.linkId),
-  index('event_submissions_event_idx').on(table.eventId),
-  index('event_submissions_contributor_idx').on(table.contributorId),
-  index('event_submissions_key_idx').on(table.r2Key)
+  index('collection_submissions_link_idx').on(table.linkId),
+  index('collection_submissions_contributor_idx').on(table.contributorId),
+  index('collection_submissions_key_idx').on(table.r2Key)
 ])
 ```
 
@@ -225,16 +229,18 @@ exists.
 can go into an album and also be downloaded for Instagram, so treat the last write as
 informational rather than as a state machine.
 
-Attribution lives on `event_contributors`, not on each row — one person editing their name
+Attribution lives on `collection_contributors`, not on each row — one person editing their name
 should re-credit their whole batch, not require 40 edits. `caption` stays per photo because
 that genuinely varies.
 
-`event_submissions` has 12 columns, so **batch inserts cap at `floor(100 / 12) = 8` rows per
+`collection_submissions` has 11 columns, so **batch inserts cap at `floor(100 / 11) = 9` rows per
 statement** under D1's 100-bound-parameter limit — the same constraint already handled in
 `uploadSession.ts`.
 
-And one migration on the existing table: `upload_sessions.actor_id` becomes nullable, plus
-`contributor_id text` and `kind text not null default 'admin'`.
+And one migration on the existing table: `upload_sessions.actor_id` stays NOT NULL (contribution
+sessions store 0, which no autoincrement user id can ever be) plus `contributor_id text` and
+`kind text not null default 'admin'`. Keeping the constraint avoids a SQLite table rebuild,
+whose generated SQL wraps a DROP TABLE in `PRAGMA foreign_keys=OFF`.
 
 ---
 
@@ -270,7 +276,7 @@ component.
 client-supplied prefix entirely:
 
 ```ts
-const prefix = `contributions/${link.eventId}/${link.id}`
+const prefix = `contributions/${link.id}`
 ```
 
 Otherwise a participant writes into `covers/` or `content-albums/...` and pollutes the admin
@@ -279,14 +285,18 @@ media browser. Content-hash keys mean they cannot *overwrite* anything, but they
 Admin side:
 
 ```
-POST   /api/admin/events/[id]/upload-links          -> create
-PATCH  /api/admin/events/[id]/upload-links/[linkId] -> open/close, expiry, caps
+POST   /api/admin/upload-links                      -> create
+PATCH  /api/admin/upload-links/[linkId]             -> open/close, expiry, caps
+GET    /api/admin/upload-links                      -> all links + counts
 
-GET    /api/admin/submissions?eventId=&used=        -> the pool, paginated
+GET    /api/admin/submissions?linkId=&used=         -> the pool, paginated
 POST   /api/admin/submissions/consolidate           -> { ids: [], albumId? }
 DELETE /api/admin/submissions                       -> { ids: [] }  to R2 trash
 GET    /api/admin/submissions/[id]/download         -> original, attachment
 ```
+
+Link management and the pool both live on `/admin/submissions` in the dashboard — the pool
+page is the home of the whole submissions workflow. Nothing appears under an activity page.
 
 Three verbs, no review stage. `consolidate` is the one that matters (§8): it copies the chosen
 objects into a content album and stamps `publishedTo` / `publishedAt`. `DELETE` routes through
@@ -458,7 +468,7 @@ open to editors.
 
 Content albums keep their media in `content-albums/<albumId>/`, which
 `server/api/admin/albums/draft.post.ts` calls the album's permanent home. Submissions live in
-`contributions/<eventId>/<linkId>/`. Consolidation therefore copies the selected objects into
+`contributions/<linkId>/<contributorId>/`. Consolidation therefore copies the selected objects into
 the album folder and points the album cells at the new keys.
 
 Referencing the submission keys in place would also work mechanically —
@@ -510,7 +520,7 @@ stage, this is now the *only* thing standing between a cleanup click and someone
 `server/utils/r2Delete.ts` already solves exactly this with `getR2DeleteReferences()` /
 `isR2DeleteReferenced()`, which scans photos, posts, events, members, hero, history,
 clubroom, and editorial albums. **Add a `submission: boolean` field to
-`R2DeleteReferenceInfo`** plus a lookup for any surviving `event_submissions` row on that key.
+`R2DeleteReferenceInfo`** plus a lookup for any surviving `collection_submissions` row on that key.
 The check is simply "does a row still point here", which is as simple as it is because the
 status column is gone.
 
@@ -692,7 +702,7 @@ KV writes, and a handful of participants take the whole site down.
 So:
 
 - rate-limit **only** at manifest-create — one write per batch of up to 250 files
-- enforce per-file and per-person caps with `count(*)` against `event_submissions`, which is
+- enforce per-file and per-person caps with `count(*)` against `collection_submissions`, which is
   storage the feature needs anyway
 - never call `rateLimit()` inside presign or complete
 
@@ -713,7 +723,7 @@ So:
 
 ## 13. Build order
 
-1. Migration: three tables, plus `upload_sessions.actor_id` nullable + `contributor_id` + `kind`.
+1. Migration: three tables, plus `upload_sessions` `kind` + `contributor_id`.
 2. `server/utils/contribution.ts` — link tokens, claim-code mint/normalize/hash,
    `requireContributor()`, cap checks.
 3. Contribute endpoints: link state, claim, me, manifest, presign, complete.
@@ -722,9 +732,10 @@ So:
    edit + remove, and the "I have a code" entry path.
 6. Reference counting: `submission` field in `r2Delete.ts`.
 7. Preview + download routes (contributor + admin), `private, no-store`.
-8. Admin: collection panel on `/admin/activities/[id]` — create link, copy URL, **close**,
+8. Admin: collection panel on `/admin/submissions` — create link, copy URL, **close**,
    set the per-participant cap and the compression preset (§10).
-9. Admin: the pool view — paginated grid, `used=` filter, per-photo download, delete.
+9. Admin: the pool view — paginated grid, `linkId=`/`used=` filters, per-photo download,
+   delete.
 10. Signed R2 copy in `r2Presign.ts`, then select-and-consolidate into a content album.
 11. i18n keys, both locales.
 
@@ -745,6 +756,9 @@ migrating contributor rows that were minted without one.
 
 **Settled:**
 
+- **Collections are standalone** — no foreign key into events/activities, no link management
+  on activity pages. An event often *has* a collection, but that is a human association; the
+  schema and the admin UI keep the two systems independent.
 - Accepted photos go to an **admin-only pool**, not straight to a public surface. Publishing
   is a second, explicit decision, and downloading for Instagram/Facebook is a first-class
   path alongside it.

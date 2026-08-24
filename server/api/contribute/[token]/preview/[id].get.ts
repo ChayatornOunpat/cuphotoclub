@@ -12,11 +12,11 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') || ''
 
   const [row] = await db
-    .select({ r2Key: schema.eventSubmissions.r2Key })
-    .from(schema.eventSubmissions)
+    .select({ r2Key: schema.collectionSubmissions.r2Key })
+    .from(schema.collectionSubmissions)
     .where(and(
-      eq(schema.eventSubmissions.id, id),
-      eq(schema.eventSubmissions.contributorId, contributor.id)
+      eq(schema.collectionSubmissions.id, id),
+      eq(schema.collectionSubmissions.contributorId, contributor.id)
     ))
     .limit(1)
 

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -18,9 +18,7 @@ const bodySchema = z.object({
 // uploading and contributor editing — it is the whole permission model.
 export default defineEventHandler(async (event) => {
   const actor = await requireAdmin(event)
-  const id = Number(getRouterParam(event, 'id'))
   const linkId = getRouterParam(event, 'linkId') || ''
-  if (!Number.isInteger(id)) throw createError({ statusCode: 400, message: 'รหัสไม่ถูกต้อง' })
 
   const result = await readValidatedBody(event, bodySchema.safeParse)
   if (!result.success) throw createError({ statusCode: 400, message: 'ข้อมูลไม่ถูกต้อง' })
@@ -28,13 +26,10 @@ export default defineEventHandler(async (event) => {
 
   const [existing] = await db
     .select()
-    .from(schema.eventUploadLinks)
-    .where(and(
-      eq(schema.eventUploadLinks.id, linkId),
-      eq(schema.eventUploadLinks.eventId, id)
-    ))
+    .from(schema.collectionLinks)
+    .where(eq(schema.collectionLinks.id, linkId))
     .limit(1)
-  if (!existing) throw createError({ statusCode: 404, message: 'ไม่พบลิงก์อัปโหลด' })
+  if (!existing) throw createError({ statusCode: 404, message: 'ไม่พบลิงก์รวมรูป' })
 
   const compress = input.compress ?? existing.compress
   const maxBytes = input.maxBytesPerPhoto ?? existing.maxBytesPerPhoto
@@ -46,7 +41,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const [updated] = await db
-    .update(schema.eventUploadLinks)
+    .update(schema.collectionLinks)
     .set({
       ...(input.status !== undefined ? { status: input.status } : {}),
       ...(input.label !== undefined ? { label: input.label } : {}),
@@ -60,17 +55,17 @@ export default defineEventHandler(async (event) => {
       ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt ? new Date(input.expiresAt) : null } : {}),
       updatedAt: new Date()
     })
-    .where(eq(schema.eventUploadLinks.id, linkId))
+    .where(eq(schema.collectionLinks.id, linkId))
     .returning()
 
   if (!updated) throw createError({ statusCode: 500, message: 'บันทึกไม่สำเร็จ' })
 
   await recordAdminAudit(actor, {
     action: 'update',
-    entityType: 'event_upload_link',
+    entityType: 'collection_link',
     entityId: updated.id,
     entityTitle: updated.label,
-    metadata: { eventId: id, ...input }
+    metadata: input
   })
 
   return { ...updated, open: isLinkOpen(updated) }

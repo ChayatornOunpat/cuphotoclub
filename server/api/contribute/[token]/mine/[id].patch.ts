@@ -18,13 +18,13 @@ export default defineEventHandler(async (event) => {
   // Scoped to this contributor, so an id belonging to someone else simply is
   // not found rather than being rejected — no probing for other people's rows.
   const updated = await db
-    .update(schema.eventSubmissions)
+    .update(schema.collectionSubmissions)
     .set({ caption: result.data.caption?.trim() || null })
     .where(and(
-      eq(schema.eventSubmissions.id, id),
-      eq(schema.eventSubmissions.contributorId, contributor.id)
+      eq(schema.collectionSubmissions.id, id),
+      eq(schema.collectionSubmissions.contributorId, contributor.id)
     ))
-    .returning({ id: schema.eventSubmissions.id, caption: schema.eventSubmissions.caption })
+    .returning({ id: schema.collectionSubmissions.id, caption: schema.collectionSubmissions.caption })
 
   if (!updated.length) throw createError({ statusCode: 404, message: 'ไม่พบรูปนี้' })
   return { ok: true, item: updated[0] }

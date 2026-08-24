@@ -1,5 +1,3 @@
-import { eq } from 'drizzle-orm'
-
 // Public: everything the contribute page needs to render itself.
 //
 // Deliberately does NOT create a contributor. A GET happens for every crawler,
@@ -9,16 +7,6 @@ import { eq } from 'drizzle-orm'
 export default defineEventHandler(async (event) => {
   const token = getRouterParam(event, 'token') || ''
   const link = await requireLink(token)
-
-  const [ev] = await db
-    .select({
-      title: schema.events.title,
-      slug: schema.events.slug,
-      eventDate: schema.events.eventDate
-    })
-    .from(schema.events)
-    .where(eq(schema.events.id, link.eventId))
-    .limit(1)
 
   const contributor = await currentContributor(event, link)
   const open = isLinkOpen(link)
@@ -37,7 +25,6 @@ export default defineEventHandler(async (event) => {
       maxBytesPerPhoto: linkMaxBytes(link),
       expiresAt: link.expiresAt
     },
-    event: ev ?? null,
     me: contributor
       ? {
           displayName: contributor.displayName,

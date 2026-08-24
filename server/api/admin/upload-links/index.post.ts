@@ -1,4 +1,3 @@
-import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -13,24 +12,17 @@ const bodySchema = z.object({
   expiresAt: z.string().datetime().nullable().optional()
 })
 
+// Open a new photo collection: a share link plus the policy that governs it.
+// Collections are standalone — nothing ties one to an event or activity.
 export default defineEventHandler(async (event) => {
   const actor = await requireAdmin(event)
-  const id = Number(getRouterParam(event, 'id'))
-  if (!Number.isInteger(id)) throw createError({ statusCode: 400, message: 'รหัสไม่ถูกต้อง' })
-
-  const [ev] = await db
-    .select({ id: schema.events.id, title: schema.events.title })
-    .from(schema.events)
-    .where(eq(schema.events.id, id))
-    .limit(1)
-  if (!ev) throw createError({ statusCode: 404, message: 'ไม่พบกิจกรรม' })
 
   const result = await readValidatedBody(event, bodySchema.safeParse)
   if (!result.success) throw createError({ statusCode: 400, message: 'ข้อมูลไม่ถูกต้อง' })
   const input = result.data
 
   // "Original" (no compression) plus a tight byte ceiling is a link where every
-  // upload fails. Refuse it here rather than letting an event discover it live.
+  // upload fails. Refuse it here rather than letting an admin discover it live.
   if (input.compress === false && (input.maxBytesPerPhoto ?? MAX_UPLOAD_BYTES) < MAX_UPLOAD_BYTES) {
     throw createError({
       statusCode: 400,
@@ -39,11 +31,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const [created] = await db
-    .insert(schema.eventUploadLinks)
+    .insert(schema.collectionLinks)
     .values({
       id: generateLinkToken(),
-      eventId: id,
-      label: input.label || ev.title,
+      label: input.label,
       requireName: input.requireName ?? false,
       maxPerContributor: input.maxPerContributor ?? 100,
       maxTotal: input.maxTotal ?? 2000,
@@ -60,10 +51,10 @@ export default defineEventHandler(async (event) => {
 
   await recordAdminAudit(actor, {
     action: 'create',
-    entityType: 'event_upload_link',
+    entityType: 'collection_link',
     entityId: created.id,
     entityTitle: created.label,
-    metadata: { eventId: id, eventTitle: ev.title }
+    metadata: { ...input }
   })
 
   return { ...created, open: isLinkOpen(created), photoCount: 0, contributorCount: 0 }

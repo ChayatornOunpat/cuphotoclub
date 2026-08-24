@@ -2,7 +2,8 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 const querySchema = z.object({
-  eventId: z.coerce.number().int().optional(),
+  // Filter by collection link — the only grouping a submission has.
+  linkId: z.string().min(1).optional(),
   // 'unused' is the triage filter that replaces what a pending queue would have
   // been: show me what I have not done anything with yet.
   used: z.enum(['all', 'unused', 'used']).default('all'),
@@ -17,46 +18,50 @@ export default defineEventHandler(async (event) => {
   await requireAdmin(event)
   const parsed = querySchema.safeParse(getQuery(event))
   if (!parsed.success) throw createError({ statusCode: 400, message: 'Invalid query.' })
-  const { eventId, used, page, perPage } = parsed.data
+  const { linkId, used, page, perPage } = parsed.data
 
   const filters = [
-    ...(eventId ? [eq(schema.eventSubmissions.eventId, eventId)] : []),
-    ...(used === 'unused' ? [isNull(schema.eventSubmissions.publishedTo)] : []),
-    ...(used === 'used' ? [sql`${schema.eventSubmissions.publishedTo} is not null`] : [])
+    ...(linkId ? [eq(schema.collectionSubmissions.linkId, linkId)] : []),
+    ...(used === 'unused' ? [isNull(schema.collectionSubmissions.publishedTo)] : []),
+    ...(used === 'used' ? [sql`${schema.collectionSubmissions.publishedTo} is not null`] : [])
   ]
   const where = filters.length ? and(...filters) : undefined
 
   const [countRow] = await db
     .select({ total: sql<number>`count(*)` })
-    .from(schema.eventSubmissions)
+    .from(schema.collectionSubmissions)
     .where(where)
   const total = Number(countRow?.total ?? 0)
 
   const rows = await db
     .select({
-      id: schema.eventSubmissions.id,
-      eventId: schema.eventSubmissions.eventId,
-      linkId: schema.eventSubmissions.linkId,
-      caption: schema.eventSubmissions.caption,
-      r2Key: schema.eventSubmissions.r2Key,
-      size: schema.eventSubmissions.size,
-      type: schema.eventSubmissions.type,
-      publishedTo: schema.eventSubmissions.publishedTo,
-      publishedAt: schema.eventSubmissions.publishedAt,
-      createdAt: schema.eventSubmissions.createdAt,
+      id: schema.collectionSubmissions.id,
+      linkId: schema.collectionSubmissions.linkId,
+      linkLabel: schema.collectionLinks.label,
+      caption: schema.collectionSubmissions.caption,
+      r2Key: schema.collectionSubmissions.r2Key,
+      size: schema.collectionSubmissions.size,
+      type: schema.collectionSubmissions.type,
+      publishedTo: schema.collectionSubmissions.publishedTo,
+      publishedAt: schema.collectionSubmissions.publishedAt,
+      createdAt: schema.collectionSubmissions.createdAt,
       // Credit lives on the contributor, so one person renaming themselves
       // re-credits their whole batch.
-      contributorId: schema.eventContributors.id,
-      displayName: schema.eventContributors.displayName,
-      contact: schema.eventContributors.contact
+      contributorId: schema.collectionContributors.id,
+      displayName: schema.collectionContributors.displayName,
+      contact: schema.collectionContributors.contact
     })
-    .from(schema.eventSubmissions)
+    .from(schema.collectionSubmissions)
     .innerJoin(
-      schema.eventContributors,
-      eq(schema.eventSubmissions.contributorId, schema.eventContributors.id)
+      schema.collectionContributors,
+      eq(schema.collectionSubmissions.contributorId, schema.collectionContributors.id)
+    )
+    .innerJoin(
+      schema.collectionLinks,
+      eq(schema.collectionSubmissions.linkId, schema.collectionLinks.id)
     )
     .where(where)
-    .orderBy(desc(schema.eventSubmissions.createdAt))
+    .orderBy(desc(schema.collectionSubmissions.createdAt))
     .limit(perPage)
     .offset((page - 1) * perPage)
 

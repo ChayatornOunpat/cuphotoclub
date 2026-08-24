@@ -1,13 +1,13 @@
 <script setup lang="ts">
-// Collection links for one event: create, share, tune, close.
-// Closing is the important one — it ends uploading *and* contributor editing,
-// which is the whole permission model (docs/event-photo-submissions.md).
-const props = defineProps<{ eventId: number }>()
+// Photo collections: create, share, tune, close. Standalone — nothing ties a
+// collection to an event or activity. Closing is the important one — it ends
+// uploading *and* contributor editing, which is the whole permission model
+// (docs/event-photo-submissions.md).
 
 const { t } = useI18n()
 const localePath = useLocalePath()
 
-interface UploadLink {
+interface CollectionLink {
   id: string
   label: string | null
   status: 'open' | 'closed'
@@ -24,8 +24,8 @@ interface UploadLink {
   contributorCount: number
 }
 
-const endpoint = computed(() => `/api/admin/events/${props.eventId}/upload-links`)
-const { data: links, refresh } = await useFetch<UploadLink[]>(endpoint)
+const endpoint = '/api/admin/upload-links'
+const { data: links, refresh } = await useFetch<CollectionLink[]>(endpoint)
 
 const busy = ref(false)
 const error = ref('')
@@ -68,7 +68,7 @@ async function createLink() {
   error.value = ''
   try {
     const preset = presetValues(form.preset)
-    await $fetch(endpoint.value, {
+    await $fetch(endpoint, {
       method: 'POST',
       body: {
         label: form.label || undefined,
@@ -90,11 +90,11 @@ async function createLink() {
   }
 }
 
-async function patchLink(link: UploadLink, body: Record<string, unknown>) {
+async function patchLink(link: CollectionLink, body: Record<string, unknown>) {
   busy.value = true
   error.value = ''
   try {
-    await $fetch(`${endpoint.value}/${link.id}`, { method: 'PATCH', body })
+    await $fetch(`${endpoint}/${link.id}`, { method: 'PATCH', body })
     await refresh()
   } catch (e) {
     error.value = errMsg(e, t('adminUploadLinks.saveFailed'))
@@ -109,7 +109,7 @@ async function patchLink(link: UploadLink, body: Record<string, unknown>) {
 const origin = useSiteOrigin()
 // Clearing a number input gives '', and Number('') is 0 — which the server
 // would reject, or worse silently accept as a limit of zero.
-function patchNumber(link: UploadLink, field: 'maxPerContributor' | 'maxTotal', e: Event) {
+function patchNumber(link: CollectionLink, field: 'maxPerContributor' | 'maxTotal', e: Event) {
   const raw = (e.target as HTMLInputElement).value.trim()
   const value = Number(raw)
   if (!raw || !Number.isFinite(value) || value < 1) {
@@ -119,11 +119,11 @@ function patchNumber(link: UploadLink, field: 'maxPerContributor' | 'maxTotal', 
   return patchLink(link, { [field]: Math.trunc(value) })
 }
 
-function publicUrl(link: UploadLink) {
+function publicUrl(link: CollectionLink) {
   return `${origin}${localePath(`/contribute/${link.id}`)}`
 }
 
-async function copyLink(link: UploadLink) {
+async function copyLink(link: CollectionLink) {
   try {
     await navigator.clipboard.writeText(publicUrl(link))
     copiedId.value = link.id
@@ -188,7 +188,7 @@ function mb(bytes: number) {
           <button type="button" class="btn" @click="editingId = editingId === link.id ? '' : link.id">
             {{ t('adminUploadLinks.limits') }}
           </button>
-          <NuxtLink class="btn" :to="localePath(`/admin/submissions?eventId=${props.eventId}`)">
+          <NuxtLink class="btn" :to="localePath(`/admin/submissions?linkId=${link.id}`)">
             {{ t('adminUploadLinks.viewPool') }}
           </NuxtLink>
         </div>
@@ -206,7 +206,7 @@ function mb(bytes: number) {
             >
           </label>
           <label class="f">
-            <span class="f__label">{{ t('adminUploadLinks.perEvent') }}</span>
+            <span class="f__label">{{ t('adminUploadLinks.perTotal') }}</span>
             <input
               class="f__input"
               type="number"

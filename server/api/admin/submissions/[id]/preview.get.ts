@@ -8,9 +8,9 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') || ''
 
   const [row] = await db
-    .select({ r2Key: schema.eventSubmissions.r2Key })
-    .from(schema.eventSubmissions)
-    .where(eq(schema.eventSubmissions.id, id))
+    .select({ r2Key: schema.collectionSubmissions.r2Key })
+    .from(schema.collectionSubmissions)
+    .where(eq(schema.collectionSubmissions.id, id))
     .limit(1)
 
   if (!row) throw createError({ statusCode: 404, message: 'Submission not found.' })

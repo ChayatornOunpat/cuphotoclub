@@ -20,9 +20,9 @@ export default defineEventHandler(async (event) => {
   if (!result.success) throw createError({ statusCode: 400, message: 'Invalid payload.' })
 
   const removed = await db
-    .delete(schema.eventSubmissions)
-    .where(inArray(schema.eventSubmissions.id, result.data.ids))
-    .returning({ id: schema.eventSubmissions.id, r2Key: schema.eventSubmissions.r2Key })
+    .delete(schema.collectionSubmissions)
+    .where(inArray(schema.collectionSubmissions.id, result.data.ids))
+    .returning({ id: schema.collectionSubmissions.id, r2Key: schema.collectionSubmissions.r2Key })
 
   if (!removed.length) return { ok: true, removed: 0, trashed: 0 }
 
@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
 
   await recordAdminAudit(actor, {
     action: 'delete',
-    entityType: 'event_submission',
+    entityType: 'collection_submission',
     entityId: removed.map(row => row.id).join(','),
     entityTitle: `${removed.length} submission(s)`,
     metadata: { removed: removed.length, trashed: orphaned.length }

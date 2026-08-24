@@ -187,9 +187,9 @@ async function cleanupExpiredUploadSessions(now: Date, event?: H3Event) {
         if (keys.length) {
           const referenced = new Set(
             (await db
-              .select({ r2Key: schema.eventSubmissions.r2Key })
-              .from(schema.eventSubmissions)
-              .where(inArray(schema.eventSubmissions.r2Key, keys.slice(0, 90))))
+              .select({ r2Key: schema.collectionSubmissions.r2Key })
+              .from(schema.collectionSubmissions)
+              .where(inArray(schema.collectionSubmissions.r2Key, keys.slice(0, 90))))
               .map(item => item.r2Key)
           )
           for (const key of keys) {

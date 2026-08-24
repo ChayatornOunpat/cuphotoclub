@@ -208,9 +208,6 @@ async function remove() {
           </div>
           <p v-else class="activity-media__empty">{{ t('adminActivities.galleryEmpty') }}</p>
         </section>
-
-        <!-- Participant photo collection for this event. -->
-        <AdminEventUploadLinks :event-id="id" />
       </section>
 
       <aside class="space-y-5">

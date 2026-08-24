@@ -101,17 +101,16 @@ export const events = sqliteTable('events', {
   updatedAt
 })
 
-// ── Event photo submissions (docs/event-photo-submissions.md) ───────────────
-// Participants upload event photos through a share link. Everything lands in an
-// admin-only pool; an admin later consolidates the keepers into a real album.
+// ── Photo collections (docs/event-photo-submissions.md) ─────────────────────
+// Participants upload photos through a share link an admin creates from the
+// dashboard. Standalone on purpose — no reference to events/activities, which
+// run on their own lifecycle. Everything lands in an admin-only pool; an admin
+// later consolidates the keepers into a real album.
 
-// One collection link per event. Carries every limit and policy the admin sets;
+// One share link per collection. Carries every limit and policy the admin sets;
 // closing it ends both uploading and contributor editing.
-export const eventUploadLinks = sqliteTable('event_upload_links', {
+export const collectionLinks = sqliteTable('collection_links', {
   id: text('id').primaryKey(), // url-safe random token, ~22 chars
-  eventId: integer('event_id')
-    .notNull()
-    .references(() => events.id, { onDelete: 'cascade' }),
   label: text('label'),
   status: text('status', { enum: ['open', 'closed'] }).notNull().default('open'),
   // Optional second factor. No admin UI ships for this yet — a link's token is
@@ -137,18 +136,15 @@ export const eventUploadLinks = sqliteTable('event_upload_links', {
   createdBy: integer('created_by').references(() => users.id),
   createdAt,
   updatedAt
-}, table => [
-  // The admin panel lists links by event on every activity page load.
-  index('event_upload_links_event_idx').on(table.eventId)
-])
+})
 
 // One row per participant per link. The id lives in the cu_contrib cookie; the
 // claim code is what makes that identity portable to another device.
-export const eventContributors = sqliteTable('event_contributors', {
+export const collectionContributors = sqliteTable('collection_contributors', {
   id: text('id').primaryKey(), // uuid
   linkId: text('link_id')
     .notNull()
-    .references(() => eventUploadLinks.id, { onDelete: 'cascade' }),
+    .references(() => collectionLinks.id, { onDelete: 'cascade' }),
   // SHA-256 of the Crockford-base32 claim code. Never the plaintext — that lives
   // only in this person's own sealed cookie.
   codeHash: text('code_hash').notNull(),
@@ -157,24 +153,23 @@ export const eventContributors = sqliteTable('event_contributors', {
   createdAt,
   lastSeenAt: integer('last_seen_at', { mode: 'timestamp' })
 }, table => [
-  // Redeem looks up by hash within a link, so two events can never collide.
-  unique('event_contributors_link_code_unq').on(table.linkId, table.codeHash),
-  index('event_contributors_code_idx').on(table.codeHash)
+  // Redeem looks up by hash within a link, so two links can never collide.
+  unique('collection_contributors_link_code_unq').on(table.linkId, table.codeHash),
+  index('collection_contributors_code_idx').on(table.codeHash)
 ])
 
 // The pool. A row here *is* a photo an admin can use; deleting the row is how
 // junk leaves. There is deliberately no review status — nothing here is public,
 // so there is nothing to moderate for. `publishedTo` records where a photo has
-// been used ('album:<id>', 'event:<id>', 'external'), not what state it is in.
-export const eventSubmissions = sqliteTable('event_submissions', {
+// been used ('album:<id>', 'external'), not what state it is in.
+export const collectionSubmissions = sqliteTable('collection_submissions', {
   id: text('id').primaryKey(), // uuid
   linkId: text('link_id')
     .notNull()
-    .references(() => eventUploadLinks.id, { onDelete: 'cascade' }),
-  eventId: integer('event_id').notNull(),
+    .references(() => collectionLinks.id, { onDelete: 'cascade' }),
   contributorId: text('contributor_id')
     .notNull()
-    .references(() => eventContributors.id, { onDelete: 'cascade' }),
+    .references(() => collectionContributors.id, { onDelete: 'cascade' }),
   caption: text('caption'), // contributor-editable while the link is open
   r2Key: text('r2_key').notNull(),
   hash: text('hash').notNull(),
@@ -187,12 +182,11 @@ export const eventSubmissions = sqliteTable('event_submissions', {
   // Content-addressed keys mean re-sending the same photo yields the same key.
   // One person's duplicate must stay one row, or it double-counts against their
   // cap; two *different* people sharing a key still get a row each.
-  unique('event_submissions_contributor_key_unq').on(table.contributorId, table.r2Key),
-  index('event_submissions_link_idx').on(table.linkId),
-  index('event_submissions_event_idx').on(table.eventId),
-  index('event_submissions_contributor_idx').on(table.contributorId),
+  unique('collection_submissions_contributor_key_unq').on(table.contributorId, table.r2Key),
+  index('collection_submissions_link_idx').on(table.linkId),
+  index('collection_submissions_contributor_idx').on(table.contributorId),
   // r2Delete's reference check looks up by key; without this it is a full scan.
-  index('event_submissions_key_idx').on(table.r2Key)
+  index('collection_submissions_key_idx').on(table.r2Key)
 ])
 
 // Singleton editable pages (e.g. key = 'about').

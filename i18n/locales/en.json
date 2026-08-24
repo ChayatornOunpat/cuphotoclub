@@ -1068,7 +1068,7 @@
     "codePlaceholder": "CUPC-XXXXX-XXXXX",
     "useCode": "Continue",
     "checking": "Checking",
-    "codeNotFound": "That code did not match anything for this event.",
+    "codeNotFound": "That code did not match anything in this collection.",
     "yourPhotos": "Your photos ({count})",
     "noCaption": "No caption",
     "captionPlaceholder": "Add a caption",
@@ -1078,11 +1078,11 @@
     "remove": "Remove",
     "confirmRemove": "Really remove",
     "empty": "Nothing sent yet.",
-    "limitNotice": "You have sent all {max} photos for this event. Remove one to make room."
+    "limitNotice": "You have sent all {max} photos for this collection. Remove one to make room."
   },
   "adminUploadLinks": {
     "title": "Photo collection",
-    "sub": "Share a link so people who came can send you their photos. Everything arrives in an admin-only pool.",
+    "sub": "Create a share link and people can send you their photos. Everything arrives in an admin-only pool.",
     "untitled": "Untitled link",
     "open": "Open",
     "closed": "Closed",
@@ -1096,7 +1096,7 @@
     "limits": "Limits",
     "viewPool": "View pool",
     "perPerson": "Photos per person",
-    "perEvent": "Photos in total",
+    "perTotal": "Photos in total",
     "requireName": "Require a name",
     "newLabel": "Label",
     "newLabelPlaceholder": "Defaults to the event title",
@@ -1113,8 +1113,8 @@
   "adminPool": {
     "title": "Submission pool",
     "sub": "Photos sent in by participants. Nothing here is public — consolidate the keepers into an album, download what you need for social, delete the rest.",
-    "event": "Event",
-    "allEvents": "All events",
+    "collection": "Collection",
+    "allCollections": "All collections",
     "show": "Show",
     "showAll": "Everything",
     "showUnused": "Not used yet",

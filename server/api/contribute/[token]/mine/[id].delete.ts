@@ -13,12 +13,12 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') || ''
 
   const removed = await db
-    .delete(schema.eventSubmissions)
+    .delete(schema.collectionSubmissions)
     .where(and(
-      eq(schema.eventSubmissions.id, id),
-      eq(schema.eventSubmissions.contributorId, contributor.id)
+      eq(schema.collectionSubmissions.id, id),
+      eq(schema.collectionSubmissions.contributorId, contributor.id)
     ))
-    .returning({ r2Key: schema.eventSubmissions.r2Key })
+    .returning({ r2Key: schema.collectionSubmissions.r2Key })
 
   const key = removed[0]?.r2Key
   if (!key) throw createError({ statusCode: 404, message: 'ไม่พบรูปนี้' })

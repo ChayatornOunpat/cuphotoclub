@@ -34,18 +34,18 @@ export default defineEventHandler(async (event) => {
 
   const rows = await db
     .select({
-      id: schema.eventSubmissions.id,
-      r2Key: schema.eventSubmissions.r2Key,
-      caption: schema.eventSubmissions.caption,
-      hash: schema.eventSubmissions.hash,
-      displayName: schema.eventContributors.displayName
+      id: schema.collectionSubmissions.id,
+      r2Key: schema.collectionSubmissions.r2Key,
+      caption: schema.collectionSubmissions.caption,
+      hash: schema.collectionSubmissions.hash,
+      displayName: schema.collectionContributors.displayName
     })
-    .from(schema.eventSubmissions)
+    .from(schema.collectionSubmissions)
     .innerJoin(
-      schema.eventContributors,
-      eq(schema.eventSubmissions.contributorId, schema.eventContributors.id)
+      schema.collectionContributors,
+      eq(schema.collectionSubmissions.contributorId, schema.collectionContributors.id)
     )
-    .where(inArray(schema.eventSubmissions.id, ids))
+    .where(inArray(schema.collectionSubmissions.id, ids))
 
   if (!rows.length) throw createError({ statusCode: 404, message: 'No matching submissions.' })
 
@@ -131,14 +131,14 @@ export default defineEventHandler(async (event) => {
   const published = [...copied.map(item => item.id), ...alreadyPresent]
   if (published.length) {
     await db
-      .update(schema.eventSubmissions)
+      .update(schema.collectionSubmissions)
       .set({ publishedTo: `album:${album.id}`, publishedAt: now })
-      .where(inArray(schema.eventSubmissions.id, published))
+      .where(inArray(schema.collectionSubmissions.id, published))
   }
 
   await recordAdminAudit(actor, {
     action: 'publish',
-    entityType: 'event_submission',
+    entityType: 'collection_submission',
     entityId: copied.map(item => item.id).join(','),
     entityTitle: `${copied.length} photo(s) → ${updated?.title || album.slug}`,
     metadata: { albumId: album.id, albumSlug: updated?.slug ?? album.slug, count: copied.length }

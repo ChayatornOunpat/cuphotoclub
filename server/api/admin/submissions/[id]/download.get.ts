@@ -11,17 +11,17 @@ export default defineEventHandler(async (event) => {
 
   const [row] = await db
     .select({
-      r2Key: schema.eventSubmissions.r2Key,
-      type: schema.eventSubmissions.type,
-      publishedTo: schema.eventSubmissions.publishedTo,
-      displayName: schema.eventContributors.displayName
+      r2Key: schema.collectionSubmissions.r2Key,
+      type: schema.collectionSubmissions.type,
+      publishedTo: schema.collectionSubmissions.publishedTo,
+      displayName: schema.collectionContributors.displayName
     })
-    .from(schema.eventSubmissions)
+    .from(schema.collectionSubmissions)
     .innerJoin(
-      schema.eventContributors,
-      eq(schema.eventSubmissions.contributorId, schema.eventContributors.id)
+      schema.collectionContributors,
+      eq(schema.collectionSubmissions.contributorId, schema.collectionContributors.id)
     )
-    .where(eq(schema.eventSubmissions.id, id))
+    .where(eq(schema.collectionSubmissions.id, id))
     .limit(1)
 
   if (!row) throw createError({ statusCode: 404, message: 'Submission not found.' })
@@ -34,12 +34,12 @@ export default defineEventHandler(async (event) => {
   // in an album and posted to Instagram, and the album is the more useful record.
   if (confirmed && !row.publishedTo) {
     await db
-      .update(schema.eventSubmissions)
+      .update(schema.collectionSubmissions)
       .set({ publishedTo: 'external', publishedAt: new Date() })
-      .where(eq(schema.eventSubmissions.id, id))
+      .where(eq(schema.collectionSubmissions.id, id))
     await recordAdminAudit(actor, {
       action: 'download',
-      entityType: 'event_submission',
+      entityType: 'collection_submission',
       entityId: id,
       entityTitle: row.displayName || 'anonymous',
       metadata: { r2Key: row.r2Key }

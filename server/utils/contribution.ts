@@ -1,7 +1,8 @@
 import type { H3Event } from 'h3'
 import { and, eq, sql } from 'drizzle-orm'
 
-// Event photo submissions — see docs/event-photo-submissions.md.
+// Photo collections — see docs/event-photo-submissions.md. Standalone: a
+// collection has no relationship to events/activities.
 //
 // Two identities meet here and must never be confused:
 //   • admins,        via nuxt-auth-utils' user session (requireAdmin)
@@ -10,8 +11,8 @@ import { and, eq, sql } from 'drizzle-orm'
 // requireUserSession() would accept one — so contributors are kept in their own
 // cookie rather than the User session, and that class of mistake cannot be made.
 
-export type UploadLink = typeof schema.eventUploadLinks.$inferSelect
-export type Contributor = typeof schema.eventContributors.$inferSelect
+export type CollectionLink = typeof schema.collectionLinks.$inferSelect
+export type CollectionContributor = typeof schema.collectionContributors.$inferSelect
 
 const CONTRIBUTOR_COOKIE = 'cu_contrib'
 
@@ -35,10 +36,10 @@ export function generateLinkToken() {
 // adopted by whoever legitimately uploads the file with that hash. Cross-user
 // dedupe is the cost; a poisoned public album is what it buys off.
 export function contributionPrefix(
-  link: Pick<UploadLink, 'id' | 'eventId'>,
+  link: Pick<CollectionLink, 'id'>,
   contributorId: string
 ) {
-  return `contributions/${link.eventId}/${link.id}/${contributorId}`
+  return `contributions/${link.id}/${contributorId}`
 }
 
 // ── Claim codes ─────────────────────────────────────────────────────────────
@@ -88,13 +89,13 @@ export async function getUploadLink(token: string) {
   if (!token) return null
   const [row] = await db
     .select()
-    .from(schema.eventUploadLinks)
-    .where(eq(schema.eventUploadLinks.id, token))
+    .from(schema.collectionLinks)
+    .where(eq(schema.collectionLinks.id, token))
     .limit(1)
   return row ?? null
 }
 
-export function isLinkOpen(link: UploadLink) {
+export function isLinkOpen(link: CollectionLink) {
   if (link.status !== 'open') return false
   if (link.expiresAt && link.expiresAt.getTime() <= Date.now()) return false
   return true
@@ -112,15 +113,15 @@ export async function requireLink(token: string) {
 export async function requireOpenLink(token: string) {
   const link = await requireLink(token)
   if (!isLinkOpen(link)) {
-    throw createError({ statusCode: 403, message: 'ปิดรับรูปภาพสำหรับกิจกรรมนี้แล้ว' })
+    throw createError({ statusCode: 403, message: 'ปิดรับรูปภาพสำหรับลิงก์นี้แล้ว' })
   }
   return link
 }
 
 // ── Contributor session ─────────────────────────────────────────────────────
 
-// Keyed by link so one browser can contribute to several events without the
-// identities overwriting each other.
+// Keyed by link so one browser can contribute to several collections without
+// the identities overwriting each other.
 interface ContributorSessionData {
   links?: Record<string, { contributorId: string, code: string }>
 }
@@ -140,17 +141,17 @@ function contributorSession(event: H3Event) {
 async function loadContributor(linkId: string, contributorId: string) {
   const [row] = await db
     .select()
-    .from(schema.eventContributors)
+    .from(schema.collectionContributors)
     .where(and(
-      eq(schema.eventContributors.id, contributorId),
-      eq(schema.eventContributors.linkId, linkId)
+      eq(schema.collectionContributors.id, contributorId),
+      eq(schema.collectionContributors.linkId, linkId)
     ))
     .limit(1)
   return row ?? null
 }
 
 // The contributor this browser already is on this link, or null.
-export async function currentContributor(event: H3Event, link: UploadLink) {
+export async function currentContributor(event: H3Event, link: CollectionLink) {
   const session = await contributorSession(event)
   const entry = session.data.links?.[link.id]
   if (!entry?.contributorId) return null
@@ -164,7 +165,7 @@ export async function currentContributor(event: H3Event, link: UploadLink) {
   return row
 }
 
-export async function requireContributor(event: H3Event, link: UploadLink) {
+export async function requireContributor(event: H3Event, link: CollectionLink) {
   const contributor = await currentContributor(event, link)
   if (!contributor) {
     throw createError({ statusCode: 401, message: 'ไม่พบเซสชันผู้ส่งรูป กรุณาเริ่มใหม่หรือใส่รหัสของคุณ' })
@@ -204,13 +205,13 @@ export async function sessionClaimCode(event: H3Event, linkId: string) {
 // never be claimed or reused, and it holds zero submissions. Bounded by how
 // often a browser double-fires its very first manifest call; not worth a schema
 // change or a D1 transaction.
-export async function ensureContributor(event: H3Event, link: UploadLink) {
+export async function ensureContributor(event: H3Event, link: CollectionLink) {
   const existing = await currentContributor(event, link)
   if (existing) return existing
 
   const code = generateClaimCode()
   const [created] = await db
-    .insert(schema.eventContributors)
+    .insert(schema.collectionContributors)
     .values({
       id: crypto.randomUUID(),
       linkId: link.id,
@@ -226,25 +227,25 @@ export async function ensureContributor(event: H3Event, link: UploadLink) {
 
 // Adopt an existing identity on a new device. Callers must rate limit first:
 // this is a guessing oracle.
-export async function claimByCode(event: H3Event, link: UploadLink, rawCode: string) {
+export async function claimByCode(event: H3Event, link: CollectionLink, rawCode: string) {
   const normalized = normalizeClaimCode(rawCode)
   if (!normalized) return null
 
   const [row] = await db
     .select()
-    .from(schema.eventContributors)
+    .from(schema.collectionContributors)
     .where(and(
-      eq(schema.eventContributors.linkId, link.id),
-      eq(schema.eventContributors.codeHash, await hashClaimCode(normalized))
+      eq(schema.collectionContributors.linkId, link.id),
+      eq(schema.collectionContributors.codeHash, await hashClaimCode(normalized))
     ))
     .limit(1)
 
   if (!row) return null
   await rememberContributor(event, link.id, row.id, normalized)
   await db
-    .update(schema.eventContributors)
+    .update(schema.collectionContributors)
     .set({ lastSeenAt: new Date() })
-    .where(eq(schema.eventContributors.id, row.id))
+    .where(eq(schema.collectionContributors.id, row.id))
   return row
 }
 
@@ -253,8 +254,8 @@ export async function claimByCode(event: H3Event, link: UploadLink, rawCode: str
 export async function contributorPhotoCount(contributorId: string) {
   const [row] = await db
     .select({ total: sql<number>`count(*)` })
-    .from(schema.eventSubmissions)
-    .where(eq(schema.eventSubmissions.contributorId, contributorId))
+    .from(schema.collectionSubmissions)
+    .where(eq(schema.collectionSubmissions.contributorId, contributorId))
   return Number(row?.total ?? 0)
 }
 
@@ -263,11 +264,11 @@ export async function contributorPhotoCount(contributorId: string) {
 // their cap either.
 export async function contributorOwnsKey(contributorId: string, r2Key: string) {
   const [row] = await db
-    .select({ id: schema.eventSubmissions.id })
-    .from(schema.eventSubmissions)
+    .select({ id: schema.collectionSubmissions.id })
+    .from(schema.collectionSubmissions)
     .where(and(
-      eq(schema.eventSubmissions.contributorId, contributorId),
-      eq(schema.eventSubmissions.r2Key, r2Key)
+      eq(schema.collectionSubmissions.contributorId, contributorId),
+      eq(schema.collectionSubmissions.r2Key, r2Key)
     ))
     .limit(1)
   return Boolean(row)
@@ -276,15 +277,15 @@ export async function contributorOwnsKey(contributorId: string, r2Key: string) {
 export async function linkPhotoCount(linkId: string) {
   const [row] = await db
     .select({ total: sql<number>`count(*)` })
-    .from(schema.eventSubmissions)
-    .where(eq(schema.eventSubmissions.linkId, linkId))
+    .from(schema.collectionSubmissions)
+    .where(eq(schema.collectionSubmissions.linkId, linkId))
   return Number(row?.total ?? 0)
 }
 
 // How many more this person may send. Counted in D1 rather than KV on purpose:
 // the KV rate limiter writes on every call, and per-file limiting would burn the
 // free-plan write quota that has taken the whole site down before.
-export async function remainingForContributor(link: UploadLink, contributorId: string) {
+export async function remainingForContributor(link: CollectionLink, contributorId: string) {
   const [mine, total] = await Promise.all([
     contributorPhotoCount(contributorId),
     linkPhotoCount(link.id)
@@ -294,6 +295,6 @@ export async function remainingForContributor(link: UploadLink, contributorId: s
 
 // The per-photo byte ceiling actually enforced on the server. A link can ask for
 // less than MAX_UPLOAD_BYTES but never more.
-export function linkMaxBytes(link: UploadLink) {
+export function linkMaxBytes(link: CollectionLink) {
   return Math.min(link.maxBytesPerPhoto || MAX_UPLOAD_BYTES, MAX_UPLOAD_BYTES)
 }
