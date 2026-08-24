@@ -1099,7 +1099,7 @@
     "perTotal": "Photos in total",
     "requireName": "Require a name",
     "newLabel": "Label",
-    "newLabelPlaceholder": "Defaults to the event title",
+    "newLabelPlaceholder": "Optional — helps you tell links apart",
     "quality": "Quality",
     "preset_small": "Small",
     "preset_balanced": "Balanced",

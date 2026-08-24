@@ -3,15 +3,19 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { t } = useI18n()
 const localePath = useLocalePath()
-const [{ data: albums }, { data: posts }, { data: events }, { data: members }, { data: heroImages }, { data: historyImage }, { data: clubroomImage }] = await Promise.all([
+const [{ data: albums }, { data: posts }, { data: events }, { data: members }, { data: heroImages }, { data: historyImage }, { data: clubroomImage }, { data: poolStats }] = await Promise.all([
   useFetch('/api/admin/albums'),
   useFetch('/api/admin/posts'),
   useFetch('/api/admin/events'),
   useFetch('/api/admin/members'),
   useFetch('/api/admin/hero-images'),
   useFetch('/api/admin/history-image'),
-  useFetch('/api/admin/clubroom-image')
+  useFetch('/api/admin/clubroom-image'),
+  // One row is enough — the endpoint returns the unfiltered total alongside.
+  useFetch<PoolStats>('/api/admin/submissions', { query: { perPage: 1 } })
 ])
+
+interface PoolStats { total: number }
 const { user } = useUserSession()
 const canManage = computed(() => user.value?.role === 'owner' || user.value?.role === 'admin')
 
@@ -44,7 +48,7 @@ const primarySections = computed(() => [
   {
     key: 'submissions',
     title: t('adminPool.title'),
-    count: null,
+    count: poolStats.value?.total ?? 0,
     meta: t('adminPool.sub'),
     to: localePath('/admin/submissions')
   }

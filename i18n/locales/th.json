@@ -1099,7 +1099,7 @@
     "perTotal": "จำนวนรูปทั้งหมด",
     "requireName": "บังคับให้ระบุชื่อ",
     "newLabel": "ชื่อลิงก์",
-    "newLabelPlaceholder": "เว้นว่างจะใช้ชื่อกิจกรรม",
+    "newLabelPlaceholder": "ไม่บังคับ — ใช้แยกลิงก์",
     "quality": "คุณภาพ",
     "preset_small": "เล็ก",
     "preset_balanced": "สมดุล",

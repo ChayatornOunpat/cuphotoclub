@@ -188,7 +188,7 @@ function mb(bytes: number) {
           <button type="button" class="btn" @click="editingId = editingId === link.id ? '' : link.id">
             {{ t('adminUploadLinks.limits') }}
           </button>
-          <NuxtLink class="btn" :to="localePath(`/admin/submissions?linkId=${link.id}`)">
+          <NuxtLink class="btn" :to="localePath(`/admin/submissions/${link.id}`)">
             {{ t('adminUploadLinks.viewPool') }}
           </NuxtLink>
         </div>
