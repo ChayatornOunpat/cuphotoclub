@@ -47,6 +47,14 @@ export interface R2PresignOptions {
   contentType: string
   metadata?: Record<string, string>
   expiresSeconds?: number
+  // When set, `content-length` becomes a SIGNED header, so the URL accepts a
+  // body of exactly this size and nothing else. Without it a presigned PUT is
+  // bounded only by R2's own 5 GB limit and can be replayed until it expires —
+  // tolerable behind an admin session, not on a link anyone can open.
+  //
+  // Deliberately NOT returned in `headers`: Content-Length is a forbidden
+  // header that the browser sets itself from the body, so it already matches.
+  contentLength?: number
 }
 
 export async function createR2PresignedPutUrl(options: R2PresignOptions) {
@@ -62,7 +70,15 @@ export async function createR2PresignedPutUrl(options: R2PresignOptions) {
       .filter(([, value]) => value)
       .map(([key, value]) => [`x-amz-meta-${key.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`, value])
   )
-  const signedHeaders = ['content-type', 'host', ...Object.keys(metadataHeaders)].sort().join(';')
+  const boundLength = Number.isFinite(options.contentLength) && (options.contentLength ?? 0) > 0
+    ? String(Math.trunc(options.contentLength as number))
+    : ''
+  const signedHeaders = [
+    'content-type',
+    'host',
+    ...(boundLength ? ['content-length'] : []),
+    ...Object.keys(metadataHeaders)
+  ].sort().join(';')
 
   const query: Record<string, string> = {
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
@@ -80,6 +96,7 @@ export async function createR2PresignedPutUrl(options: R2PresignOptions) {
   const canonicalHeaders = [
     `content-type:${options.contentType}`,
     `host:${host}`,
+    ...(boundLength ? [`content-length:${boundLength}`] : []),
     ...Object.entries(metadataHeaders).map(([key, value]) => `${key}:${value}`)
   ].sort().join('\n') + '\n'
 
@@ -210,6 +227,94 @@ export async function signR2PresignedDeleteUrl(signer: R2DeleteSigner, key: stri
 export async function createR2PresignedDeleteUrl(options: Omit<R2PresignOptions, 'contentType' | 'metadata'>) {
   const signer = await createR2DeleteSigner(options)
   return signR2PresignedDeleteUrl(signer, options.key, options.expiresSeconds ?? 900)
+}
+
+// Server-side object copy, used when consolidating submissions into an album.
+//
+// The NuxtHub blob API has no copy, and the obvious getArrayBuffer() + put()
+// pulls every byte of a multi-megabyte image through Worker memory and back —
+// a batch of those is the same resource ceiling that produced the Error 1102
+// incidents this codebase already carries scar tissue for. S3's
+// `x-amz-copy-source` makes R2 do the copy internally; no bytes cross the Worker.
+//
+// Presigned rather than a signed request so it reuses the exact pattern above;
+// the caller is the Worker, and it must send the signed header verbatim.
+export async function createR2PresignedCopyUrl(
+  options: Omit<R2PresignOptions, 'contentType' | 'metadata'> & { sourceKey: string }
+) {
+  const expiresSeconds = Math.min(Math.max(options.expiresSeconds ?? 900, 60), 3600)
+  const { amzDate, dateStamp } = amzDates()
+  const host = `${options.accountId}.r2.cloudflarestorage.com`
+  const credentialScope = `${dateStamp}/${PRESIGN_REGION}/${PRESIGN_SERVICE}/aws4_request`
+  const canonicalUri = `/${encodePath(options.bucketName)}/${encodePath(options.key)}`
+  // Must be byte-identical between the signature and the request we send.
+  const copySource = `/${encodePath(options.bucketName)}/${encodePath(options.sourceKey)}`
+  const signedHeaders = 'host;x-amz-copy-source'
+
+  const query: Record<string, string> = {
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Content-Sha256': 'UNSIGNED-PAYLOAD',
+    'X-Amz-Credential': `${options.accessKeyId}/${credentialScope}`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(expiresSeconds),
+    'X-Amz-SignedHeaders': signedHeaders
+  }
+  const canonicalQuery = Object.entries(query)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${encodeRfc3986(key)}=${encodeRfc3986(value)}`)
+    .join('&')
+
+  const canonicalHeaders = `host:${host}\nx-amz-copy-source:${copySource}\n`
+  const canonicalRequest = [
+    'PUT',
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    signedHeaders,
+    'UNSIGNED-PAYLOAD'
+  ].join('\n')
+
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    credentialScope,
+    await sha256(canonicalRequest)
+  ].join('\n')
+
+  const kDate = await hmac(encoder.encode(`AWS4${options.secretAccessKey}`), dateStamp)
+  const kRegion = await hmac(kDate, PRESIGN_REGION)
+  const kService = await hmac(kRegion, PRESIGN_SERVICE)
+  const kSigning = await hmac(kService, 'aws4_request')
+  const signature = hex(await hmac(kSigning, stringToSign))
+
+  return {
+    url: `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`,
+    // Default metadata directive is COPY, so content-type carries over.
+    headers: { 'x-amz-copy-source': copySource }
+  }
+}
+
+// Copy one object inside the bucket. Throws with R2's own message on failure so
+// a partial consolidation says which key broke.
+export async function copyR2Object(sourceKey: string, destKey: string) {
+  const config = assertR2DirectUploadConfig()
+  const signed = await createR2PresignedCopyUrl({ ...config, key: destKey, sourceKey })
+  const response = await fetch(signed.url, { method: 'PUT', headers: signed.headers })
+  if (!response.ok) {
+    // R2's body can carry bucket and account detail, so it goes to the log
+    // rather than to whoever triggered the copy.
+    const detail = await response.text().catch(() => '')
+    console.error('r2 copy failed', {
+      sourceKey,
+      destKey,
+      status: response.status,
+      detail: detail.slice(0, 500)
+    })
+    throw createError({
+      statusCode: 502,
+      message: `Could not copy ${sourceKey} (R2 returned ${response.status}).`
+    })
+  }
 }
 
 export function r2DirectUploadConfig() {

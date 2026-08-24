@@ -41,14 +41,16 @@ export default defineEventHandler(async (event) => {
   const now = new Date().toISOString()
   const session: UploadSession = {
     id: crypto.randomUUID(),
+    kind: 'admin',
     actorId: actor.id,
+    contributorId: null,
     prefix,
     createdAt: now,
     updatedAt: now,
     items
   }
   try {
-    await saveUploadSession(session)
+    await saveUploadSession(session, event)
   } catch (error) {
     const cause = error instanceof Error ? error.message : String(error)
     console.error('upload session save failed', {

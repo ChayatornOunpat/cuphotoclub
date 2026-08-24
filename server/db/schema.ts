@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
 
 const createdAt = integer('created_at', { mode: 'timestamp' })
   .notNull()
@@ -100,6 +100,100 @@ export const events = sqliteTable('events', {
   createdAt,
   updatedAt
 })
+
+// ── Event photo submissions (docs/event-photo-submissions.md) ───────────────
+// Participants upload event photos through a share link. Everything lands in an
+// admin-only pool; an admin later consolidates the keepers into a real album.
+
+// One collection link per event. Carries every limit and policy the admin sets;
+// closing it ends both uploading and contributor editing.
+export const eventUploadLinks = sqliteTable('event_upload_links', {
+  id: text('id').primaryKey(), // url-safe random token, ~22 chars
+  eventId: integer('event_id')
+    .notNull()
+    .references(() => events.id, { onDelete: 'cascade' }),
+  label: text('label'),
+  status: text('status', { enum: ['open', 'closed'] }).notNull().default('open'),
+  // Optional second factor. No admin UI ships for this yet — a link's token is
+  // the credential; this exists so adding one later is not a migration.
+  passcodeHash: text('passcode_hash'),
+  requireName: integer('require_name', { mode: 'boolean' }).notNull().default(false),
+
+  maxPerContributor: integer('max_per_contributor').notNull().default(100),
+  maxTotal: integer('max_total').notNull().default(2000),
+
+  // Client-side compression policy, handed to the uploader as props. Stored as
+  // real numbers rather than a preset enum so the admin UI can offer presets and
+  // still let someone nudge one value without a schema change. Defaults mirror
+  // R2ImageUploader's own constants.
+  compress: integer('compress', { mode: 'boolean' }).notNull().default(true),
+  compressMaxDim: integer('compress_max_dim').notNull().default(3040),
+  compressQuality: integer('compress_quality').notNull().default(85), // percent
+  // The server-enforced half of that policy: compression runs in the browser and
+  // can be bypassed, this cannot. Never above MAX_UPLOAD_BYTES.
+  maxBytesPerPhoto: integer('max_bytes_per_photo').notNull().default(15 * 1024 * 1024),
+
+  expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  createdBy: integer('created_by').references(() => users.id),
+  createdAt,
+  updatedAt
+}, table => [
+  // The admin panel lists links by event on every activity page load.
+  index('event_upload_links_event_idx').on(table.eventId)
+])
+
+// One row per participant per link. The id lives in the cu_contrib cookie; the
+// claim code is what makes that identity portable to another device.
+export const eventContributors = sqliteTable('event_contributors', {
+  id: text('id').primaryKey(), // uuid
+  linkId: text('link_id')
+    .notNull()
+    .references(() => eventUploadLinks.id, { onDelete: 'cascade' }),
+  // SHA-256 of the Crockford-base32 claim code. Never the plaintext — that lives
+  // only in this person's own sealed cookie.
+  codeHash: text('code_hash').notNull(),
+  displayName: text('display_name'), // null = anonymous
+  contact: text('contact'), // admin-only, optional
+  createdAt,
+  lastSeenAt: integer('last_seen_at', { mode: 'timestamp' })
+}, table => [
+  // Redeem looks up by hash within a link, so two events can never collide.
+  unique('event_contributors_link_code_unq').on(table.linkId, table.codeHash),
+  index('event_contributors_code_idx').on(table.codeHash)
+])
+
+// The pool. A row here *is* a photo an admin can use; deleting the row is how
+// junk leaves. There is deliberately no review status — nothing here is public,
+// so there is nothing to moderate for. `publishedTo` records where a photo has
+// been used ('album:<id>', 'event:<id>', 'external'), not what state it is in.
+export const eventSubmissions = sqliteTable('event_submissions', {
+  id: text('id').primaryKey(), // uuid
+  linkId: text('link_id')
+    .notNull()
+    .references(() => eventUploadLinks.id, { onDelete: 'cascade' }),
+  eventId: integer('event_id').notNull(),
+  contributorId: text('contributor_id')
+    .notNull()
+    .references(() => eventContributors.id, { onDelete: 'cascade' }),
+  caption: text('caption'), // contributor-editable while the link is open
+  r2Key: text('r2_key').notNull(),
+  hash: text('hash').notNull(),
+  size: integer('size').notNull().default(0),
+  type: text('type').notNull(),
+  publishedTo: text('published_to'),
+  publishedAt: integer('published_at', { mode: 'timestamp' }),
+  createdAt
+}, table => [
+  // Content-addressed keys mean re-sending the same photo yields the same key.
+  // One person's duplicate must stay one row, or it double-counts against their
+  // cap; two *different* people sharing a key still get a row each.
+  unique('event_submissions_contributor_key_unq').on(table.contributorId, table.r2Key),
+  index('event_submissions_link_idx').on(table.linkId),
+  index('event_submissions_event_idx').on(table.eventId),
+  index('event_submissions_contributor_idx').on(table.contributorId),
+  // r2Delete's reference check looks up by key; without this it is a full scan.
+  index('event_submissions_key_idx').on(table.r2Key)
+])
 
 // Singleton editable pages (e.g. key = 'about').
 export const pages = sqliteTable('pages', {
@@ -209,9 +303,21 @@ export const adminAuditLogs = sqliteTable('admin_audit_logs', {
   createdAt
 })
 
+// Shared by the admin uploader and the public contribute page. `kind` says which
+// owns a session, and exactly one of actorId / contributorId is set — the
+// endpoints for each kind check their own field and never the other's.
 export const uploadSessions = sqliteTable('upload_sessions', {
   id: text('id').primaryKey(),
+  kind: text('kind', { enum: ['admin', 'contribution'] }).notNull().default('admin'),
+  // Stays NOT NULL so this table can be migrated with plain ADD COLUMNs.
+  // Dropping the constraint would force SQLite to rebuild the table, and the
+  // generated rebuild wraps DROP TABLE in `PRAGMA foreign_keys=OFF` — a pragma
+  // that does not survive into the next statement when each one is its own D1
+  // request, so the DROP would cascade-wipe upload_session_items and a failed
+  // pragma would half-apply the migration. Contribution sessions store 0, which
+  // no autoincrement user id can ever be.
   actorId: integer('actor_id').notNull(),
+  contributorId: text('contributor_id'), // set when kind = 'contribution'
   prefix: text('prefix').notNull(),
   createdAt,
   updatedAt

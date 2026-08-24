@@ -33,6 +33,10 @@ export interface R2DeleteReferenceInfo {
   history: boolean
   clubroom: boolean
   editorialAlbum: boolean
+  // A photo sitting in an event's submission pool. Nothing else in this scan
+  // knows about the pool, so without this an admin tidying /admin/r2-images
+  // deletes the object out from under a submission and the pool shows a hole.
+  submission: boolean
 }
 
 export function emptyR2DeleteReferenceInfo(): R2DeleteReferenceInfo {
@@ -44,12 +48,13 @@ export function emptyR2DeleteReferenceInfo(): R2DeleteReferenceInfo {
     hero: false,
     history: false,
     clubroom: false,
-    editorialAlbum: false
+    editorialAlbum: false,
+    submission: false
   }
 }
 
 export function isR2DeleteReferenced(info: R2DeleteReferenceInfo) {
-  return info.galleryPhoto || info.post || info.activity || info.member || info.hero || info.history || info.clubroom || info.editorialAlbum
+  return info.galleryPhoto || info.post || info.activity || info.member || info.hero || info.history || info.clubroom || info.editorialAlbum || info.submission
 }
 
 export async function getR2DeleteReferences(keys: string[]) {
@@ -75,7 +80,8 @@ export async function getR2DeleteReferences(keys: string[]) {
     heroRows,
     historyRows,
     clubroomRows,
-    editorialAlbums
+    editorialAlbums,
+    submissions
   ] = await Promise.all([
     selectChunked(normalizedKeys, c => db.select({ r2Key: schema.photos.r2Key }).from(schema.photos).where(inArray(schema.photos.r2Key, c))),
     selectChunked(normalizedKeys, c => db.select({ coverR2Key: schema.posts.coverR2Key }).from(schema.posts).where(inArray(schema.posts.coverR2Key, c))),
@@ -85,8 +91,14 @@ export async function getR2DeleteReferences(keys: string[]) {
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'heroImages')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'clubroomImage')),
-    albumStore.list()
+    albumStore.list(),
+    selectChunked(normalizedKeys, c => db.select({ r2Key: schema.eventSubmissions.r2Key }).from(schema.eventSubmissions).where(inArray(schema.eventSubmissions.r2Key, c)))
   ])
+
+  for (const item of submissions) {
+    const key = normalizeR2Key(item.r2Key)
+    if (key) ensure(key).submission = true
+  }
 
   for (const item of galleryPhotos) {
     const key = normalizeR2Key(item.r2Key)
@@ -162,6 +174,7 @@ export async function scrubR2DeleteReferences(keys: string[]) {
   }
 
   await Promise.all([
+    ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.delete(schema.eventSubmissions).where(inArray(schema.eventSubmissions.r2Key, c))),
     ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.posts).set({ coverR2Key: null }).where(inArray(schema.posts.coverR2Key, c))),
     ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.events).set({ coverR2Key: null }).where(inArray(schema.events.coverR2Key, c))),
     ...chunk(normalizedKeys, D1_INARRAY_CHUNK).map(c => db.update(schema.members).set({ photoR2Key: null }).where(inArray(schema.members.photoR2Key, c)))

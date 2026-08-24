@@ -682,7 +682,8 @@ function trashReferenceLabels(item: TrashItem): string[] {
     hero: 'Hero',
     history: 'Our History',
     clubroom: 'Clubroom',
-    editorialAlbum: 'Album'
+    editorialAlbum: 'Album',
+    submission: 'Event submission'
   }
   return Object.entries(item.references)
     .filter(([, value]) => value)

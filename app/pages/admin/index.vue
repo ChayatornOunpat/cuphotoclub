@@ -40,6 +40,13 @@ const primarySections = computed(() => [
     count: events.value?.length ?? 0,
     meta: t('admin.activityWork'),
     to: localePath('/admin/activities')
+  },
+  {
+    key: 'submissions',
+    title: t('adminPool.title'),
+    count: null,
+    meta: t('adminPool.sub'),
+    to: localePath('/admin/submissions')
   }
 ])
 

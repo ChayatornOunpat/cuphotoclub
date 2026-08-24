@@ -1,5 +1,13 @@
 <script setup lang="ts">
 const { t } = useI18n()
+
+// Tuned in /admin/image-lab against real camera files: 3040 clears a
+// full-width album cell (~1284 CSS px) on a 2x display with headroom for
+// full-bleed covers, and WebP at 85 holds up at 1:1 while costing roughly half
+// the bytes per pixel of the old JPEG at 90. Overridable per instance via props.
+const COMPRESS_MAX_DIM_DEFAULT = 3040
+const COMPRESS_QUALITY_DEFAULT = 85 // percent
+
 const props = withDefaults(defineProps<{
   prefix?: string
   multiple?: boolean
@@ -7,14 +15,57 @@ const props = withDefaults(defineProps<{
   dropzoneClass?: string
   showPreviews?: boolean
   detectDates?: boolean
+  // Where the manifest/presign/complete trio lives. The public contribute page
+  // points this at its own routes, which share these utils but guard on the
+  // contributor cookie instead of an admin session.
+  endpointBase?: string
+  // Compression policy. On the contribute page these come from the link the
+  // admin configured, and showCompressControl is false — a participant never
+  // sees a knob for something the admin decided.
+  compress?: boolean
+  compressMaxDim?: number
+  compressQuality?: number
+  showCompressControl?: boolean
+  // sessionStorage remembers what this browser already uploaded so a reopened
+  // modal does not re-send it. Turn it off where a file may legitimately be
+  // sent again after being removed — on the contribute page the cache would
+  // otherwise make remove-then-re-add impossible.
+  rememberSignatures?: boolean
+  // Whether AdminUploadDock exists on this page to receive an in-flight upload
+  // when the modal unmounts. False on public pages (the contribute page): there
+  // is no dock, so closing mid-upload cancels instead of leaving an invisible,
+  // unstoppable upload running. Kept separate from rememberSignatures because
+  // the two happen to be false together today but mean different things.
+  handoffToDock?: boolean
+  // Per-file ceiling the *server* will enforce. A contribution link may set this
+  // lower than MAX_UPLOAD_BYTES, and the client must know: otherwise a phone
+  // spends minutes uploading a file that gets refused on arrival.
+  maxBytes?: number
 }>(), {
   prefix: 'uploads',
   multiple: true,
   maxFiles: 0,
   dropzoneClass: '',
   showPreviews: true,
-  detectDates: false
+  detectDates: false,
+  endpointBase: '/api/admin/upload/sessions',
+  compress: true,
+  compressMaxDim: COMPRESS_MAX_DIM_DEFAULT,
+  compressQuality: COMPRESS_QUALITY_DEFAULT,
+  showCompressControl: true,
+  rememberSignatures: true,
+  handoffToDock: true,
+  maxBytes: 0
 })
+
+// Effective policy: props win, so the admin uploader keeps today's behaviour and
+// the contribute page follows its link. maxBytes is clamped — a link may ask for
+// less than the hard cap, never more.
+const effectiveMaxBytes = computed(() =>
+  props.maxBytes > 0 ? Math.min(props.maxBytes, MAX_UPLOAD_BYTES) : MAX_UPLOAD_BYTES)
+const maxBytesLabel = computed(() => Math.round(effectiveMaxBytes.value / (1024 * 1024)))
+const compressMaxDim = computed(() => props.compressMaxDim || COMPRESS_MAX_DIM_DEFAULT)
+const compressQuality = computed(() => (props.compressQuality || COMPRESS_QUALITY_DEFAULT) / 100)
 
 const model = defineModel<string[]>({ default: () => [] })
 const emit = defineEmits<{
@@ -41,12 +92,6 @@ const pendingQueue = ref<File[]>([])
 const failedUploads = ref<Array<{ file: File, name: string, reason: string }>>([])
 const completedSignatures = new Set<string>()
 
-// Tuned in /admin/image-lab against real camera files: 3040 clears a
-// full-width album cell (~1284 CSS px) on a 2x display with headroom for
-// full-bleed covers, and WebP at 85 holds up at 1:1 while costing roughly half
-// the bytes per pixel of the old JPEG at 90.
-const COMPRESS_MAX_DIM = 3040
-const COMPRESS_QUALITY = 0.85
 const COMPRESS_MIN_BYTES = 200_000
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 const UPLOAD_CONCURRENCY = 3
@@ -54,7 +99,10 @@ const UPLOAD_BATCH_DELAY_MS = 1_000
 const UPLOAD_SESSION_SIZE = 250
 const RESOURCE_LIMIT_PAUSE_MS = 30_000
 
-const autoCompress = ref(true)
+const autoCompress = ref(props.compress)
+// The contribute page learns its policy from the API after mount, so the prop
+// can change once after the first render.
+watch(() => props.compress, (value) => { autoCompress.value = value })
 let resourcePausePromise: Promise<void> | null = null
 let resourcePauseTimer: ReturnType<typeof setInterval> | null = null
 let shouldStopCurrentUpload = false
@@ -102,11 +150,14 @@ function prepareId(file: File) {
 }
 
 function signatureStorageKey() {
-  return `cu-r2-uploaded-signatures:${props.prefix}`
+  // Keyed on the endpoint too: the contribute page sends no prefix (the server
+  // decides it), so prefix alone would collide across events and make one
+  // event's resume cache suppress another's uploads.
+  return `cu-r2-uploaded-signatures:${props.endpointBase}:${props.prefix}`
 }
 
 function loadCompletedSignatures() {
-  if (!import.meta.client) return
+  if (!import.meta.client || !props.rememberSignatures) return
   try {
     const saved = JSON.parse(sessionStorage.getItem(signatureStorageKey()) || '[]')
     if (Array.isArray(saved)) {
@@ -120,6 +171,7 @@ function loadCompletedSignatures() {
 }
 
 function rememberCompletedSignature(signature: string) {
+  if (!props.rememberSignatures) return
   completedSignatures.add(signature)
   if (!import.meta.client) return
   try {
@@ -140,32 +192,48 @@ function fileExt(file: File) {
   return file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
 }
 
-function rawUploadError(err: any) {
-  const data = err?.data ?? err?.response?._data
-  return typeof data === 'string'
-    ? data
-    : data?.message || data?.statusMessage || err?.message || err?.statusMessage || ''
+// Upload failures arrive as $fetch FetchError, raw Error, or whatever a Worker
+// returned — never one shape, so everything below narrows through `unknown`.
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : null
 }
 
-function isWorkerResourceLimitError(err: any) {
+function errStatusCode(err: unknown): number {
+  const value = asRecord(err)?.statusCode
+  return typeof value === 'number' ? value : 0
+}
+
+function firstString(...values: unknown[]) {
+  return values.find(value => typeof value === 'string' && value) as string | undefined
+}
+
+function rawUploadError(err: unknown) {
+  const record = asRecord(err)
+  const data = record?.data ?? asRecord(record?.response)?._data
+  if (typeof data === 'string') return data
+  const dataRecord = asRecord(data)
+  return firstString(dataRecord?.message, dataRecord?.statusMessage, record?.message, record?.statusMessage) ?? ''
+}
+
+function isWorkerResourceLimitError(err: unknown) {
   const raw = rawUploadError(err)
   return /Worker exceeded resource limits|Error 1102|exceeded resource limits/i.test(raw)
-    || (err?.statusCode >= 500 && /cloudflare|worker|fetch|network|response/i.test(raw || err?.name || ''))
+    || (errStatusCode(err) >= 500 && /cloudflare|worker|fetch|network|response/i.test(raw || String(asRecord(err)?.name ?? '')))
 }
 
-function uploadErrorMessage(err: any) {
+function uploadErrorMessage(err: unknown) {
   const raw = rawUploadError(err)
 
   if (isWorkerResourceLimitError(err)) {
-    return 'Cloudflare Worker exceeded resource limits. Upload stopped; retry failed files after the cooldown.'
+    return t('uploader.errBusy')
   }
   if (/Failed to fetch|fetch failed|NetworkError/i.test(raw)) {
-    return 'Network request failed. If this was a direct R2 upload, check the bucket CORS settings and retry this file.'
+    return t('uploader.errNetwork')
   }
-  if (err?.statusCode === 413 || /too large|ใหญ่เกิน/i.test(raw)) {
-    return 'File is too large after compression.'
+  if (errStatusCode(err) === 413 || /too large|ใหญ่เกิน/i.test(raw)) {
+    return t('uploader.errTooLarge', { mb: maxBytesLabel.value })
   }
-  return raw ? String(raw).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220) : 'Upload failed without a server message.'
+  return raw ? String(raw).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220) : t('uploader.errUnknown')
 }
 
 function beginResourceLimitPause() {
@@ -235,14 +303,14 @@ function uniqueUncompleted(files: File[]) {
 // /cdn-cgi/image transforms by the free-tier quota). Encoders that can't
 // produce it must fall back to JPEG rather than to toBlob's silent PNG, which
 // would be *larger* than the JPEG it replaced — so probe once with a 1x1
-// canvas and cache the answer for the session.
+// canvas and cache the answer for the life of this uploader.
 let webpEncodeProbe: Promise<boolean> | null = null
 function supportsWebpEncode() {
   if (!webpEncodeProbe) {
     webpEncodeProbe = new Promise<boolean>((resolve) => {
       const canvas = document.createElement('canvas')
       canvas.width = canvas.height = 1
-      canvas.toBlob(blob => resolve(blob?.type === 'image/webp'), 'image/webp', COMPRESS_QUALITY)
+      canvas.toBlob(blob => resolve(blob?.type === 'image/webp'), 'image/webp', 0.9)
     })
   }
   return webpEncodeProbe
@@ -251,9 +319,10 @@ function supportsWebpEncode() {
 async function compressImage(file: File): Promise<File> {
   const bmp = await createImageBitmap(file)
   let w = bmp.width, h = bmp.height
-  if (w > COMPRESS_MAX_DIM || h > COMPRESS_MAX_DIM) {
-    if (w >= h) { h = Math.round(h * COMPRESS_MAX_DIM / w); w = COMPRESS_MAX_DIM }
-    else        { w = Math.round(w * COMPRESS_MAX_DIM / h); h = COMPRESS_MAX_DIM }
+  const maxDim = compressMaxDim.value
+  if (w > maxDim || h > maxDim) {
+    if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim }
+    else        { w = Math.round(w * maxDim / h); h = maxDim }
   }
   const canvas = document.createElement('canvas')
   canvas.width = w; canvas.height = h
@@ -261,7 +330,7 @@ async function compressImage(file: File): Promise<File> {
   bmp.close()
   const type = (await supportsWebpEncode()) ? 'image/webp' : 'image/jpeg'
   const compressed = await new Promise<Blob>((res, rej) =>
-    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), type, COMPRESS_QUALITY)
+    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), type, compressQuality.value)
   )
   // Never ship a result larger than the original. When the original wins, hand
   // it back untouched: re-wrapping it under the encoder's name and MIME type
@@ -301,7 +370,14 @@ onBeforeUnmount(() => {
   // Closing the modal does not cancel the upload — hand the task off to the
   // floating dock. A finished task is cleared unless it still has failures or
   // cancellations worth surfacing in the dock.
-  if (task.value.status === 'uploading') task.value.ownerVisible = false
+  //
+  // Without a dock to receive it (public pages) an uploading task would keep
+  // running invisibly with no progress and no way to stop it, so cancel instead.
+  if (task.value.status === 'uploading' && !props.handoffToDock) {
+    requestUploadCancel(task)
+    task.value.status = 'idle'
+  }
+  else if (task.value.status === 'uploading') task.value.ownerVisible = false
   else if (!task.value.errorCount && !task.value.cancelledCount) task.value.status = 'idle'
   else task.value.ownerVisible = false
 })
@@ -326,7 +402,7 @@ async function createUploadSessionBatch(files: File[], sessionStart: number, seq
   const session = await $fetch<{
     id: string
     items: Array<{ id: string, key: string, status: string }>
-  }>('/api/admin/upload/sessions', {
+  }>(props.endpointBase, {
     method: 'POST',
     body: {
       prefix: props.prefix,
@@ -363,8 +439,8 @@ async function uploadPreparedFile(
   const signature = fileSignature(item.file)
   let stoppedByResourceLimit = false
   try {
-    if (item.toUpload.size > MAX_UPLOAD_BYTES) {
-      throw new Error('File is too large after compression.')
+    if (item.toUpload.size > effectiveMaxBytes.value) {
+      throw new Error(t('uploader.errTooLarge', { mb: maxBytesLabel.value }))
     }
 
     if (item.exists && item.key) {
@@ -421,7 +497,7 @@ async function uploadPreparedFile(
 async function uploadPreparedFileDirect(item: UploadManifestItem) {
   if (!item.sessionId || !item.itemId) throw new Error('Upload manifest item is missing session identity.')
 
-  const base = `/api/admin/upload/sessions/${encodeURIComponent(item.sessionId)}/items/${encodeURIComponent(item.itemId)}`
+  const base = `${props.endpointBase}/${encodeURIComponent(item.sessionId)}/items/${encodeURIComponent(item.itemId)}`
   const presigned = await $fetch<{
     key: string
     status: string
@@ -433,8 +509,16 @@ async function uploadPreparedFileDirect(item: UploadManifestItem) {
     signal: uploadSignal ?? undefined
   })
 
+  // Already in R2 — nothing to upload, but still confirm it. complete is the
+  // only place a submission row is created, and it is idempotent, so skipping
+  // it here is what used to leave a contributor with no record of their photo.
   if (presigned.duplicate || presigned.status === 'exists' || presigned.status === 'uploaded') {
     duplicateCount.value++
+    // No catch: complete creates the submission row, so a failure here has to
+    // land in the retryable-failure path rather than report a photo that only
+    // half-exists. Retrying re-presigns, hits the duplicate branch again, and
+    // re-completes — which is why complete must be idempotent.
+    await $fetch<{ key: string }>(`${base}/complete`, { method: 'POST' })
     return { key: presigned.key }
   }
   if (!presigned.upload) {
@@ -732,7 +816,7 @@ function onDrop(e: DragEvent) {
           {{ t('uploader.dragHere') }}
           <button type="button" class="r2up__pick" @click="chooseFiles">{{ t('uploader.browse') }}</button>
         </p>
-        <p class="r2up__hint">{{ t('uploader.hintR2') }}</p>
+        <p class="r2up__hint">{{ t('uploader.hintR2', { mb: maxBytesLabel }) }}</p>
       </template>
       <p v-else class="r2up__full">{{ t('uploader.limitReached') }}</p>
 
@@ -740,14 +824,14 @@ function onDrop(e: DragEvent) {
     </div>
 
     <!-- Compress toggle -->
-    <div class="r2up__compress">
+    <div v-if="showCompressControl" class="r2up__compress">
       <span class="r2up__compress-label">{{ t('uploader.autoCompress') }}</span>
       <div class="r2up__compress-toggle">
         <button type="button" class="r2up__compress-btn" :class="{ active: autoCompress }" @click="autoCompress = true">{{ t('uploader.on') }}</button>
         <button type="button" class="r2up__compress-btn" :class="{ active: !autoCompress }" @click="autoCompress = false">{{ t('uploader.off') }}</button>
       </div>
       <span class="r2up__compress-detail">
-        {{ autoCompress ? t('uploader.compressOn', { dim: COMPRESS_MAX_DIM, quality: Math.round(COMPRESS_QUALITY * 100) }) : t('uploader.compressOff') }}
+        {{ autoCompress ? t('uploader.compressOn', { dim: compressMaxDim, quality: Math.round(compressQuality * 100) }) : t('uploader.compressOff') }}
       </span>
     </div>
 

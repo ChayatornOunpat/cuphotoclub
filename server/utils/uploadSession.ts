@@ -1,4 +1,5 @@
-import { and, asc, eq, lt } from 'drizzle-orm'
+import type { H3Event } from 'h3'
+import { and, asc, eq, inArray, lt } from 'drizzle-orm'
 
 export type UploadSessionItemStatus = 'pending' | 'exists' | 'uploaded' | 'failed'
 
@@ -16,7 +17,14 @@ export interface UploadSessionItem {
 
 export interface UploadSession {
   id: string
+  // Which side owns this session. Exactly one of actorId / contributorId is set;
+  // each side's endpoints check their own field and never the other's, so an
+  // admin route can never act on a contributor's session or vice versa.
+  kind: 'admin' | 'contribution'
+  // 0 for contributions. The column stays NOT NULL so the table never needs a
+  // SQLite rebuild to migrate; no autoincrement user id is ever 0.
   actorId: number
+  contributorId: string | null
   prefix: string
   createdAt: string
   updatedAt: string
@@ -72,7 +80,9 @@ export async function getUploadSession(id: string) {
 
   return {
     id: session.id,
+    kind: session.kind,
     actorId: session.actorId,
+    contributorId: session.contributorId,
     prefix: session.prefix,
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
@@ -90,17 +100,19 @@ export async function getUploadSession(id: string) {
   } satisfies UploadSession
 }
 
-export async function saveUploadSession(session: UploadSession) {
+export async function saveUploadSession(session: UploadSession, event?: H3Event) {
   const now = new Date()
   const createdAt = new Date(session.createdAt)
   session.updatedAt = now.toISOString()
-  await cleanupExpiredUploadSessions(now)
+  await cleanupExpiredUploadSessions(now, event)
 
   await db
     .insert(schema.uploadSessions)
     .values({
       id: session.id,
+      kind: session.kind,
       actorId: session.actorId,
+      contributorId: session.contributorId,
       prefix: session.prefix,
       createdAt: Number.isNaN(createdAt.getTime()) ? now : createdAt,
       updatedAt: now
@@ -108,7 +120,9 @@ export async function saveUploadSession(session: UploadSession) {
     .onConflictDoUpdate({
       target: schema.uploadSessions.id,
       set: {
+        kind: session.kind,
         actorId: session.actorId,
+        contributorId: session.contributorId,
         prefix: session.prefix,
         updatedAt: now
       }
@@ -142,22 +156,73 @@ export async function saveUploadSession(session: UploadSession) {
   }
 }
 
-async function cleanupExpiredUploadSessions(now: Date) {
+// R2 deletes cost a subrequest each, and this runs inside a normal request, so
+// only a few objects are reclaimed per pass. Abandoned uploads are a slow leak,
+// not a spike, so a slow drain keeps up.
+const SWEEP_OBJECTS_PER_RUN = 8
+
+async function cleanupExpiredUploadSessions(now: Date, event?: H3Event) {
   const cutoff = new Date(now.getTime() - UPLOAD_SESSION_TTL_MS)
   const expired = await db
-    .select({ id: schema.uploadSessions.id })
+    .select({ id: schema.uploadSessions.id, kind: schema.uploadSessions.kind })
     .from(schema.uploadSessions)
     .where(lt(schema.uploadSessions.updatedAt, cutoff))
     .limit(50)
 
-  for (const row of expired) {
-    await db
-      .delete(schema.uploadSessionItems)
-      .where(eq(schema.uploadSessionItems.sessionId, row.id))
-    await db
-      .delete(schema.uploadSessions)
-      .where(eq(schema.uploadSessions.id, row.id))
+  if (!expired.length) return
+
+  const sweep = async () => {
+    let swept = 0
+    for (const row of expired) {
+      // A contribution session that expired without completing may have left
+      // objects in R2 that no submission row points at — a presigned PUT can
+      // succeed while /complete never runs. Nothing else would ever collect
+      // those, and the prefix is invisible to the admin media browser.
+      if (row.kind === 'contribution' && swept < SWEEP_OBJECTS_PER_RUN) {
+        const items = await db
+          .select({ r2Key: schema.uploadSessionItems.r2Key })
+          .from(schema.uploadSessionItems)
+          .where(eq(schema.uploadSessionItems.sessionId, row.id))
+        const keys = [...new Set(items.map(item => item.r2Key))].filter(Boolean)
+        if (keys.length) {
+          const referenced = new Set(
+            (await db
+              .select({ r2Key: schema.eventSubmissions.r2Key })
+              .from(schema.eventSubmissions)
+              .where(inArray(schema.eventSubmissions.r2Key, keys.slice(0, 90))))
+              .map(item => item.r2Key)
+          )
+          for (const key of keys) {
+            if (swept >= SWEEP_OBJECTS_PER_RUN) break
+            if (referenced.has(key)) continue
+            await blob.delete(key).catch(() => {})
+            swept++
+          }
+        }
+      }
+
+      await db
+        .delete(schema.uploadSessionItems)
+        .where(eq(schema.uploadSessionItems.sessionId, row.id))
+      await db
+        .delete(schema.uploadSessions)
+        .where(eq(schema.uploadSessions.id, row.id))
+    }
   }
+
+  // The sweep reclaims *other* requests' garbage, so it must not add tail
+  // latency to whichever upload happened to trigger it. Defer past the response
+  // where the runtime supports waitUntil (Workers keeps the promise alive);
+  // otherwise fall back to running inline.
+  type WaitUntilCapable = { $waitUntil?: (promise: Promise<unknown>) => void }
+  const runtime = event as WaitUntilCapable | undefined
+  if (typeof runtime?.$waitUntil === 'function') {
+    runtime.$waitUntil(sweep().catch((error) => {
+      console.error('upload session cleanup failed', error)
+    }))
+    return
+  }
+  await sweep()
 }
 
 export async function saveUploadSessionItem(session: UploadSession, item: UploadSessionItem) {
