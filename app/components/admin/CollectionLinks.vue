@@ -140,10 +140,29 @@ function mb(bytes: number) {
 
 <template>
   <section class="eul">
-    <header class="eul__head">
-      <h2 class="eul__title">{{ t('adminUploadLinks.title') }}</h2>
-      <p class="eul__sub">{{ t('adminUploadLinks.sub') }}</p>
-    </header>
+    <!-- Creation first: opening a collection is the page's primary action; the
+         list of existing links follows below. -->
+    <div class="eul__create">
+      <label class="f">
+        <span class="f__label">{{ t('adminUploadLinks.newLabel') }}</span>
+        <input v-model="form.label" class="f__input" type="text" maxlength="200" :placeholder="t('adminUploadLinks.newLabelPlaceholder')">
+      </label>
+      <label class="f">
+        <span class="f__label">{{ t('adminUploadLinks.perPerson') }}</span>
+        <input v-model.number="form.maxPerContributor" class="f__input" type="number" min="1" max="1000">
+      </label>
+      <label class="f">
+        <span class="f__label">{{ t('adminUploadLinks.quality') }}</span>
+        <select v-model="form.preset" class="f__input">
+          <option v-for="p in PRESETS" :key="p.key" :value="p.key">
+            {{ t(`adminUploadLinks.preset_${p.key}`) }} · {{ p.dim }}px · {{ p.quality }}% · {{ mb(p.bytes) }}MB
+          </option>
+        </select>
+      </label>
+      <button type="button" class="btn btn--primary" :disabled="busy" @click="createLink">
+        {{ t('adminUploadLinks.create') }}
+      </button>
+    </div>
 
     <p v-if="error" class="eul__error">{{ error }}</p>
 
@@ -229,28 +248,6 @@ function mb(bytes: number) {
     </ul>
 
     <p v-else class="eul__empty">{{ t('adminUploadLinks.none') }}</p>
-
-    <div class="eul__create">
-      <label class="f">
-        <span class="f__label">{{ t('adminUploadLinks.newLabel') }}</span>
-        <input v-model="form.label" class="f__input" type="text" maxlength="200" :placeholder="t('adminUploadLinks.newLabelPlaceholder')">
-      </label>
-      <label class="f">
-        <span class="f__label">{{ t('adminUploadLinks.perPerson') }}</span>
-        <input v-model.number="form.maxPerContributor" class="f__input" type="number" min="1" max="1000">
-      </label>
-      <label class="f">
-        <span class="f__label">{{ t('adminUploadLinks.quality') }}</span>
-        <select v-model="form.preset" class="f__input">
-          <option v-for="p in PRESETS" :key="p.key" :value="p.key">
-            {{ t(`adminUploadLinks.preset_${p.key}`) }} · {{ p.dim }}px · {{ p.quality }}% · {{ mb(p.bytes) }}MB
-          </option>
-        </select>
-      </label>
-      <button type="button" class="btn btn--primary" :disabled="busy" @click="createLink">
-        {{ t('adminUploadLinks.create') }}
-      </button>
-    </div>
   </section>
 </template>
 
@@ -263,15 +260,6 @@ function mb(bytes: number) {
   flex-direction: column;
   gap: 1rem;
 }
-.eul__head { display: flex; flex-direction: column; gap: 0.25rem; }
-.eul__title {
-  font-family: var(--font-sans);
-  font-size: 0.56rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--dark);
-}
-.eul__sub { font-family: var(--font-sans); font-size: 0.68rem; color: var(--muted); }
 .eul__error {
   border-left: 2px solid var(--accent);
   padding: 0.5rem 0.7rem;
@@ -329,8 +317,8 @@ function mb(bytes: number) {
   grid-template-columns: 2fr 1fr 2fr auto;
   gap: 0.6rem;
   align-items: end;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--subtle);
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--subtle);
 }
 .f { display: flex; flex-direction: column; gap: 0.25rem; }
 .f--check { flex-direction: row; align-items: center; gap: 0.4rem; }
