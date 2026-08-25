@@ -850,7 +850,7 @@ function onSubmit() {
         <!-- text, lead, pullquote, inset -->
         <textarea
           v-if="selectedBlock.type === 'text' || selectedBlock.type === 'lead' || selectedBlock.type === 'pullquote' || selectedBlock.type === 'inset'"
-          v-model="(selectedBlock as any).content"
+          v-model="selectedBlock.content"
           rows="4"
           class="prop-textarea"
           :placeholder="selectedBlock.type === 'lead' ? t('adminPostForm.phLead') : selectedBlock.type === 'pullquote' ? t('adminPostForm.phPullquote') : selectedBlock.type === 'inset' ? t('adminPostForm.phInset') : t('adminPostForm.phText')"
@@ -859,7 +859,7 @@ function onSubmit() {
         <!-- heading, subheading -->
         <input
           v-else-if="selectedBlock.type === 'heading' || selectedBlock.type === 'subheading'"
-          v-model="(selectedBlock as any).content"
+          v-model="selectedBlock.content"
           type="text"
           class="prop-input"
           :placeholder="selectedBlock.type === 'heading' ? t('adminPostForm.phHeading') : t('adminPostForm.phSubheading')"
@@ -867,22 +867,22 @@ function onSubmit() {
 
         <!-- blockquote -->
         <template v-else-if="selectedBlock.type === 'blockquote'">
-          <textarea v-model="(selectedBlock as any).content" rows="3" class="prop-textarea" :placeholder="t('adminPostForm.phQuote')" />
-          <input v-model="(selectedBlock as any).cite" type="text" class="prop-input" :placeholder="t('adminPostForm.phAttribution')">
+          <textarea v-model="selectedBlock.content" rows="3" class="prop-textarea" :placeholder="t('adminPostForm.phQuote')" />
+          <input v-model="selectedBlock.cite" type="text" class="prop-input" :placeholder="t('adminPostForm.phAttribution')">
         </template>
 
         <!-- image -->
         <template v-else-if="selectedBlock.type === 'image'">
           <div class="prop-photo">
-            <img v-if="(selectedBlock as any).src" :src="(selectedBlock as any).src" alt="" class="prop-thumb">
+            <img v-if="selectedBlock.src" :src="selectedBlock.src" alt="" class="prop-thumb">
             <button type="button" class="prop-pick-btn" @click="selectedBlock && openImagePicker({ kind: 'block', id: selectedBlock.id, field: 'src' })">
-              {{ (selectedBlock as any).src ? t('adminForm.coverChange') : t('adminPicker.chooseFromLibrary') }}
+              {{ selectedBlock.src ? t('adminForm.coverChange') : t('adminPicker.chooseFromLibrary') }}
             </button>
           </div>
-          <input v-model="(selectedBlock as any).src" type="text" class="prop-input prop-input--url" :placeholder="t('adminPostForm.phImageUrl')">
-          <input v-model="(selectedBlock as any).caption" type="text" class="prop-input" :placeholder="t('adminPostForm.phCaption')">
+          <input v-model="selectedBlock.src" type="text" class="prop-input prop-input--url" :placeholder="t('adminPostForm.phImageUrl')">
+          <input v-model="selectedBlock.caption" type="text" class="prop-input" :placeholder="t('adminPostForm.phCaption')">
           <label class="prop-check">
-            <input v-model="(selectedBlock as any).breakout" type="checkbox">
+            <input v-model="selectedBlock.breakout" type="checkbox">
             {{ t('adminPostForm.breakout') }}
           </label>
         </template>
@@ -890,34 +890,34 @@ function onSubmit() {
         <!-- photo-full -->
         <template v-else-if="selectedBlock.type === 'photo-full'">
           <div class="prop-photo">
-            <img v-if="(selectedBlock as any).src" :src="(selectedBlock as any).src" alt="" class="prop-thumb">
+            <img v-if="selectedBlock.src" :src="selectedBlock.src" alt="" class="prop-thumb">
             <button type="button" class="prop-pick-btn" @click="selectedBlock && openImagePicker({ kind: 'block', id: selectedBlock.id, field: 'src' })">
-              {{ (selectedBlock as any).src ? t('adminForm.coverChange') : t('adminPicker.chooseFromLibrary') }}
+              {{ selectedBlock.src ? t('adminForm.coverChange') : t('adminPicker.chooseFromLibrary') }}
             </button>
           </div>
-          <input v-model="(selectedBlock as any).src" type="text" class="prop-input prop-input--url" :placeholder="t('adminPostForm.phPhotoUrl')">
-          <input v-model="(selectedBlock as any).caption" type="text" class="prop-input" :placeholder="t('adminPostForm.phCaption')">
+          <input v-model="selectedBlock.src" type="text" class="prop-input prop-input--url" :placeholder="t('adminPostForm.phPhotoUrl')">
+          <input v-model="selectedBlock.caption" type="text" class="prop-input" :placeholder="t('adminPostForm.phCaption')">
         </template>
 
         <!-- photo-pair -->
         <template v-else-if="selectedBlock.type === 'photo-pair'">
           <div class="prop-pair">
             <div class="prop-photo">
-              <img v-if="(selectedBlock as any).src1" :src="(selectedBlock as any).src1" alt="" class="prop-thumb">
+              <img v-if="selectedBlock.src1" :src="selectedBlock.src1" alt="" class="prop-thumb">
               <button type="button" class="prop-pick-btn" @click="selectedBlock && openImagePicker({ kind: 'block', id: selectedBlock.id, field: 'src1' })">{{ t('adminPostForm.phLeftPhotoUrl') }}</button>
             </div>
             <div class="prop-photo">
-              <img v-if="(selectedBlock as any).src2" :src="(selectedBlock as any).src2" alt="" class="prop-thumb">
+              <img v-if="selectedBlock.src2" :src="selectedBlock.src2" alt="" class="prop-thumb">
               <button type="button" class="prop-pick-btn" @click="selectedBlock && openImagePicker({ kind: 'block', id: selectedBlock.id, field: 'src2' })">{{ t('adminPostForm.phRightPhotoUrl') }}</button>
             </div>
           </div>
-          <input v-model="(selectedBlock as any).caption" type="text" class="prop-input" :placeholder="t('adminPostForm.phSharedCaption')">
+          <input v-model="selectedBlock.caption" type="text" class="prop-input" :placeholder="t('adminPostForm.phSharedCaption')">
         </template>
 
         <!-- qanda -->
         <template v-else-if="selectedBlock.type === 'qanda'">
-          <textarea v-model="(selectedBlock as any).question" rows="2" class="prop-textarea" :placeholder="t('adminPostForm.phQuestion')" />
-          <textarea v-model="(selectedBlock as any).answer" rows="3" class="prop-textarea" :placeholder="t('adminPostForm.phAnswer')" />
+          <textarea v-model="selectedBlock.question" rows="2" class="prop-textarea" :placeholder="t('adminPostForm.phQuestion')" />
+          <textarea v-model="selectedBlock.answer" rows="3" class="prop-textarea" :placeholder="t('adminPostForm.phAnswer')" />
         </template>
 
         <!-- divider -->

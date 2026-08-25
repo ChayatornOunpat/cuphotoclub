@@ -4,12 +4,27 @@ import type { Post } from '~~/shared/types'
 // `editable`, `selectedBlockId` and `draggableBlocks` are admin-only hooks used
 // by AdminPostForm to reuse this component as a live "direct-write" canvas.
 // They default off, so the public blog page renders exactly as before.
-defineProps<{
+const props = defineProps<{
   post: Post
+  /** Renders a "back" link above/in each hero variant when set. */
+  backTo?: string
+  backLabel?: string
+  /** Shows the footer share button and emits `share`. */
+  shareable?: boolean
   editable?: boolean
   selectedBlockId?: string
   draggableBlocks?: boolean
 }>()
+
+const emit = defineEmits<{ share: [] }>()
+
+// Dark full-bleed hero parallax (same factor as the former inline renderer).
+const parallaxY = ref(0)
+function onScroll() {
+  parallaxY.value = window.scrollY * 0.15
+}
+onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
+onUnmounted(() => window.removeEventListener('scroll', onScroll))
 </script>
 
 <template>
@@ -19,23 +34,26 @@ defineProps<{
       <!-- Standard hero -->
       <template v-if="(post.heroStyle ?? 'standard') === 'standard'">
         <header class="std-head">
+          <NuxtLink v-if="backTo" :to="backTo" class="post-back">{{ backLabel }}</NuxtLink>
           <p class="std-head__eyebrow" data-edit="tag">{{ post.tag }} · {{ post.date }}</p>
           <h1 class="std-head__title" data-edit="title">{{ post.title }}</h1>
           <p v-if="post.excerpt" class="std-head__excerpt" data-edit="excerpt">{{ post.excerpt }}</p>
           <p v-if="post.author" class="std-head__author" data-edit="author">{{ post.author }}</p>
         </header>
         <div v-if="post.image" class="std-hero" data-edit="image">
-          <img :src="post.image" :alt="post.title">
+          <AppImg :src="post.image" :alt="post.title" width="1200" height="800"
+            sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" eager optimize />
         </div>
       </template>
 
       <!-- Dark full-bleed hero -->
       <header v-else-if="post.heroStyle === 'dark-full'" class="df-head">
-        <div class="df-head__bg" data-edit="image">
+        <div class="df-head__bg" data-edit="image" :style="{ transform: `translateY(${parallaxY}px)` }">
           <img v-if="post.image" :src="post.image" :alt="post.title">
         </div>
         <div class="df-head__gradient" />
         <div class="df-head__inner">
+          <NuxtLink v-if="backTo" :to="backTo" class="post-back post-back--light">{{ backLabel }}</NuxtLink>
           <p class="df-head__tag" data-edit="tag">{{ post.tag }}</p>
           <h1 class="df-head__title" data-edit="title">{{ post.title }}</h1>
           <div class="df-head__meta">
@@ -52,6 +70,7 @@ defineProps<{
           <img v-if="post.image" :src="post.image" :alt="post.title">
         </div>
         <div class="sp-head__content">
+          <NuxtLink v-if="backTo" :to="backTo" class="post-back post-back--light sp-head__back">{{ backLabel }}</NuxtLink>
           <p class="sp-head__tag" data-edit="tag">{{ post.tag }}</p>
           <h1 class="sp-head__title" data-edit="title">{{ post.title }}</h1>
           <p v-if="post.excerpt" class="sp-head__excerpt" data-edit="excerpt">{{ post.excerpt }}</p>
@@ -65,6 +84,7 @@ defineProps<{
 
       <!-- Minimal dark header -->
       <header v-else-if="post.heroStyle === 'minimal-dark'" class="md-head">
+        <NuxtLink v-if="backTo" :to="backTo" class="post-back post-back--dim">{{ backLabel }}</NuxtLink>
         <p class="md-head__tag" data-edit="tag">{{ post.tag }}</p>
         <h1 class="md-head__title" data-edit="title">{{ post.title }}</h1>
         <p v-if="post.excerpt" class="md-head__sub" data-edit="excerpt">{{ post.excerpt }}</p>
@@ -78,33 +98,33 @@ defineProps<{
       <!-- Body -->
       <div class="post__body">
         <template v-for="(block, i) in post.blocks" :key="block.id">
-          <p v-if="block.type === 'text'" class="pb-text" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</p>
-          <p v-else-if="block.type === 'lead'" class="pb-lead" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</p>
-          <h2 v-else-if="block.type === 'heading'" class="pb-heading" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</h2>
-          <h3 v-else-if="block.type === 'subheading'" class="pb-subheading" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</h3>
-          <div v-else-if="block.type === 'pullquote'" class="pb-pullquote" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</div>
+          <p v-if="block.type === 'text'" class="pb-text" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ block.content }}</p>
+          <p v-else-if="block.type === 'lead'" class="pb-lead" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ block.content }}</p>
+          <h2 v-else-if="block.type === 'heading'" class="pb-heading" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ block.content }}</h2>
+          <h3 v-else-if="block.type === 'subheading'" class="pb-subheading" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ block.content }}</h3>
+          <div v-else-if="block.type === 'pullquote'" class="pb-pullquote" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ block.content }}</div>
           <blockquote v-else-if="block.type === 'blockquote'" class="pb-blockquote" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
-            <span>{{ (block as any).content }}</span>
-            <cite v-if="(block as any).cite">{{ (block as any).cite }}</cite>
+            <span>{{ block.content }}</span>
+            <cite v-if="block.cite">{{ block.cite }}</cite>
           </blockquote>
-          <figure v-else-if="block.type === 'image'" class="pb-image" :class="{ 'pb-image--breakout': (block as any).breakout, 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
-            <img :src="(block as any).src" :alt="(block as any).caption || ''">
-            <figcaption v-if="(block as any).caption">{{ (block as any).caption }}</figcaption>
+          <figure v-else-if="block.type === 'image'" class="pb-image" :class="{ 'pb-image--breakout': block.breakout, 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
+            <img :src="block.src" :alt="block.caption || ''">
+            <figcaption v-if="block.caption">{{ block.caption }}</figcaption>
           </figure>
           <figure v-else-if="block.type === 'photo-full'" class="pb-photo-full" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
-            <img :src="(block as any).src" :alt="(block as any).caption || ''">
-            <figcaption v-if="(block as any).caption">{{ (block as any).caption }}</figcaption>
+            <img :src="block.src" :alt="block.caption || ''">
+            <figcaption v-if="block.caption">{{ block.caption }}</figcaption>
           </figure>
           <figure v-else-if="block.type === 'photo-pair'" class="pb-photo-pair" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
-            <img :src="(block as any).src1" alt="">
-            <img :src="(block as any).src2" alt="">
-            <figcaption v-if="(block as any).caption" class="pb-photo-pair__cap">{{ (block as any).caption }}</figcaption>
+            <img :src="block.src1" alt="">
+            <img :src="block.src2" alt="">
+            <figcaption v-if="block.caption" class="pb-photo-pair__cap">{{ block.caption }}</figcaption>
           </figure>
           <div v-else-if="block.type === 'divider'" class="pb-divider" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">· · ·</div>
-          <div v-else-if="block.type === 'inset'" class="pb-inset" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ (block as any).content }}</div>
+          <div v-else-if="block.type === 'inset'" class="pb-inset" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">{{ block.content }}</div>
           <div v-else-if="block.type === 'qanda'" class="pb-qanda" :class="{ 'is-admin-selected': editable && selectedBlockId === block.id }" :data-block-n="i" :data-block-id="block.id" :draggable="draggableBlocks || undefined">
-            <div class="pb-qanda__q">{{ (block as any).question }}</div>
-            <div class="pb-qanda__a">{{ (block as any).answer }}</div>
+            <div class="pb-qanda__q">{{ block.question }}</div>
+            <div class="pb-qanda__a">{{ block.answer }}</div>
           </div>
         </template>
 
@@ -113,6 +133,7 @@ defineProps<{
           <div class="post__tags">
             <span class="post__tag-pill">{{ post.tag }}</span>
           </div>
+          <button v-if="shareable" class="post__share" @click="emit('share')">Share →</button>
         </div>
       </div>
 
@@ -162,6 +183,20 @@ defineProps<{
 
 /* ─── Post shell ─────────────────────────────────────────────────────────── */
 .post { overflow: visible; }
+
+/* ─── Shared back link ───────────────────────────────────────────────────── */
+.post-back {
+  display: inline-block; font-size: 0.56rem; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--muted); text-decoration: none;
+  margin-bottom: 2rem; transition: color 0.2s;
+}
+.post-back:hover { color: var(--accent); }
+.post-back--light { color: rgba(245,244,240,0.45); }
+.post-back--light:hover { color: var(--accent); }
+.post-back--dim { color: rgba(245,244,240,0.3); }
+.post-back--dim:hover { color: var(--accent); }
+.md-head .post-back { display: block; margin-bottom: 2.5rem; }
+.sp-head__back { position: absolute; top: 6rem; left: 4rem; }
 
 /* ─── Standard hero ──────────────────────────────────────────────────────── */
 .std-head {
@@ -304,6 +339,13 @@ defineProps<{
 .post--minimal-dark .post__footer { border-top-color: rgba(245,244,240,0.08); }
 .post__tag-pill { font-size: 0.54rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); padding: 0.35rem 0.75rem; border: 1px solid var(--subtle); display: inline-block; }
 .post--minimal-dark .post__tag-pill { color: rgba(245,244,240,0.3); border-color: rgba(245,244,240,0.1); }
+.post__share {
+  font-family: var(--font-sans); font-size: 0.54rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--muted); background: none;
+  border: none; cursor: pointer; transition: color 0.2s;
+}
+.post__share:hover { color: var(--accent); }
+.post--minimal-dark .post__share { color: rgba(245,244,240,0.3); }
 
 /* ─── Author bio ─────────────────────────────────────────────────────────── */
 .author-bio { background: var(--paper); border-top: 1px solid var(--subtle); padding: 3rem; }
@@ -318,13 +360,22 @@ defineProps<{
 .post--minimal-dark .author-bio__text { color: rgba(245,244,240,0.4); }
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
   .sp-head { grid-template-columns: 1fr; min-height: auto; }
   .sp-head__img { min-height: 50svh; }
   .sp-head__content { padding: 6rem 2.5rem 3rem; }
+  .sp-head__back { top: 4rem; left: 2.5rem; }
   .pb-image--breakout { margin: 2.5rem 0; }
 }
-@media (max-width: 620px) {
+@media (max-width: 720px) {
+  .sp-head__content { padding: 5rem 1.5rem 2.5rem; }
+  .sp-head__back { top: 3.5rem; left: 1.5rem; }
+  .pb-photo-pair { grid-template-columns: 1fr; }
+  .pb-photo-pair img { height: 60vh; }
+  .author-bio { padding: 2rem 1.5rem; }
+  .author-bio__inner { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
   .std-head, .post__body { padding-left: 1.5rem; padding-right: 1.5rem; }
   .std-hero { padding-left: 1.5rem; padding-right: 1.5rem; }
   .md-head { padding: 7rem 1.5rem 4rem; }
@@ -332,8 +383,6 @@ defineProps<{
   .pb-photo-full img { height: 60vh; }
   .pb-photo-pair { padding: 0 1.5rem; }
   .pb-photo-pair img { height: 50vh; }
-  .author-bio { padding: 2rem 1.5rem; }
-  .author-bio__inner { grid-template-columns: 1fr; }
   .post__footer { flex-direction: column; align-items: flex-start; gap: 1rem; }
 }
 </style>

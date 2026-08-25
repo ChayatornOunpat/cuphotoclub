@@ -1126,6 +1126,9 @@
     "limitNotice": "You have sent all {max} photos for this collection. Remove one to make room."
   },
   "adminUploadLinks": {
+    "groupDetails": "Details",
+    "groupWhen": "When & where",
+    "groupLimits": "Limits",
     "title": "Photo collection",
     "sub": "Create a share link and people can send you their photos. Everything arrives in an admin-only pool.",
     "untitled": "Untitled link",

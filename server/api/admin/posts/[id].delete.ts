@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  const { user } = await requireUserSession(event)
+  const user = await requireAdmin(event)
   const id = getRouterParam(event, 'id')!
   const post = await postStore.get(id)
   if (!(await postStore.remove(id))) throw createError({ statusCode: 404, statusMessage: 'Post not found' })

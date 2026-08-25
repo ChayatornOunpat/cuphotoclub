@@ -56,15 +56,12 @@ function goToday() {
   viewMonth.value = now.getMonth()
 }
 
-const intlLocale = computed(() => (locale.value === 'th' ? 'th-TH' : 'en-GB'))
 const monthTitle = computed(() =>
-  new Intl.DateTimeFormat(intlLocale.value, { month: 'long', year: 'numeric' })
-    .format(new Date(viewYear.value, viewMonth.value, 1))
+  formatMonthYear(new Date(viewYear.value, viewMonth.value, 1), locale.value)
 )
-const weekdayLabels = computed(() => {
-  const fmt = new Intl.DateTimeFormat(intlLocale.value, { weekday: 'short', timeZone: 'UTC' })
-  return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(Date.UTC(2023, 0, 1 + i))))
-})
+const weekdayLabels = computed(() =>
+  Array.from({ length: 7 }, (_, i) => formatWeekdayShort(new Date(Date.UTC(2023, 0, 1 + i)), locale.value))
+)
 
 const eventsByDay = computed(() => {
   const map = new Map<string, EventRow[]>()

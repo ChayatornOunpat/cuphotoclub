@@ -1,4 +1,4 @@
 export default defineEventHandler(async (event) => {
-  await requireUserSession(event)
+  await requireAdmin(event)
   return await postStore.list()
 })

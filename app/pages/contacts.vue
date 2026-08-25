@@ -17,9 +17,9 @@ const SOCIALS = [
   { label: 'Linktree', handle: 'linktr.ee/CUPhotoClub', icon: 'simple-icons:linktree', url: 'https://linktr.ee/CUPhotoClub' }
 ]
 
-// The clubroom: Chulachakrapong Building. Coordinates (from OpenStreetMap) are
-// the fallback pin; the place name is what the Maps Embed API geocodes.
-const MAP_COORDS = '13.7354841,100.5309902'
+// The clubroom: Chulachakrapong Building. The place name is what the Maps
+// Embed API geocodes; its OpenStreetMap coordinates are 13.7354841,100.5309902
+// if a fallback pin is ever needed again.
 const MAP_QUERY = 'อาคารจุลจักรพงษ์ จุฬาลงกรณ์มหาวิทยาลัย'
 
 // Prefer Google's Maps Embed API — it's the only keyed embed that renders BOTH

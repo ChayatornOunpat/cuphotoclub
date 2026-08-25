@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { index, integer, primaryKey, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import type { AlbumRow, AlbumStyle, ContentStatus, HeroStyle, Placement, PostBlock, TextAlign, TextFont } from '~~/shared/types'
 
 const createdAt = integer('created_at', { mode: 'timestamp' })
   .notNull()
@@ -256,8 +257,6 @@ export const settings = sqliteTable('settings', {
 // Slug-keyed editorial content (Lego-grid albums, block-based posts) managed by
 // albumStore / postStore. Separate from the relational `albums` / `posts` tables
 // above, which model the photo-gallery domain (integer ids, R2 photos, FKs).
-
-import type { AlbumRow, AlbumStyle, ContentStatus, HeroStyle, Placement, PostBlock, TextAlign, TextFont } from '~~/shared/types'
 
 // Lego-grid albums seeded from content/albums/*.md.
 export const contentAlbums = sqliteTable('content_albums', {

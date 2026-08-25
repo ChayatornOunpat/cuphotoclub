@@ -4,7 +4,7 @@
 // uploading *and* contributor editing, which is the whole permission model
 // (docs/event-photo-submissions.md).
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const localePath = useLocalePath()
 
 interface CollectionLink {
@@ -175,20 +175,11 @@ async function copyLink(link: CollectionLink) {
   }
 }
 
-// Date · place, both optional. Pinned to UTC and mapped to the reader's locale
-// the same way the activities and contribute pages do — a date stored as
-// midnight UTC would otherwise render as the previous day west of Greenwich.
-const intlLocale = computed(() => (locale.value === 'th' ? 'th-TH' : 'en-GB'))
+// Date · place, both optional. formatDate is the site's one date formatter
+// (app/utils/format.ts) — the same dd/mm/yy the albums table uses, read in UTC.
 function metaLine(link: CollectionLink) {
   const parts: string[] = []
-  if (link.eventDate) {
-    const d = new Date(link.eventDate)
-    if (!Number.isNaN(d.getTime())) {
-      parts.push(new Intl.DateTimeFormat(intlLocale.value, {
-        day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'
-      }).format(d))
-    }
-  }
+  if (link.eventDate) parts.push(formatDate(link.eventDate))
   if (link.location) parts.push(link.location)
   return parts.join(' · ')
 }
@@ -318,88 +309,109 @@ function dateInput(value: string | null) {
         </div>
 
         <div v-if="editingId === link.id" class="row__edit">
-          <label class="f f--wide">
-            <span class="f__label">{{ t('adminUploadLinks.newLabel') }}</span>
-            <input
-              class="f__input"
-              type="text"
-              maxlength="200"
-              :value="link.label"
-              @change="patchLink(link, { label: String(($event.target as HTMLInputElement).value).trim() || undefined })"
-            >
-          </label>
-          <label class="f f--wide">
-            <span class="f__label">{{ t('adminUploadLinks.newDescription') }}</span>
-            <input
-              class="f__input"
-              type="text"
-              maxlength="500"
-              :value="link.description ?? ''"
-              @change="patchLink(link, { description: String(($event.target as HTMLInputElement).value).trim() || null })"
-            >
-          </label>
-          <label class="f">
-            <span class="f__label">{{ t('adminUploadLinks.date') }}</span>
-            <input
-              class="f__input"
-              type="date"
-              :value="dateInput(link.eventDate)"
-              @change="patchLink(link, { eventDate: String(($event.target as HTMLInputElement).value) || null })"
-            >
-          </label>
-          <label class="f">
-            <span class="f__label">{{ t('adminUploadLinks.location') }}</span>
-            <input
-              class="f__input"
-              type="text"
-              maxlength="200"
-              :value="link.location ?? ''"
-              :placeholder="t('adminUploadLinks.locationPlaceholder')"
-              @change="patchLink(link, { location: String(($event.target as HTMLInputElement).value).trim() || null })"
-            >
-          </label>
-          <!-- Optional. Collections are standalone, so there is no event cover
-               to inherit — without one the contribute page draws a gradient. -->
-          <div class="f f--cover">
+          <!-- Cover gets its own rail. As a full-width row capped at 320px it
+               left most of the panel empty, which is what made this panel read
+               as unfinished. Optional: collections are standalone, so there is
+               no event cover to inherit — without one the page draws a gradient. -->
+          <div class="edit__cover">
             <span class="f__label">{{ t('adminUploadLinks.cover') }}</span>
             <AdminCoverUploader
               :model-value="link.coverR2Key"
               prefix="covers/collections"
+              :allow-library="false"
               aspect="aspect-[3/2]"
               @update:model-value="value => patchLink(link, { coverR2Key: value ?? null })"
             />
             <span class="f__hint">{{ t('adminUploadLinks.coverHint') }}</span>
           </div>
-          <label class="f">
-            <span class="f__label">{{ t('adminUploadLinks.perPerson') }}</span>
-            <input
-              class="f__input"
-              type="number"
-              min="1"
-              max="1000"
-              :value="link.maxPerContributor"
-              @change="patchNumber(link, 'maxPerContributor', $event)"
-            >
-          </label>
-          <label class="f">
-            <span class="f__label">{{ t('adminUploadLinks.perTotal') }}</span>
-            <input
-              class="f__input"
-              type="number"
-              min="1"
-              max="20000"
-              :value="link.maxTotal"
-              @change="patchNumber(link, 'maxTotal', $event)"
-            >
-          </label>
-          <label class="f f--check">
-            <input
-              type="checkbox"
-              :checked="link.requireName"
-              @change="patchLink(link, { requireName: ($event.target as HTMLInputElement).checked })"
-            >
-            <span class="f__label">{{ t('adminUploadLinks.requireName') }}</span>
-          </label>
+
+          <!-- Three clusters rather than one undifferentiated grid: fields that
+               answer the same question sit together, and the space between
+               groups is what separates them — no boxes, no rules. -->
+          <div class="edit__groups">
+            <div class="grp">
+              <span class="grp__head">{{ t('adminUploadLinks.groupDetails') }}</span>
+              <label class="f">
+                <span class="f__label">{{ t('adminUploadLinks.newLabel') }}</span>
+                <input
+                  class="f__input"
+                  type="text"
+                  maxlength="200"
+                  :value="link.label"
+                  @change="patchLink(link, { label: String(($event.target as HTMLInputElement).value).trim() || undefined })"
+                >
+              </label>
+              <label class="f">
+                <span class="f__label">{{ t('adminUploadLinks.newDescription') }}</span>
+                <input
+                  class="f__input"
+                  type="text"
+                  maxlength="500"
+                  :value="link.description ?? ''"
+                  :placeholder="t('adminUploadLinks.newDescriptionPlaceholder')"
+                  @change="patchLink(link, { description: String(($event.target as HTMLInputElement).value).trim() || null })"
+                >
+              </label>
+            </div>
+
+            <div class="grp">
+              <span class="grp__head">{{ t('adminUploadLinks.groupWhen') }}</span>
+              <label class="f">
+                <span class="f__label">{{ t('adminUploadLinks.date') }}</span>
+                <input
+                  class="f__input"
+                  type="date"
+                  :value="dateInput(link.eventDate)"
+                  @change="patchLink(link, { eventDate: String(($event.target as HTMLInputElement).value) || null })"
+                >
+              </label>
+              <label class="f">
+                <span class="f__label">{{ t('adminUploadLinks.location') }}</span>
+                <input
+                  class="f__input"
+                  type="text"
+                  maxlength="200"
+                  :value="link.location ?? ''"
+                  :placeholder="t('adminUploadLinks.locationPlaceholder')"
+                  @change="patchLink(link, { location: String(($event.target as HTMLInputElement).value).trim() || null })"
+                >
+              </label>
+            </div>
+
+            <div class="grp grp--three">
+              <span class="grp__head">{{ t('adminUploadLinks.groupLimits') }}</span>
+              <label class="f">
+                <span class="f__label">{{ t('adminUploadLinks.perPerson') }}</span>
+                <input
+                  class="f__input"
+                  type="number"
+                  min="1"
+                  max="1000"
+                  :value="link.maxPerContributor"
+                  @change="patchNumber(link, 'maxPerContributor', $event)"
+                >
+              </label>
+              <label class="f">
+                <span class="f__label">{{ t('adminUploadLinks.perTotal') }}</span>
+                <input
+                  class="f__input"
+                  type="number"
+                  min="1"
+                  max="20000"
+                  :value="link.maxTotal"
+                  @change="patchNumber(link, 'maxTotal', $event)"
+                >
+              </label>
+              <label class="f f--check">
+                <input
+                  type="checkbox"
+                  :checked="link.requireName"
+                  @change="patchLink(link, { requireName: ($event.target as HTMLInputElement).checked })"
+                >
+                <span class="f__label">{{ t('adminUploadLinks.requireName') }}</span>
+              </label>
+            </div>
+          </div>
         </div>
       </li>
     </ul>
@@ -613,13 +625,53 @@ function dateInput(value: string | null) {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* Settings panel. Three spacing steps, used consistently: --gap-tight inside a
+   field, --gap-field between fields in a group, --gap-group between groups.
+   The old panel used one 0.6rem gap for all three, which is why nine unrelated
+   controls read as a single wall. */
 .row__edit {
+  --gap-tight: 0.3rem;
+  --gap-field: 0.9rem;
+  --gap-group: 1.85rem;
+
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.6rem;
-  margin-top: 1.1rem;
-  padding-top: 0.9rem;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--gap-group);
+  margin-top: 1.3rem;
+  padding-top: 1.2rem;
   border-top: 1px solid var(--subtle);
+}
+
+.edit__cover { display: flex; flex-direction: column; gap: var(--gap-tight); }
+.edit__groups { display: flex; flex-direction: column; gap: var(--gap-group); }
+
+.grp {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap-field);
+  align-items: end;
+}
+.grp--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* The group's name carries the hairline, so the rule doubles as the separator
+   and the panel needs no boxes to show its structure. */
+.grp__head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.grp__head::after { content: ''; flex: 1; height: 1px; background: var(--subtle); }
+
+@media (max-width: 860px) {
+  .row__edit { grid-template-columns: 1fr; gap: var(--gap-group); }
+  .edit__cover { max-width: 240px; }
+  .grp, .grp--three { grid-template-columns: 1fr; }
 }
 
 .eul__create {
@@ -630,11 +682,11 @@ function dateInput(value: string | null) {
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--subtle);
 }
-.f { display: flex; flex-direction: column; gap: 0.25rem; }
+.f { display: flex; flex-direction: column; gap: var(--gap-tight, 0.3rem); }
 .f--check { flex-direction: row; align-items: center; gap: 0.4rem; }
 /* The cover preview is far taller than a text input — give it the full row so
    it does not stretch the whole auto-fit grid to its height. */
-.f--cover { grid-column: 1 / -1; max-width: 320px; }
+/* .f--cover retired: the cover has its own column now (.edit__cover). */
 .f__hint {
   font-family: var(--font-sans);
   font-size: 0.68rem;

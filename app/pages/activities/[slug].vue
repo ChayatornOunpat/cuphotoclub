@@ -85,33 +85,27 @@ const coverUrl = computed(() => {
   if (!imageSrc.value) return undefined
   return /^https?:\/\//i.test(imageSrc.value) ? imageSrc.value : `${origin}${imageSrc.value}`
 })
-const intlLocale = computed(() => (locale.value === 'th' ? 'th-TH' : 'en-GB'))
 // Keep image-only activity bodies visible; stripping tags made a body containing
 // only Markdown images look empty even though it had meaningful content.
 const hasBody = computed(() => Boolean(ev.value?.bodyHtml?.trim()))
 
-// Event dates are stored as UTC midnight, so a fixed UTC timezone recovers the
-// intended calendar day regardless of the viewer's timezone.
-function formatEventDate(value: string, options: Intl.DateTimeFormatOptions) {
-  return new Intl.DateTimeFormat(intlLocale.value, { ...options, timeZone: 'UTC' }).format(new Date(value))
-}
-
+// All date rendering goes through app/utils/format.ts — the site has one date
+// formatter. The long forms below are the event page's own shapes, declared
+// there rather than as an Intl instance built here.
 const dateRange = computed(() => {
   if (!ev.value?.eventDate) return t('activities.comingSoon')
-  const options: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }
-  const start = formatEventDate(ev.value.eventDate, options)
+  const start = formatLongDate(ev.value.eventDate, locale.value, true)
   if (!ev.value.endDate || ev.value.endDate === ev.value.eventDate) return start
-  return `${start} - ${formatEventDate(ev.value.endDate, options)}`
+  return `${start} - ${formatLongDate(ev.value.endDate, locale.value, true)}`
 })
 // Shorter form for the hero meta line.
 const dateShort = computed(() => {
   if (!ev.value?.eventDate) return t('activities.comingSoon')
-  const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' }
-  const start = formatEventDate(ev.value.eventDate, options)
+  const start = formatLongDate(ev.value.eventDate, locale.value)
   if (!ev.value.endDate || ev.value.endDate === ev.value.eventDate) return start
-  return `${start} - ${formatEventDate(ev.value.endDate, options)}`
+  return `${start} - ${formatLongDate(ev.value.endDate, locale.value)}`
 })
-const dateDay = computed(() => ev.value?.eventDate ? formatEventDate(ev.value.eventDate, { day: '2-digit' }) : '')
+const dateDay = computed(() => ev.value?.eventDate ? formatDayNumber(ev.value.eventDate, locale.value, true) : '')
 
 useSeoMeta({
   title: () => ev.value!.title,

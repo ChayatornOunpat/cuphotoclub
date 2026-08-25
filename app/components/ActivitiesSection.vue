@@ -19,7 +19,6 @@ const localePath = useLocalePath()
 // One featured event, presented like the other chapters' lead content. Items
 // arrive sorted soonest-first and already filtered to upcoming by /api/home.
 const nextEvent = computed(() => props.items[0] ?? null)
-const intlLocale = computed(() => locale.value === 'th' ? 'th-TH' : 'en-GB')
 
 function asDate(value: string) {
   const date = new Date(value)
@@ -30,15 +29,13 @@ function formatActivityDate(item: ActivityItem) {
   const start = asDate(item.date)
   if (!start) return t('activities.comingSoon')
 
-  const day = new Intl.DateTimeFormat(intlLocale.value, { day: 'numeric', timeZone: 'UTC' })
-  const dayMonth = new Intl.DateTimeFormat(intlLocale.value, { day: 'numeric', month: 'short', timeZone: 'UTC' })
   const end = asDate(item.endDate)
 
-  if (!end || item.endDate === item.date) return dayMonth.format(start)
+  if (!end || item.endDate === item.date) return formatDayMonth(start, locale.value)
   if (start.getUTCFullYear() === end.getUTCFullYear() && start.getUTCMonth() === end.getUTCMonth()) {
-    return `${day.format(start)}—${dayMonth.format(end)}`
+    return `${formatDayNumber(start, locale.value)}—${formatDayMonth(end, locale.value)}`
   }
-  return `${dayMonth.format(start)}—${dayMonth.format(end)}`
+  return `${formatDayMonth(start, locale.value)}—${formatDayMonth(end, locale.value)}`
 }
 </script>
 

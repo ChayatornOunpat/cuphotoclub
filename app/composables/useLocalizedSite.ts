@@ -1,4 +1,6 @@
-export function useLocalizedSite(site: Ref<any>) {
+type SiteConfig = typeof import('~/utils/defaultSite')['defaultSite']
+
+export function useLocalizedSite(site: Ref<SiteConfig | null | undefined>) {
   const { t } = useI18n()
 
   return computed(() => {

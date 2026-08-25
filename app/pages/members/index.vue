@@ -21,7 +21,7 @@ const [{ data: members }, { data: pageData }] = await Promise.all([
 
 const lead = computed(() => {
   try {
-    const parsed = JSON.parse((pageData.value as any)?.body || '{}')
+    const parsed = JSON.parse((pageData.value as { body?: string } | null)?.body || '{}')
     return (locale.value === 'th' ? parsed.th : parsed.en) || t('members.lead')
   } catch {
     return t('members.lead')

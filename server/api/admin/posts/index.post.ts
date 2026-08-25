@@ -1,7 +1,7 @@
 import type { PostInput } from '~~/shared/types'
 
 export default defineEventHandler(async (event) => {
-  const { user } = await requireUserSession(event)
+  const user = await requireAdmin(event)
   const body = await readBody<PostInput>(event)
 
   const error = validatePost(body)

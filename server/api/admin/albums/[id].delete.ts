@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  const { user } = await requireUserSession(event)
+  const user = await requireAdmin(event)
   const id = getRouterParam(event, 'id')!
   const album = await albumStore.get(id)
   if (!(await albumStore.remove(id))) throw createError({ statusCode: 404, statusMessage: 'Album not found' })

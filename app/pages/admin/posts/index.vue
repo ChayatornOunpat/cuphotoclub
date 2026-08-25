@@ -40,9 +40,11 @@ const visiblePosts = computed(() => {
   const rows = [...(posts.value ?? [])]
     .filter((post) => {
       if (!q) return true
-      const blockText = (post.blocks ?? []).map((b: any) =>
-        b.content ?? b.question ?? b.answer ?? b.caption ?? ''
-      ).join(' ')
+      const blockText = (post.blocks ?? []).map((block) => {
+        // Blocks are a union — only some carry each of these fields.
+        const b = block as { content?: string, question?: string, answer?: string, caption?: string }
+        return b.content ?? b.question ?? b.answer ?? b.caption ?? ''
+      }).join(' ')
       return [post.title, post.tag, post.excerpt, blockText]
         .some(value => String(value ?? '').toLowerCase().includes(q))
     })

@@ -7,6 +7,7 @@
     "build": "nuxt build --preset=cloudflare-pages",
     "build:node": "nuxt build",
     "typecheck": "nuxi typecheck",
+    "lint": "eslint .",
     "dev": "nuxt dev",
     "dev:real": "node ./scripts/dev-real.mjs",
     "online": "node ./scripts/online.mjs",

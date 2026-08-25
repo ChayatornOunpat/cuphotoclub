@@ -15,7 +15,7 @@
 // app/layouts/contribute.vue for why.
 definePageMeta({ layout: 'contribute' })
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
 const token = computed(() => String(route.params.token || ''))
@@ -405,18 +405,12 @@ const coverSrc = computed(() => {
   return key ? `/images/${key.replace(/^\/+/, '')}` : ''
 })
 
-// Date and place, when the admin filled them in. Formatted in the reader's
-// locale and pinned to UTC, matching the activities pages — a date stored as
-// midnight UTC would otherwise render as the previous day west of Greenwich.
-const intlLocale = computed(() => (locale.value === 'th' ? 'th-TH' : 'en-GB'))
+// Date and place, when the admin filled them in. formatDate is the site's one
+// date formatter (app/utils/format.ts) — same dd/mm/yy the albums use, read in
+// UTC so a date stored as midnight UTC keeps its day everywhere.
 const eventDateText = computed(() => {
   const raw = link.value.eventDate
-  if (!raw) return ''
-  const d = new Date(raw)
-  if (Number.isNaN(d.getTime())) return ''
-  return new Intl.DateTimeFormat(intlLocale.value, {
-    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'
-  }).format(d)
+  return raw ? formatDate(raw) : ''
 })
 const metaParts = computed(() => [eventDateText.value, link.value.location || ''].filter(Boolean))
 

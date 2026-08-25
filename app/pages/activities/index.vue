@@ -52,24 +52,17 @@ function goToday() {
   viewMonth.value = now.getMonth()
 }
 
-const intlLocale = computed(() => (locale.value === 'th' ? 'th-TH' : 'en-GB'))
-
 const monthTitle = computed(() =>
-  new Intl.DateTimeFormat(intlLocale.value, { month: 'long', year: 'numeric' })
-    .format(new Date(viewYear.value, viewMonth.value, 1))
+  formatMonthYear(new Date(viewYear.value, viewMonth.value, 1), locale.value)
 )
 
-const yearTitle = computed(() =>
-  new Intl.DateTimeFormat(intlLocale.value, { year: 'numeric' })
-    .format(new Date(viewYear.value, 6, 1))
-)
+const yearTitle = computed(() => formatYear(new Date(viewYear.value, 6, 1), locale.value))
 
 // Sunday-first weekday header labels.
-const weekdayLabels = computed(() => {
-  const fmt = new Intl.DateTimeFormat(intlLocale.value, { weekday: 'short', timeZone: 'UTC' })
+const weekdayLabels = computed(() =>
   // 2023-01-01 was a Sunday
-  return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(Date.UTC(2023, 0, 1 + i))))
-})
+  Array.from({ length: 7 }, (_, i) => formatWeekdayShort(new Date(Date.UTC(2023, 0, 1 + i)), locale.value))
+)
 
 // day key -> events occurring that day (multi-day events appear on every day of their span)
 const eventsByDay = computed(() => {
@@ -145,10 +138,9 @@ function selectDay(cell: DayCell) {
 }
 
 function formatRange(ev: EventRow) {
-  const fmt = new Intl.DateTimeFormat(intlLocale.value, { day: 'numeric', month: 'short', timeZone: 'UTC' })
-  const start = fmt.format(new Date(ev.eventDate!))
+  const start = formatDayMonth(ev.eventDate!, locale.value)
   if (!ev.endDate || ev.endDate === ev.eventDate) return start
-  return `${start} – ${fmt.format(new Date(ev.endDate))}`
+  return `${start} – ${formatDayMonth(ev.endDate, locale.value)}`
 }
 </script>
 

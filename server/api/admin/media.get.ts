@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  await requireUserSession(event)
+  await requireAdmin(event)
 
   const query = getQuery(event)
   const prefix = String(query.prefix || '').replace(/[^a-z0-9/_-]/gi, '')

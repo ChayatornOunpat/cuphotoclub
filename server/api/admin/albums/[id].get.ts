@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  await requireUserSession(event)
+  await requireAdmin(event)
   // decode: slugs may contain Thai (percent-encoded in the URL); h3 does not
   // decode router params by default.
   const id = decodeRouteSegment(getRouterParam(event, 'id', { decode: true })!)

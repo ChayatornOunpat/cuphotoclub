@@ -1,5 +1,12 @@
 <script setup lang="ts">
-const props = defineProps<{ prefix?: string, aspect?: string }>()
+// `allowLibrary` off means upload-only. Collections use it: their cover belongs
+// to that one collection, and picking a shared library image would make the
+// object referenced from two places, so replacing or deleting one silently
+// pulls the image out of the other.
+const props = withDefaults(
+  defineProps<{ prefix?: string, aspect?: string, allowLibrary?: boolean }>(),
+  { allowLibrary: true }
+)
 const model = defineModel<string | null>()
 const { t } = useI18n()
 
@@ -25,7 +32,7 @@ function onPicked(keys: string[]) {
     <div v-if="model" class="relative overflow-hidden rounded-md ring-1 ring-line">
       <img :src="`/images/${model}`" class="w-full object-cover" :class="aspect || 'aspect-[16/9]'" alt="">
       <div class="absolute right-2 top-2 flex gap-1.5">
-        <button type="button" class="rounded bg-white/90 p-1.5 text-ink-soft hover:bg-white hover:text-ink" :title="t('adminPicker.chooseFromLibrary')" @click="pickerOpen = true">
+        <button v-if="props.allowLibrary" type="button" class="rounded bg-white/90 p-1.5 text-ink-soft hover:bg-white hover:text-ink" :title="t('adminPicker.chooseFromLibrary')" @click="pickerOpen = true">
           <Icon name="heroicons:photo" class="size-4" />
         </button>
         <button type="button" class="rounded bg-white/90 p-1.5 text-red-600 hover:bg-white" @click="model = null">
@@ -42,11 +49,11 @@ function onPicked(keys: string[]) {
         :dropzone-class="aspect || 'aspect-[16/9]'"
         @uploaded="onUploaded"
       />
-      <button type="button" class="justify-self-start text-xs text-ink-soft underline hover:text-ink" @click="pickerOpen = true">
+      <button v-if="props.allowLibrary" type="button" class="justify-self-start text-xs text-ink-soft underline hover:text-ink" @click="pickerOpen = true">
         {{ t('adminPicker.chooseFromLibrary') }}
       </button>
     </div>
 
-    <AdminImagePickerModal v-model="pickerOpen" :prefix="prefix || 'covers'" @select="onPicked" />
+    <AdminImagePickerModal v-if="props.allowLibrary" v-model="pickerOpen" :prefix="prefix || 'covers'" @select="onPicked" />
   </div>
 </template>

@@ -251,8 +251,8 @@ async function submitPasswordGate() {
       body: { password: passwordGate.password }
     })
     resolvePasswordGate(true)
-  } catch (err: any) {
-    passwordGate.error = err?.data?.message || 'Password check failed.'
+  } catch (err) {
+    passwordGate.error = errText(err) || 'Password check failed.'
   } finally {
     passwordGate.loading = false
   }
@@ -262,15 +262,24 @@ const DELETE_RESOURCE_LIMIT_PAUSE_MS = 30_000
 let deleteResourcePausePromise: Promise<void> | null = null
 let deleteResourcePauseTimer: ReturnType<typeof setInterval> | null = null
 
-function rawDeleteError(err: any) {
-  const data = err?.data
-  return typeof data === 'string'
-    ? data
-    : data?.message || data?.statusMessage || err?.message || ''
+// $fetch rejections carry the server payload on `data`; everything that reads
+// an error message goes through here so the digging is written once.
+type FetchErr = {
+  statusCode?: number
+  message?: string
+  data?: string | { message?: string, statusMessage?: string }
 }
 
-function isDeleteResourceLimitError(err: any) {
-  return /Worker exceeded resource limits|Error 1102/i.test(rawDeleteError(err))
+function errText(err: unknown): string {
+  const e = err as FetchErr | undefined
+  const data = e?.data
+  return typeof data === 'string'
+    ? data
+    : data?.message || data?.statusMessage || e?.message || ''
+}
+
+function isDeleteResourceLimitError(err: unknown) {
+  return /Worker exceeded resource limits|Error 1102/i.test(errText(err))
 }
 
 function beginDeleteResourceLimitPause() {
@@ -343,12 +352,12 @@ async function deleteImage(image: R2Image) {
     stepDeleteProgress(image.key)
     await refresh()
     await refreshTrash()
-  } catch (err: any) {
-    if (err?.statusCode === 409) {
+  } catch (err) {
+    if ((err as FetchErr)?.statusCode === 409) {
       stepDeleteProgress(image.key, 'blocked')
       if (await askDeleteConfirmation({
         title: 'Trash referenced image?',
-        message: err.data?.message || 'This image is still referenced elsewhere.',
+        message: errText(err) || 'This image is still referenced elsewhere.',
         detail: image.key,
         confirmLabel: 'Move to trash anyway'
       })) {
@@ -358,16 +367,16 @@ async function deleteImage(image: R2Image) {
           stepDeleteProgress(image.key)
           await refresh()
           await refreshTrash()
-        } catch (forceErr: any) {
+        } catch (forceErr) {
           if (isDeleteResourceLimitError(forceErr)) await beginDeleteResourceLimitPause()
           stepDeleteProgress(image.key, 'failed')
-          alert(forceErr?.data?.message || 'Could not move image to trash.')
+          alert(errText(forceErr) || 'Could not move image to trash.')
         }
       }
     } else {
       if (isDeleteResourceLimitError(err)) await beginDeleteResourceLimitPause()
       stepDeleteProgress(image.key, 'failed')
-      alert(err?.data?.message || 'Could not move image to trash.')
+      alert(errText(err) || 'Could not move image to trash.')
     }
   } finally {
     deletingKey.value = null
@@ -467,10 +476,6 @@ function goToPage(n: number) {
 const DELETE_DIRECT_CONCURRENCY = 8
 const DELETE_SESSION_SIZE = 250
 
-function wait(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
 async function runDeletePool<T>(items: T[], worker: (item: T) => Promise<void>) {
   for (let index = 0; index < items.length; index += DELETE_DIRECT_CONCURRENCY) {
     await waitForDeleteResourceLimitPause()
@@ -531,17 +536,17 @@ async function runDeleteSessions(keys: string[], force: boolean, blocked: string
         await requestDirectDelete(item)
         results.push({ key: item.key, status: 'deleted' })
         stepDeleteProgress(item.key)
-      } catch (err: any) {
+      } catch (err) {
         failed.push(item.key)
-        results.push({ key: item.key, status: 'failed', error: err?.message || 'Direct R2 delete failed.' })
+        results.push({ key: item.key, status: 'failed', error: errText(err) || 'Direct R2 delete failed.' })
         stepDeleteProgress(item.key, 'failed')
       }
     })
 
     try {
       await completeDeleteSession(session.id, results)
-    } catch (err: any) {
-      const message = err?.data?.message || err?.message || 'Could not complete delete session.'
+    } catch (err) {
+      const message = errText(err) || 'Could not complete delete session.'
       for (const result of results) {
         if (result.status === 'deleted') failed.push(result.key)
       }
@@ -567,10 +572,10 @@ async function runTrashSessions(keys: string[], force: boolean, blocked: string[
           stepDeleteProgress(item.key)
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       if (isDeleteResourceLimitError(err)) await beginDeleteResourceLimitPause()
       for (const key of chunk) stepDeleteProgress(key, 'failed')
-      alert(rawDeleteError(err) || 'Could not move images to trash.')
+      alert(errText(err) || 'Could not move images to trash.')
     }
   }
 }
@@ -701,8 +706,8 @@ async function restoreKeys(keys: string[]) {
     clearTrashSelection()
     await refreshTrash()
     await refresh()
-  } catch (err: any) {
-    alert(rawDeleteError(err) || 'Could not restore images.')
+  } catch (err) {
+    alert(errText(err) || 'Could not restore images.')
   } finally {
     trashBusy.value = false
   }

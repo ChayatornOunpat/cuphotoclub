@@ -750,8 +750,8 @@ const previewAlbum = computed(() => ({
   coverSrc: form.coverSrc || form.rows.flatMap(r => r.cells).find(c => c.type === 'image' && c.src)?.src || PLACEHOLDER_IMG,
   dark: form.dark,
   textDefaults: form.textDefaults,
-  rows: form.rows.map((row, ri) => ({
-    cells: row.cells.map((cell, ci) => {
+  rows: form.rows.map(row => ({
+    cells: row.cells.map((cell) => {
       if (cell.type !== 'image') return cell
       return { ...cell, src: cell.src || PLACEHOLDER_IMG }
     })
