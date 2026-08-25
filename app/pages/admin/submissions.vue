@@ -28,9 +28,7 @@ useHead(() => ({ title: t('adminPool.title') }))
 .admin-wrap { max-width: 1120px; margin: 0 auto; padding: 3rem 2rem 5rem; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 2.5rem; gap: 1.5rem; }
 .page-head h1 { font-family: var(--font-serif); font-size: 2.5rem; font-weight: 200; margin-top: 0.5rem; }
-.back { display: inline-block; font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+.back { display: inline-block; font-size: 0.58rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
 .back:hover { color: var(--accent); }
-/* The lead is a full sentence, not a label — it was set at label size and
-   tracked out like one, which made it the hardest line on the page to read. */
-.sub { font-size: 0.88rem; letter-spacing: 0.01em; line-height: 1.55; color: var(--muted); margin-top: 0.5rem; max-width: 70ch; }
+.sub { font-size: 0.7rem; letter-spacing: 0.1em; color: var(--muted); margin-top: 0.35rem; }
 </style>

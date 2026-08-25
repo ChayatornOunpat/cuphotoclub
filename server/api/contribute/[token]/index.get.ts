@@ -37,6 +37,10 @@ export default defineEventHandler(async (event) => {
       ? {
           displayName: contributor.displayName,
           contact: contributor.contact,
+          // Null on rows created before the column existed — the page treats
+          // that as "not consented", which is the safe reading.
+          creditHandle: Boolean(contributor.creditHandle),
+          note: contributor.note,
           // Only present for the browser that minted it; someone who arrived by
           // typing a code already has it in hand.
           code: (await sessionClaimCode(event, link.id).then(code => code && formatClaimCode(code))) || null,

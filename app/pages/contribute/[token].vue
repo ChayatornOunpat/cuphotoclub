@@ -1,11 +1,22 @@
 <script setup lang="ts">
-// Participant upload page. Deliberately shaped like dropping files into Google
-// Drive: the dropzone is the page, and everything else sits at the edges.
-// There are no settings here — caps, compression and the byte ceiling are all
-// decided by the admin on the link (see docs/event-photo-submissions.md).
-definePageMeta({ layout: 'site' })
+// Participant upload page. Three stages rather than one flat form:
+//
+//   1. welcome  — what this collection is, and what a claim code is for.
+//   2. identity — mint a code (optionally with a name / contact / credit
+//                 consent), or adopt one typed from another device.
+//   3. upload   — the working screen: sticky counter, dropzone, photo grid.
+//
+// Everything about the upload itself (presign → PUT → complete, compression,
+// retries, the pending queue) still lives in R2ImageUploader; this page only
+// decides composition, chrome and state. Caps, compression and the byte ceiling
+// are the admin's, set on the link (see docs/event-photo-submissions.md).
+//
+// The layout is `contribute`, not `site`: no nav, no footer nav columns. See
+// app/layouts/contribute.vue for why.
+definePageMeta({ layout: 'contribute' })
 
 const { t, locale } = useI18n()
+const localePath = useLocalePath()
 const route = useRoute()
 const token = computed(() => String(route.params.token || ''))
 
@@ -28,6 +39,8 @@ interface LinkState {
   me: {
     displayName: string | null
     contact: string | null
+    creditHandle: boolean
+    note: string | null
     code: string | null
     used: number
     remaining: number
@@ -46,39 +59,38 @@ interface MineItem {
 
 const api = computed(() => `/api/contribute/${encodeURIComponent(token.value)}`)
 
-const { data: state, refresh: refreshState } = await useFetch<LinkState>(api, {
+const { data: state, error: stateError, refresh: refreshState } = await useFetch<LinkState>(api, {
   key: () => `contribute-${token.value}`
 })
-
-if (!state.value) {
-  throw createError({ statusCode: 404, statusMessage: 'Upload link not found', fatal: true })
-}
 
 // useFetch sets `data` back to undefined when a refresh fails, and a refresh
 // runs after every save. Holding the last good payload keeps a network blip
 // from blanking a page someone is in the middle of using.
-const lastGood = ref<LinkState>(state.value)
+const lastGood = ref<LinkState | null>(state.value ?? null)
 watch(state, (value) => { if (value) lastGood.value = value })
-const view = computed<LinkState>(() => state.value ?? lastGood.value)
 
-const mine = ref<MineItem[]>([])
-const loadingMine = ref(false)
-
-async function refreshMine() {
-  loadingMine.value = true
-  try {
-    const result = await $fetch<{ open: boolean, items: MineItem[] }>(`${api.value}/mine`)
-    mine.value = result.items
-  } catch {
-    mine.value = []
-  } finally {
-    loadingMine.value = false
-  }
+// A deleted collection and a mistyped token are indistinguishable to the server,
+// so the page owns this state in its own words rather than throwing a fatal 404
+// into the site-wide error page — which offers "back to home", useless to
+// someone standing in a venue holding a QR code.
+const notFound = computed(() => !state.value && !lastGood.value)
+if (import.meta.server && !state.value) {
+  const event = useRequestEvent()
+  if (event) setResponseStatus(event, 404)
 }
 
-onMounted(() => {
-  if (state.value?.me) refreshMine()
-})
+// Shape-complete stand-in so every computed below can stay unguarded. Only ever
+// read while the not-found branch is what actually renders.
+const EMPTY: LinkState = {
+  link: {
+    label: null, description: null, coverKey: null, eventDate: null, location: null,
+    open: false, requireName: false, maxPerContributor: 0,
+    compress: true, compressMaxDim: 3040, compressQuality: 85,
+    maxBytesPerPhoto: 0, expiresAt: null
+  },
+  me: null
+}
+const view = computed<LinkState>(() => state.value ?? lastGood.value ?? EMPTY)
 
 const link = computed(() => view.value.link)
 const me = computed(() => view.value.me)
@@ -86,135 +98,301 @@ const open = computed(() => link.value.open)
 const used = computed(() => me.value?.used ?? 0)
 const remaining = computed(() => me.value?.remaining ?? link.value.maxPerContributor)
 const atLimit = computed(() => Boolean(me.value) && remaining.value <= 0)
+const meterRatio = computed(() => {
+  const max = link.value.maxPerContributor || 1
+  return Math.min(1, used.value / max)
+})
 
-// ── Name / credit ───────────────────────────────────────────────────────────
+// ── Stage machine ───────────────────────────────────────────────────────────
+type Stage = 'welcome' | 'create' | 'issued' | 'claim' | 'upload'
+// Someone who already has an identity in this browser lands straight on the
+// working screen; the welcome is for a first visit, not a returning tab.
+const stage = ref<Stage>(me.value ? 'upload' : 'welcome')
+
+const errorMessage = ref('')
+function apiMessage(err: unknown, fallback: string) {
+  const data = (err as { data?: { message?: string } })?.data
+  return data?.message || fallback
+}
+
+// ── Toasts ──────────────────────────────────────────────────────────────────
+const toast = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+function showToast(message: string) {
+  toast.value = message
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toast.value = '' }, 2600)
+}
+
+// ── Clipboard ───────────────────────────────────────────────────────────────
+// navigator.clipboard does not exist on a non-secure origin, and this page is
+// opened over venue wifi more than anywhere else on the site. Fall back to the
+// old offscreen-selection trick before admitting defeat.
+async function writeClipboard(text: string) {
+  try {
+    if (window.isSecureContext && navigator.clipboard) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // Blocked or denied — the fallback below may still work.
+  }
+  try {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.top = '-1000px'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
+    area.select()
+    area.setSelectionRange(0, text.length)
+    const ok = document.execCommand('copy')
+    document.body.removeChild(area)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+async function copyCode() {
+  const code = me.value?.code
+  if (!code) return
+  const ok = await writeClipboard(code)
+  showToast(ok ? t('contribute.codeCopied') : t('contribute.copyFailed'))
+}
+
+// ── Their photos ────────────────────────────────────────────────────────────
+const mine = ref<MineItem[]>([])
+const loadingMine = ref(false)
+const selectedIds = ref<string[]>([])
+
+async function refreshMine() {
+  loadingMine.value = true
+  try {
+    const result = await $fetch<{ open: boolean, items: MineItem[] }>(`${api.value}/mine`)
+    mine.value = result.items
+    // Drop selections whose photo is gone, or "3 selected" outlives the photos.
+    const alive = new Set(result.items.map(item => item.id))
+    selectedIds.value = selectedIds.value.filter(id => alive.has(id))
+  } catch {
+    mine.value = []
+    selectedIds.value = []
+  } finally {
+    loadingMine.value = false
+  }
+}
+
+onMounted(() => { if (me.value) refreshMine() })
+
+// ── Identity fields ─────────────────────────────────────────────────────────
 const nameInput = ref('')
 const contactInput = ref('')
-const savingName = ref(false)
-const nameSaved = ref(false)
+const creditHandle = ref(false)
+const noteInput = ref('')
+const creating = ref(false)
+
 // Seed the fields from the server once per identity. A plain watchEffect on
 // `me` re-ran after every refresh and overwrote whatever was half-typed.
-const seededFor = ref('')
+const seeded = ref(false)
 watch(me, (value) => {
-  const key = value ? `${value.displayName ?? ''}|${value.contact ?? ''}` : ''
-  if (!value || seededFor.value) return
-  seededFor.value = key || 'seeded'
+  if (!value || seeded.value) return
+  seeded.value = true
   nameInput.value = value.displayName ?? ''
   contactInput.value = value.contact ?? ''
+  creditHandle.value = Boolean(value.creditHandle)
+  noteInput.value = value.note ?? ''
 }, { immediate: true })
 
-async function saveName() {
-  if (!open.value || savingName.value) return
-  savingName.value = true
+async function createCode() {
+  if (creating.value) return
+  creating.value = true
   errorMessage.value = ''
   try {
     await $fetch(`${api.value}/me`, {
       method: 'PATCH',
-      body: { displayName: nameInput.value, contact: contactInput.value }
+      body: {
+        displayName: nameInput.value,
+        contact: contactInput.value,
+        creditHandle: creditHandle.value
+      }
     })
     await refreshState()
-    nameSaved.value = true
-    setTimeout(() => { nameSaved.value = false }, 1800)
+    // No plaintext code means this browser adopted an identity rather than
+    // minting one; there is nothing to show, so go straight to work.
+    stage.value = me.value?.code ? 'issued' : 'upload'
+    await refreshMine()
   } catch (err) {
     errorMessage.value = apiMessage(err, t('contribute.saveFailed'))
   } finally {
-    savingName.value = false
+    creating.value = false
   }
 }
 
-// ── Claim code ──────────────────────────────────────────────────────────────
-const codeCopied = ref(false)
-async function copyCode() {
-  if (!me.value?.code) return
-  try {
-    await navigator.clipboard.writeText(me.value.code)
-    codeCopied.value = true
-    setTimeout(() => { codeCopied.value = false }, 1600)
-  } catch {
-    // Clipboard blocked (insecure context, permissions) — the code is on screen
-    // to read anyway, so this is not worth an error message.
-  }
-}
-
-const showCodeEntry = ref(false)
+// ── Adopt a code ────────────────────────────────────────────────────────────
 const codeInput = ref('')
 const claiming = ref(false)
+const claimError = ref('')
+
+// Format as they type, so a code pasted out of a screenshot, a chat message or
+// a notes app lands in the CUPC-XXXXX-XXXXX shape. "CUPC" can never begin a real
+// code body — U is not in the Crockford alphabet the codes are drawn from — so
+// stripping a leading prefix is unambiguous, and treating a *partial* prefix as
+// literal is what keeps backspace from re-inserting the text being deleted.
+function formatCodeInput(raw: string) {
+  const cleaned = String(raw || '').toUpperCase().replace(/[^0-9A-Z]/g, '')
+  if (!cleaned) return ''
+  if ('CUPC'.startsWith(cleaned)) return cleaned
+  const body = cleaned.startsWith('CUPC') ? cleaned.slice(4) : cleaned
+  const parts = ['CUPC', body.slice(0, 5)]
+  if (body.length > 5) parts.push(body.slice(5, 10))
+  return parts.join('-')
+}
+
+function onCodeInput(event: Event) {
+  const el = event.target as HTMLInputElement
+  const formatted = formatCodeInput(el.value)
+  codeInput.value = formatted
+  el.value = formatted
+}
+
 async function claimCode() {
   if (claiming.value || !codeInput.value.trim()) return
   claiming.value = true
-  errorMessage.value = ''
+  claimError.value = ''
   try {
     await $fetch(`${api.value}/claim`, { method: 'POST', body: { code: codeInput.value } })
     codeInput.value = ''
-    showCodeEntry.value = false
+    seeded.value = false
     await refreshState()
     await refreshMine()
+    stage.value = 'upload'
   } catch (err) {
-    errorMessage.value = apiMessage(err, t('contribute.codeNotFound'))
+    claimError.value = apiMessage(err, t('contribute.claimFailed'))
   } finally {
     claiming.value = false
   }
 }
 
 // ── Uploads ─────────────────────────────────────────────────────────────────
-const errorMessage = ref('')
-const uploadedKeys = ref<string[]>([])
-
-function apiMessage(err: unknown, fallback: string) {
-  const data = (err as { data?: { message?: string } })?.data
-  return data?.message || fallback
-}
-
 // The uploader manages its own progress; once a batch lands we re-read both the
 // counts and the grid so "34 of 100" and the thumbnails agree.
+const uploadedKeys = ref<string[]>([])
 async function onUploaded() {
   await Promise.all([refreshState(), refreshMine()])
 }
 
-// ── Per-photo edit / remove ─────────────────────────────────────────────────
-const editingId = ref('')
-const captionDraft = ref('')
-const busyId = ref('')
+// ── Selection ───────────────────────────────────────────────────────────────
+const selectionCount = computed(() => selectedIds.value.length)
 
-function startEdit(item: MineItem) {
-  editingId.value = item.id
-  captionDraft.value = item.caption ?? ''
+function isSelected(id: string) {
+  return selectedIds.value.includes(id)
+}
+function toggleSelect(id: string) {
+  selectedIds.value = isSelected(id)
+    ? selectedIds.value.filter(row => row !== id)
+    : [...selectedIds.value, id]
+}
+function selectAll() {
+  selectedIds.value = mine.value.map(item => item.id)
+}
+function clearSelection() {
+  selectedIds.value = []
 }
 
-async function saveCaption(item: MineItem) {
-  busyId.value = item.id
-  errorMessage.value = ''
-  try {
-    await $fetch(`${api.value}/mine/${item.id}`, {
-      method: 'PATCH',
-      body: { caption: captionDraft.value }
-    })
-    item.caption = captionDraft.value.trim() || null
-    editingId.value = ''
-  } catch (err) {
-    errorMessage.value = apiMessage(err, t('contribute.saveFailed'))
-  } finally {
-    busyId.value = ''
-  }
+// ── Removal ─────────────────────────────────────────────────────────────────
+const removing = ref(false)
+// Confirmation is a dialog, never a second inline button: on a phone the second
+// tap of an accidental double-tap would land on "yes" and the batch is gone.
+const confirmOpen = ref(false)
+const cancelButton = ref<HTMLButtonElement | null>(null)
+watch(confirmOpen, (value) => {
+  if (value) nextTick(() => cancelButton.value?.focus())
+})
+
+async function deleteOne(id: string) {
+  await $fetch(`${api.value}/mine/${id}`, { method: 'DELETE' })
+  mine.value = mine.value.filter(row => row.id !== id)
+  selectedIds.value = selectedIds.value.filter(row => row !== id)
 }
 
-const confirmRemoveId = ref('')
-
-async function removePhoto(item: MineItem) {
-  busyId.value = item.id
+// The × on a tile removes that one photo straight away. One tap, one photo, and
+// it is the photo under their finger — there is nothing to confirm.
+async function removeOne(item: MineItem) {
+  if (removing.value || !open.value) return
+  removing.value = true
   errorMessage.value = ''
   try {
-    await $fetch(`${api.value}/mine/${item.id}`, { method: 'DELETE' })
-    mine.value = mine.value.filter(row => row.id !== item.id)
-    confirmRemoveId.value = ''
+    await deleteOne(item.id)
     await refreshState()
+    showToast(t('contribute.removedOne'))
   } catch (err) {
     errorMessage.value = apiMessage(err, t('contribute.removeFailed'))
   } finally {
-    busyId.value = ''
+    removing.value = false
   }
 }
 
+async function removeSelected() {
+  if (removing.value) return
+  removing.value = true
+  errorMessage.value = ''
+  const count = selectedIds.value.length
+  try {
+    for (const id of [...selectedIds.value]) await deleteOne(id)
+    confirmOpen.value = false
+    await refreshState()
+    showToast(count === 1 ? t('contribute.removedOne') : t('contribute.removedMany', { count }))
+  } catch (err) {
+    errorMessage.value = apiMessage(err, t('contribute.removeFailed'))
+  } finally {
+    removing.value = false
+  }
+}
+
+// ── Full-size viewer ────────────────────────────────────────────────────────
+const viewerId = ref('')
+const viewerItem = computed(() => mine.value.find(item => item.id === viewerId.value) ?? null)
+function openViewer(item: MineItem) { viewerId.value = item.id }
+function closeViewer() { viewerId.value = '' }
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && viewerId.value) closeViewer()
+}
+
+// ── Note ────────────────────────────────────────────────────────────────────
+const noteSaved = ref(false)
+const savingNote = ref(false)
+let noteFlashTimer: ReturnType<typeof setTimeout> | null = null
+
+// Saves on blur with a flash, matching how the name field has always behaved. A
+// submit button here would read as "send my photos", which it is not.
+async function saveNote() {
+  if (!open.value || savingNote.value) return
+  if ((noteInput.value.trim() || null) === (me.value?.note ?? null)) return
+  savingNote.value = true
+  errorMessage.value = ''
+  try {
+    await $fetch(`${api.value}/me`, { method: 'PATCH', body: { note: noteInput.value } })
+    await refreshState()
+    noteSaved.value = true
+    if (noteFlashTimer) clearTimeout(noteFlashTimer)
+    noteFlashTimer = setTimeout(() => { noteSaved.value = false }, 1800)
+  } catch (err) {
+    errorMessage.value = apiMessage(err, t('contribute.saveFailed'))
+  } finally {
+    savingNote.value = false
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  if (toastTimer) clearTimeout(toastTimer)
+  if (noteFlashTimer) clearTimeout(noteFlashTimer)
+})
+
+// ── Header presentation ─────────────────────────────────────────────────────
 const heading = computed(() => link.value.label || t('contribute.title'))
 const description = computed(() => link.value.description || '')
 
@@ -250,207 +428,410 @@ useSeoMeta({
 </script>
 
 <template>
-  <div class="contrib">
-    <header class="contrib__head" :class="{ 'contrib__head--cover': coverSrc }">
-      <!-- One bounded image per page load, so the transform budget applies. -->
-      <AppImg
-        v-if="coverSrc"
-        class="contrib__cover"
-        :src="coverSrc"
-        :alt="heading"
-        sizes="100vw md:720px"
-        eager
-        optimize
-      />
-      <div class="contrib__head-body">
-        <p class="contrib__eyebrow">{{ t('contribute.eyebrow') }}</p>
-        <h1 class="contrib__title">{{ heading }}</h1>
-        <p v-if="metaParts.length" class="contrib__meta">
-          <span v-for="(part, i) in metaParts" :key="part">
-            <span v-if="i" class="contrib__meta-sep" aria-hidden="true"> · </span>{{ part }}
-          </span>
-        </p>
-        <p v-if="description" class="contrib__desc">{{ description }}</p>
-        <p v-if="open" class="contrib__lead">{{ t('contribute.lead') }}</p>
-        <p v-else class="contrib__closed">{{ t('contribute.closed') }}</p>
-      </div>
-    </header>
-
-    <p v-if="errorMessage" class="contrib__error">{{ errorMessage }}</p>
-
-    <!-- Drop first, ask questions later. -->
-    <section v-if="open" class="contrib__drop">
-      <AdminR2ImageUploader
-        v-if="!atLimit"
-        v-model="uploadedKeys"
-        :endpoint-base="`${api}/sessions`"
-        :remember-signatures="false"
-        :handoff-to-dock="false"
-        :compress="link.compress"
-        :compress-max-dim="link.compressMaxDim"
-        :compress-quality="link.compressQuality"
-        :show-compress-control="false"
-        :max-bytes="link.maxBytesPerPhoto"
-        :show-previews="false"
-        :max-files="remaining"
-        @uploaded="onUploaded"
-      />
-      <p v-if="atLimit" class="contrib__limit">
-        {{ t('contribute.limitNotice', { max: link.maxPerContributor }) }}
-      </p>
-      <p class="contrib__counter" :class="{ 'is-full': atLimit }">
-        {{ t('contribute.counter', { used, max: link.maxPerContributor }) }}
-        <span v-if="atLimit"> · {{ t('contribute.limitReached') }}</span>
-      </p>
-    </section>
-
-    <!-- Credit. One optional field; blank means anonymous. -->
-    <section v-if="open" class="contrib__credit">
-      <div class="field">
-        <label class="field__label" for="contrib-name">
-          {{ link.requireName ? t('contribute.nameRequired') : t('contribute.nameOptional') }}
-        </label>
-        <input
-          id="contrib-name"
-          v-model="nameInput"
-          class="field__input"
-          type="text"
-          maxlength="120"
-          :placeholder="t('contribute.namePlaceholder')"
-          @blur="saveName"
-        >
-      </div>
-      <div class="field">
-        <label class="field__label" for="contrib-contact">{{ t('contribute.contactOptional') }}</label>
-        <input
-          id="contrib-contact"
-          v-model="contactInput"
-          class="field__input"
-          type="text"
-          maxlength="200"
-          :placeholder="t('contribute.contactPlaceholder')"
-          @blur="saveName"
-        >
-      </div>
-      <p class="contrib__credit-note">
-        <span v-if="nameSaved" class="contrib__saved">{{ t('contribute.saved') }}</span>
-        <span v-else>{{ t('contribute.creditNote') }}</span>
-      </p>
-    </section>
-
-    <!-- Claim code: a quiet strip, never a gate. -->
-    <section v-if="me?.code" class="contrib__code">
-      <span class="contrib__code-label">{{ t('contribute.codeLabel') }}</span>
-      <code class="contrib__code-value">{{ me.code }}</code>
-      <button type="button" class="contrib__code-copy" @click="copyCode">
-        {{ codeCopied ? t('contribute.copied') : t('contribute.copy') }}
-      </button>
-      <span class="contrib__code-hint">{{ t('contribute.codeHint') }}</span>
-    </section>
-
-    <section v-else class="contrib__code contrib__code--entry">
-      <button v-if="!showCodeEntry" type="button" class="contrib__link-btn" @click="showCodeEntry = true">
-        {{ t('contribute.haveCode') }}
-      </button>
-      <template v-else>
-        <input
-          v-model="codeInput"
-          class="field__input contrib__code-input"
-          :aria-label="t('contribute.codePlaceholder')"
-          type="text"
-          autocapitalize="characters"
-          spellcheck="false"
-          :placeholder="t('contribute.codePlaceholder')"
-          @keyup.enter="claimCode"
-        >
-        <button type="button" class="contrib__code-copy" :disabled="claiming" @click="claimCode">
-          {{ claiming ? t('contribute.checking') : t('contribute.useCode') }}
-        </button>
-      </template>
-    </section>
-
-    <!-- Their photos. This grid is the confirmation that it worked. -->
-    <section v-if="mine.length" class="contrib__mine">
-      <h2 class="contrib__mine-title">{{ t('contribute.yourPhotos', { count: mine.length }) }}</h2>
-      <ul class="grid">
-        <li v-for="item in mine" :key="item.id" class="tile">
-          <img class="tile__img" :src="item.previewUrl" alt="" loading="lazy">
-
-          <div v-if="editingId === item.id" class="tile__edit">
-            <input
-              v-model="captionDraft"
-              class="field__input"
-              :aria-label="t('contribute.captionPlaceholder')"
-              type="text"
-              maxlength="500"
-              :placeholder="t('contribute.captionPlaceholder')"
-              @keyup.enter="saveCaption(item)"
-            >
-            <div class="tile__edit-actions">
-              <button type="button" class="tile__btn" :disabled="busyId === item.id" @click="saveCaption(item)">
-                {{ t('contribute.save') }}
-              </button>
-              <button type="button" class="tile__btn" @click="editingId = ''">{{ t('contribute.cancel') }}</button>
-            </div>
-          </div>
-
-          <div v-else class="tile__foot">
-            <p class="tile__caption">{{ item.caption || t('contribute.noCaption') }}</p>
-            <div v-if="open" class="tile__actions">
-              <button type="button" class="tile__btn" @click="startEdit(item)">{{ t('contribute.edit') }}</button>
-              <button
-                v-if="confirmRemoveId !== item.id"
-                type="button"
-                class="tile__btn tile__btn--danger"
-                @click="confirmRemoveId = item.id"
-              >{{ t('contribute.remove') }}</button>
-              <template v-else>
-                <button
-                  type="button"
-                  class="tile__btn tile__btn--danger"
-                  :disabled="busyId === item.id"
-                  @click="removePhoto(item)"
-                >{{ t('contribute.confirmRemove') }}</button>
-                <button type="button" class="tile__btn" @click="confirmRemoveId = ''">{{ t('contribute.cancel') }}</button>
-              </template>
-            </div>
-          </div>
-        </li>
+  <!-- ── Not found ──────────────────────────────────────────────────────── -->
+  <div v-if="notFound || stateError" class="stage stage--solo">
+    <div class="stage__body stage__body--narrow">
+      <p class="mark"><span class="mark__cu">CU</span>PHOTOCLUB</p>
+      <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
+      <h1 class="stage__title">{{ t('contribute.notFoundTitle') }}</h1>
+      <p class="stage__lead">{{ t('contribute.notFoundLead') }}</p>
+      <ul class="notes">
+        <li>{{ t('contribute.notFoundNote1') }}</li>
+        <li>{{ t('contribute.notFoundNote2') }}</li>
       </ul>
+      <div class="actions">
+        <NuxtLink class="btn btn--fill" :to="localePath('/albums')">{{ t('contribute.notFoundAlbums') }}</NuxtLink>
+        <NuxtLink class="btn btn--ghost" :to="localePath('/contacts')">{{ t('contribute.notFoundContact') }}</NuxtLink>
+      </div>
+    </div>
+  </div>
+
+  <div v-else class="contrib">
+    <!-- ── Stage 1: welcome ─────────────────────────────────────────────── -->
+    <template v-if="stage === 'welcome'">
+      <header class="stage" :class="{ 'stage--cover': coverSrc }">
+        <!-- One bounded image per page load, so the transform budget applies. -->
+        <AppImg
+          v-if="coverSrc"
+          class="stage__cover"
+          :src="coverSrc"
+          :alt="heading"
+          sizes="100vw md:720px"
+          eager
+          optimize
+        />
+        <div class="stage__body">
+          <p class="mark"><span class="mark__cu">CU</span>PHOTOCLUB</p>
+          <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
+          <h1 class="stage__title">{{ heading }}</h1>
+          <p v-if="metaParts.length" class="stage__meta">
+            <span v-for="(part, i) in metaParts" :key="part">
+              <span v-if="i" class="stage__meta-sep" aria-hidden="true"> · </span>{{ part }}
+            </span>
+          </p>
+          <p v-if="description" class="stage__desc">{{ description }}</p>
+        </div>
+      </header>
+      <div class="cut-line" />
+
+      <div class="welcome">
+        <p v-if="!open" class="alert">{{ t('contribute.closed') }}</p>
+
+        <section class="about">
+          <h2 class="about__title">{{ t('contribute.codeAboutTitle') }}</h2>
+          <i18n-t class="about__body" keypath="contribute.codeAboutBody" tag="p" scope="global">
+            <template #code>
+              <code class="about__code">{{ t('contribute.codePlaceholder') }}</code>
+            </template>
+            <template #screenshot>
+              <strong class="about__strong">{{ t('contribute.codeAboutScreenshot') }}</strong>
+            </template>
+          </i18n-t>
+        </section>
+
+        <div class="actions">
+          <button v-if="open" type="button" class="btn btn--fill" @click="stage = 'create'">
+            {{ t('contribute.getCode') }}
+          </button>
+          <button type="button" class="btn btn--ghost" @click="stage = 'claim'">
+            {{ t('contribute.haveCode') }}
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <!-- ── Stage 2a: get your code ──────────────────────────────────────── -->
+    <section v-else-if="stage === 'create'" class="panel">
+      <div class="panel__inner">
+        <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
+        <h1 class="panel__title">{{ t('contribute.createTitle') }}</h1>
+
+        <p v-if="errorMessage" class="alert">{{ errorMessage }}</p>
+
+        <div class="field">
+          <label class="field__label" for="contrib-name">
+            {{ link.requireName ? t('contribute.nameRequired') : t('contribute.nameOptional') }}
+          </label>
+          <input
+            id="contrib-name"
+            v-model="nameInput"
+            class="field__input"
+            type="text"
+            maxlength="120"
+            :placeholder="t('contribute.namePlaceholder')"
+          >
+          <p class="field__hint">{{ t('contribute.nameHint') }}</p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="contrib-contact">{{ t('contribute.contactOptional') }}</label>
+          <input
+            id="contrib-contact"
+            v-model="contactInput"
+            class="field__input"
+            type="text"
+            maxlength="200"
+            :placeholder="t('contribute.contactPlaceholder')"
+          >
+          <!-- The hint rewrites itself with the switch: the same field means two
+               different things depending on whether it will be published. -->
+          <p class="field__hint">
+            {{ creditHandle ? t('contribute.contactHintPublic') : t('contribute.contactHintPrivate') }}
+          </p>
+        </div>
+
+        <!-- Squared, not a pill. This is a consent control, and everything else
+             on the site is right angles. -->
+        <button
+          type="button"
+          class="switch"
+          role="switch"
+          :aria-checked="creditHandle"
+          @click="creditHandle = !creditHandle"
+        >
+          <span class="switch__box" :class="{ 'is-on': creditHandle }" aria-hidden="true">
+            <span class="switch__knob" />
+          </span>
+          <span class="switch__label">{{ t('contribute.creditSwitch') }}</span>
+        </button>
+
+        <div class="actions actions--stack">
+          <button type="button" class="btn btn--fill" :disabled="creating" @click="createCode">
+            {{ creating ? t('contribute.creating') : t('contribute.createCode') }}
+          </button>
+          <button type="button" class="linkbtn" @click="stage = 'welcome'">{{ t('contribute.back') }}</button>
+        </div>
+      </div>
     </section>
 
-    <p v-else-if="me && !loadingMine" class="contrib__empty">{{ t('contribute.empty') }}</p>
+    <!-- ── Stage 2b: code issued ────────────────────────────────────────── -->
+    <section v-else-if="stage === 'issued'" class="panel">
+      <div class="panel__inner">
+        <p class="eyebrow-line">{{ t('contribute.codeLabel') }}</p>
+
+        <button type="button" class="codeframe" :aria-label="t('contribute.copyCodeAria')" @click="copyCode">
+          <span class="codeframe__value">{{ me?.code }}</span>
+        </button>
+
+        <p class="panel__lead">{{ t('contribute.issuedLead') }}</p>
+
+        <i18n-t class="warn" keypath="contribute.issuedWarn" tag="p" scope="global">
+          <template #emphasis>
+            <strong class="warn__strong">{{ t('contribute.issuedWarnEmphasis') }}</strong>
+          </template>
+        </i18n-t>
+
+        <div class="actions actions--stack">
+          <button type="button" class="btn btn--ghost" @click="copyCode">{{ t('contribute.copyCode') }}</button>
+          <button type="button" class="btn btn--fill" @click="stage = 'upload'">
+            {{ t('contribute.issuedContinue') }}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Stage 2c: enter a code ───────────────────────────────────────── -->
+    <section v-else-if="stage === 'claim'" class="panel">
+      <div class="panel__inner">
+        <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
+        <h1 class="panel__title">{{ t('contribute.claimTitle') }}</h1>
+
+        <div class="field">
+          <label class="field__label" for="contrib-code">{{ t('contribute.codeLabel') }}</label>
+          <input
+            id="contrib-code"
+            class="field__input field__input--code"
+            type="text"
+            autocapitalize="characters"
+            autocomplete="off"
+            spellcheck="false"
+            maxlength="16"
+            :value="codeInput"
+            :placeholder="t('contribute.codePlaceholder')"
+            @input="onCodeInput"
+            @keyup.enter="claimCode"
+          >
+          <p v-if="claimError" class="field__error">{{ claimError }}</p>
+        </div>
+
+        <div class="actions actions--stack">
+          <button type="button" class="btn btn--fill" :disabled="claiming" @click="claimCode">
+            {{ claiming ? t('contribute.checking') : t('contribute.useCode') }}
+          </button>
+          <button v-if="open" type="button" class="linkbtn" @click="stage = 'create'">
+            {{ t('contribute.claimToGetCode') }}
+          </button>
+          <button type="button" class="linkbtn" @click="stage = 'welcome'">{{ t('contribute.back') }}</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Stage 3: upload ──────────────────────────────────────────────── -->
+    <template v-else>
+      <!-- Sticky because the counter, the code and the selection actions all
+           have to stay reachable while someone scrolls a wall of thumbnails. -->
+      <div class="topbar">
+        <div class="topbar__row topbar__row--title">
+          <div class="topbar__id">
+            <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
+            <p class="topbar__label">{{ heading }}</p>
+          </div>
+          <button
+            v-if="me?.code"
+            type="button"
+            class="chip"
+            :aria-label="t('contribute.copyCodeAria')"
+            @click="copyCode"
+          >{{ me.code }}</button>
+        </div>
+
+        <div v-if="selectionCount" class="topbar__row topbar__row--select">
+          <span class="topbar__count">{{ t('contribute.selectedCount', { n: selectionCount }) }}</span>
+          <div class="topbar__actions">
+            <button type="button" class="minibtn" @click="clearSelection">{{ t('contribute.cancel') }}</button>
+            <button type="button" class="minibtn minibtn--accent" :disabled="removing" @click="confirmOpen = true">
+              {{ t('contribute.remove') }}
+            </button>
+          </div>
+        </div>
+        <div v-else class="topbar__row">
+          <span class="topbar__count" :class="{ 'is-full': atLimit }">
+            {{ t('contribute.counter', { used, max: link.maxPerContributor }) }}
+          </span>
+          <button v-if="mine.length" type="button" class="minibtn" @click="selectAll">
+            {{ t('contribute.selectAll') }}
+          </button>
+        </div>
+
+        <div
+          class="meter"
+          role="progressbar"
+          :aria-valuenow="used"
+          aria-valuemin="0"
+          :aria-valuemax="link.maxPerContributor"
+        >
+          <span class="meter__fill" :style="{ transform: `scaleX(${meterRatio})` }" />
+        </div>
+      </div>
+
+      <div class="work">
+        <p v-if="errorMessage" class="alert">{{ errorMessage }}</p>
+        <p v-if="!open" class="alert alert--quiet">{{ t('contribute.closed') }}</p>
+
+        <!-- The dropzone is the page while nothing has landed, and a strip once
+             the grid has something to show. -->
+        <div v-if="open && !atLimit" class="zone" :class="mine.length ? 'zone--compact' : 'zone--full'">
+          <AdminR2ImageUploader
+            v-model="uploadedKeys"
+            :endpoint-base="`${api}/sessions`"
+            :remember-signatures="false"
+            :handoff-to-dock="false"
+            :compress="link.compress"
+            :compress-max-dim="link.compressMaxDim"
+            :compress-quality="link.compressQuality"
+            :show-compress-control="false"
+            :max-bytes="link.maxBytesPerPhoto"
+            :show-previews="false"
+            :max-files="remaining"
+            @uploaded="onUploaded"
+          />
+        </div>
+        <p v-else-if="open && atLimit" class="alert alert--quiet">
+          {{ t('contribute.limitNotice', { max: link.maxPerContributor }) }}
+        </p>
+
+        <ul v-if="mine.length" class="pgrid">
+          <li
+            v-for="item in mine"
+            :key="item.id"
+            class="ptile"
+            :class="{ 'is-selected': isSelected(item.id) }"
+          >
+            <button
+              type="button"
+              class="ptile__select"
+              :aria-pressed="isSelected(item.id)"
+              :aria-label="t('contribute.selectPhoto')"
+              @click="toggleSelect(item.id)"
+            >
+              <img class="ptile__img" :src="item.previewUrl" alt="" loading="lazy">
+            </button>
+
+            <button
+              type="button"
+              class="ptile__ctl ptile__ctl--zoom"
+              :aria-label="t('contribute.viewFullSize')"
+              @click.stop="openViewer(item)"
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+                <circle cx="7" cy="7" r="4.5" />
+                <line x1="10.4" y1="10.4" x2="14" y2="14" />
+              </svg>
+            </button>
+
+            <button
+              v-if="open"
+              type="button"
+              class="ptile__ctl ptile__ctl--remove"
+              :disabled="removing"
+              :aria-label="t('contribute.removePhoto')"
+              @click.stop="removeOne(item)"
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+                <line x1="4" y1="4" x2="12" y2="12" />
+                <line x1="12" y1="4" x2="4" y2="12" />
+              </svg>
+            </button>
+          </li>
+        </ul>
+        <p v-else-if="!loadingMine" class="empty">{{ t('contribute.empty') }}</p>
+
+        <section v-if="open" class="notebox">
+          <label class="field__label" for="contrib-note">{{ t('contribute.noteLabel') }}</label>
+          <textarea
+            id="contrib-note"
+            v-model="noteInput"
+            class="field__input notebox__area"
+            rows="3"
+            maxlength="2000"
+            :placeholder="t('contribute.notePlaceholder')"
+            @blur="saveNote"
+          />
+          <p class="field__hint">
+            <span v-if="noteSaved" class="field__saved">{{ t('contribute.saved') }}</span>
+            <span v-else>{{ t('contribute.noteHint') }}</span>
+          </p>
+        </section>
+      </div>
+    </template>
+
+    <!-- ── Full-size viewer ─────────────────────────────────────────────── -->
+    <Teleport to="body">
+      <div v-if="viewerItem" class="viewer" @click="closeViewer">
+        <img class="viewer__img" :src="viewerItem.previewUrl" alt="" @click.stop>
+        <button
+          type="button"
+          class="viewer__close"
+          :aria-label="t('contribute.closeViewer')"
+          @click.stop="closeViewer"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+            <line x1="4" y1="4" x2="12" y2="12" />
+            <line x1="12" y1="4" x2="4" y2="12" />
+          </svg>
+        </button>
+      </div>
+    </Teleport>
+
+    <!-- ── Remove confirmation ──────────────────────────────────────────── -->
+    <UiModal
+      :model-value="confirmOpen"
+      :title="selectionCount === 1
+        ? t('contribute.removeConfirmOne')
+        : t('contribute.removeConfirmMany', { count: selectionCount })"
+      @update:model-value="value => { if (!value) confirmOpen = false }"
+    >
+      <p class="confirm-text">{{ t('contribute.removeConfirmBody') }}</p>
+      <div class="confirm-actions">
+        <!-- Cancel takes focus: a stray tap must land on the safe one. -->
+        <button ref="cancelButton" type="button" class="minibtn" @click="confirmOpen = false">
+          {{ t('contribute.cancel') }}
+        </button>
+        <button type="button" class="minibtn minibtn--accent" :disabled="removing" @click="removeSelected">
+          {{ t('contribute.remove') }}
+        </button>
+      </div>
+    </UiModal>
+
+    <!-- ── Toast ────────────────────────────────────────────────────────── -->
+    <Transition name="toast">
+      <p v-if="toast" class="toast" role="status">{{ toast }}</p>
+    </Transition>
   </div>
 </template>
 
 <style scoped>
-.contrib {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 5rem 1.5rem 6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
+.contrib { display: flex; flex-direction: column; }
 
-/* Two header treatments. Without a cover the page keeps its plain editorial
-   stack on paper; with one the same stack moves onto the photo, over a scrim
-   that keeps the type legible whatever the admin uploaded. */
-.contrib__head { display: flex; flex-direction: column; gap: 0.6rem; }
-.contrib__head-body { display: contents; }
-
-.contrib__head--cover {
+/* ── The dark stage (welcome header + not-found) ────────────────────────── */
+.stage {
   position: relative;
-  display: block;
-  margin: -5rem -1.5rem 0;
-  padding: 0;
-  min-height: 260px;
-  background:
-    linear-gradient(135deg, var(--dark) 0%, #2A1A24 55%, var(--accent) 220%);
+  background: var(--hero-bg);
   overflow: hidden;
 }
+/* No cover: the club's own gradient, a deliberate treatment rather than a
+   stand-in for a missing photo. */
+.stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--dark) 0%, #2A1A24 55%, var(--accent) 220%);
+}
+.stage--cover::before { display: none; }
+.stage--solo { min-height: 100vh; display: flex; align-items: center; }
+
 /* AppImg's root element is the <img> itself, so this targets it directly. */
-.contrib__head--cover .contrib__cover {
+.stage__cover {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -458,105 +839,207 @@ useSeoMeta({
   object-fit: cover;
   display: block;
 }
-.contrib__head--cover::after {
+.stage--cover::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(12, 12, 10, 0.15) 0%, rgba(12, 12, 10, 0.82) 100%);
+  background: linear-gradient(to bottom, rgba(12, 12, 10, 0.2) 0%, rgba(12, 12, 10, 0.86) 100%);
 }
-.contrib__head--cover .contrib__head-body {
+.stage__body {
   position: relative;
   z-index: 1;
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 2.75rem 1.5rem 3.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding: 7rem 1.5rem 1.75rem;
+  gap: 0.7rem;
 }
-.contrib__meta {
-  font-family: var(--font-sans);
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-.contrib__meta-sep { color: var(--accent); }
+.stage__body--narrow { max-width: 44rem; }
 
-.contrib__head--cover .contrib__title { color: #F5F4F0; }
-.contrib__head--cover .contrib__meta { color: rgba(245, 244, 240, 0.7); }
-.contrib__head--cover .contrib__desc,
-.contrib__head--cover .contrib__lead { color: rgba(245, 244, 240, 0.82); }
-.contrib__head--cover .contrib__closed { color: #F5F4F0; }
-
-@media (min-width: 760px) {
-  .contrib__head--cover { min-height: 320px; border-radius: 0; }
-  .contrib__head--cover .contrib__head-body { padding: 8rem 2.25rem 2.25rem; }
+.mark {
+  font-family: var(--font-latin-sans);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  color: rgba(245, 244, 240, 0.72);
+  user-select: none;
+  margin-bottom: 1.75rem;
 }
-.contrib__eyebrow {
+.mark__cu { color: var(--accent); }
+
+.eyebrow-line {
   font-family: var(--font-sans);
   font-size: 0.5rem;
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--accent);
 }
-.contrib__title {
+
+.stage__title {
   font-family: var(--font-serif);
-  font-size: clamp(1.9rem, 4vw, 3rem);
-  line-height: 1.08;
-  color: var(--dark);
+  font-size: clamp(2rem, 5.5vw, 3.4rem);
+  font-weight: 300;
+  line-height: 1.06;
+  color: #F5F4F0;
 }
-.contrib__desc {
+.stage__meta {
   font-family: var(--font-sans);
-  font-size: 0.85rem;
-  line-height: 1.6;
-  color: var(--dark);
-  max-width: 52ch;
-  margin: 0 auto;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: rgba(245, 244, 240, 0.68);
 }
-.contrib__lead,
-.contrib__closed {
+.stage__meta-sep { color: var(--accent); }
+.stage__desc,
+.stage__lead {
   font-family: var(--font-serif);
   font-size: 1rem;
-  line-height: 1.6;
-  color: var(--muted);
+  line-height: 1.65;
+  color: rgba(245, 244, 240, 0.82);
   max-width: 52ch;
 }
-.contrib__closed { color: var(--dark); }
 
-.contrib__error {
-  border-left: 2px solid var(--accent);
-  padding: 0.6rem 0.9rem;
-  background: var(--paper);
+.notes {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.notes li {
+  position: relative;
+  padding-left: 1rem;
   font-family: var(--font-sans);
-  font-size: 0.8rem;
-  color: var(--dark);
+  font-size: 0.78rem;
+  line-height: 1.65;
+  color: rgba(245, 244, 240, 0.5);
+  max-width: 52ch;
+}
+.notes li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+  width: 5px;
+  height: 1px;
+  background: var(--accent);
 }
 
-.contrib__drop { display: flex; flex-direction: column; gap: 0.6rem; }
-.contrib__counter {
-  font-family: var(--font-sans);
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
+/* ── Welcome body, on paper ─────────────────────────────────────────────── */
+.welcome {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
 }
-.contrib__counter.is-full { color: var(--accent); }
-.contrib__limit {
-  border: 1px dashed var(--accent);
-  padding: 0.7rem 0.9rem;
-  font-family: var(--font-serif);
-  font-size: 0.92rem;
-  color: var(--dark);
-}
-
-/* ── Credit ── */
-.contrib__credit {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem 1.25rem;
-  padding: 1.25rem;
+.about {
   border: 1px solid var(--subtle);
   background: var(--paper);
+  padding: 1.4rem 1.5rem;
+  max-width: 48rem;
 }
-.field { display: flex; flex-direction: column; gap: 0.35rem; }
+.about__title {
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.85rem;
+}
+.about__body {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--dark);
+}
+.about__code {
+  font-family: var(--font-latin-sans);
+  font-size: 0.88rem;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.about__strong { font-weight: 600; color: var(--dark); }
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+.actions { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+.actions--stack { flex-direction: column; align-items: stretch; margin-top: 0.5rem; }
+
+.btn {
+  border: 1px solid var(--accent);
+  background: transparent;
+  padding: 0.85rem 1.4rem;
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: center;
+  text-decoration: none;
+  color: var(--accent);
+  cursor: pointer;
+  transition: background-color 0.18s, color 0.18s, border-color 0.18s;
+}
+.btn--fill { background: var(--accent); color: #F5F4F0; }
+.btn--fill:hover { background: transparent; color: var(--accent); }
+.btn--ghost { border-color: rgba(245, 244, 240, 0.35); color: rgba(245, 244, 240, 0.85); }
+.btn--ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+
+/* The ghost button needs ink, not paper-white, once it sits on paper. */
+.welcome .btn--ghost,
+.panel .btn--ghost { border-color: var(--subtle); color: var(--dark); }
+.welcome .btn--ghost:hover,
+.panel .btn--ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+.linkbtn {
+  border: 0;
+  background: transparent;
+  padding: 0.4rem 0;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.linkbtn:hover { color: var(--accent); }
+
+/* ── Identity panels ────────────────────────────────────────────────────── */
+.panel {
+  min-height: 70vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3.5rem 1.25rem 4rem;
+}
+.panel__inner {
+  width: 100%;
+  max-width: 470px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+.panel__title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.7rem, 5vw, 2.3rem);
+  font-weight: 300;
+  line-height: 1.1;
+  color: var(--dark);
+}
+.panel__lead {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--dark);
+}
+
+.field { display: flex; flex-direction: column; gap: 0.4rem; }
 .field__label {
   font-family: var(--font-sans);
   font-size: 0.5rem;
@@ -568,47 +1051,160 @@ useSeoMeta({
   width: 100%;
   border: 1px solid var(--subtle);
   background: #fff;
-  padding: 0.55rem 0.7rem;
+  padding: 0.7rem 0.8rem;
   font-family: var(--font-serif);
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   color: var(--dark);
 }
 .field__input:focus { outline: none; border-color: var(--accent); }
-.contrib__credit-note {
-  grid-column: 1 / -1;
+.field__input--code {
+  font-family: var(--font-latin-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.field__hint {
   font-family: var(--font-sans);
-  font-size: 0.62rem;
+  font-size: 0.68rem;
+  line-height: 1.55;
   color: var(--muted);
 }
-.contrib__saved { color: var(--accent); }
+.field__saved { color: var(--accent); }
+.field__error {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--accent);
+}
 
-/* ── Claim code ── */
-.contrib__code {
+/* Squared switch — a consent control, not a pill. */
+.switch {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  padding: 0.7rem 0.9rem;
-  border: 1px dashed var(--subtle);
+  gap: 0.7rem;
+  border: 0;
+  background: transparent;
+  padding: 0.2rem 0;
+  cursor: pointer;
+  text-align: left;
 }
-.contrib__code-label {
+.switch__box {
+  flex: none;
+  width: 2.6rem;
+  height: 1.3rem;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  display: block;
+  position: relative;
+  transition: border-color 0.18s, background-color 0.18s;
+}
+.switch__box.is-on { border-color: var(--accent); background: var(--accent); }
+.switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(1.3rem - 6px);
+  height: calc(1.3rem - 6px);
+  background: var(--muted);
+  transition: transform 0.18s, background-color 0.18s;
+}
+.switch__box.is-on .switch__knob {
+  background: #F5F4F0;
+  transform: translateX(1.3rem);
+}
+.switch__label {
   font-family: var(--font-sans);
-  font-size: 0.5rem;
-  letter-spacing: 0.18em;
+  font-size: 0.8rem;
+  color: var(--dark);
+}
+
+/* ── Code issued ────────────────────────────────────────────────────────── */
+.codeframe {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-top: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  background: transparent;
+  padding: 1.5rem 0;
+  cursor: pointer;
+  text-align: left;
+}
+.codeframe__value {
+  font-family: var(--font-latin-sans);
+  font-size: clamp(1.25rem, 6.5vw, 2.1rem);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--dark);
+  word-break: break-all;
+}
+.warn {
+  border-left: 2px solid var(--accent);
+  padding: 0.55rem 0 0.55rem 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.warn__strong { font-weight: 600; color: var(--dark); }
+
+/* ── Sticky top bar ─────────────────────────────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--body-bg);
+  border-bottom: 1px solid var(--subtle);
+  padding: 0.7rem 1.1rem 0;
+}
+.topbar__row {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.55rem;
+}
+.topbar__row--title { align-items: flex-start; }
+.topbar__id { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.topbar__label {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  line-height: 1.2;
+  color: var(--dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar__count {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
 }
-.contrib__code-value {
-  font-family: var(--font-latin-sans);
-  font-size: 0.95rem;
-  letter-spacing: 0.12em;
-  color: var(--dark);
-}
-.contrib__code-copy,
-.contrib__link-btn {
+.topbar__count.is-full { color: var(--accent); }
+.topbar__row--select .topbar__count { color: var(--accent); }
+.topbar__actions { display: flex; gap: 0.4rem; }
+
+.chip {
+  flex: none;
   border: 1px solid var(--subtle);
   background: transparent;
-  padding: 0.3rem 0.7rem;
+  padding: 0.35rem 0.6rem;
+  font-family: var(--font-latin-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--dark);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.minibtn {
+  border: 1px solid var(--subtle);
+  background: transparent;
+  padding: 0.32rem 0.65rem;
   font-family: var(--font-sans);
   font-size: 0.5rem;
   letter-spacing: 0.16em;
@@ -617,81 +1213,222 @@ useSeoMeta({
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
-.contrib__code-copy:hover,
-.contrib__link-btn:hover { border-color: var(--accent); color: var(--accent); }
-.contrib__code-copy:disabled { opacity: 0.5; cursor: default; }
-.contrib__code-hint {
-  font-family: var(--font-sans);
-  font-size: 0.62rem;
-  color: var(--muted);
-}
-.contrib__code--entry { border-style: solid; }
-.contrib__code-input { max-width: 16rem; letter-spacing: 0.12em; }
+.minibtn:hover { border-color: var(--accent); color: var(--accent); }
+.minibtn:disabled { opacity: 0.5; cursor: default; }
+.minibtn--accent { border-color: var(--accent); color: var(--accent); }
 
-/* ── Their photos ── */
-.contrib__mine { display: flex; flex-direction: column; gap: 0.9rem; }
-.contrib__mine-title {
-  font-family: var(--font-sans);
-  font-size: 0.5rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--muted);
+/* The hairline under both rows: how full their allowance is, at a glance. */
+.meter {
+  max-width: 1180px;
+  margin: 0 auto;
+  height: 2px;
+  background: var(--subtle);
+  overflow: hidden;
 }
-.grid {
+.meter__fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 0.25s ease;
+}
+
+/* ── Work area ──────────────────────────────────────────────────────────── */
+.work {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1.1rem 1.1rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.alert {
+  border-left: 2px solid var(--accent);
+  padding: 0.6rem 0.9rem;
+  background: var(--paper);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--dark);
+}
+.alert--quiet { border-left-color: var(--subtle); color: var(--muted); }
+
+/* The uploader owns its own dropzone markup, so both sizes are set through its
+   root. Large while nothing has been sent; a strip once photos exist. */
+.zone--full :deep(.r2up__zone) { min-height: 15rem; }
+.zone--compact :deep(.r2up__zone) { min-height: 0; padding: 0.85rem 1rem; }
+.zone--compact :deep(.r2up__icon),
+.zone--compact :deep(.r2up__hint) { display: none; }
+
+/* ── Photo grid ─────────────────────────────────────────────────────────── */
+.pgrid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
 }
-.tile {
-  border: 1px solid var(--subtle);
-  background: var(--paper);
-  display: flex;
-  flex-direction: column;
+@media (min-width: 900px) {
+  .pgrid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
 }
-.tile__img {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  display: block;
+.ptile {
+  position: relative;
+  aspect-ratio: 1 / 1;
   background: var(--subtle);
 }
-.tile__foot,
-.tile__edit { padding: 0.55rem 0.6rem; display: flex; flex-direction: column; gap: 0.45rem; }
-.tile__caption {
-  font-family: var(--font-serif);
-  font-size: 0.82rem;
-  color: var(--dark);
-  overflow-wrap: anywhere;
-}
-.tile__actions,
-.tile__edit-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-.tile__btn {
-  border: 1px solid var(--subtle);
+.ptile__select {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  margin: 0;
+  padding: 0;
   background: transparent;
-  padding: 0.22rem 0.5rem;
-  font-family: var(--font-sans);
-  font-size: 0.46rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--dark);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
 }
-.tile__btn:hover { border-color: var(--accent); color: var(--accent); }
-.tile__btn:disabled { opacity: 0.5; cursor: default; }
-.tile__btn--danger:hover { border-color: var(--accent); color: var(--accent); }
+.ptile__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Selection is the border and the wash — no checkbox. On a wall of thumbnails a
+   checkbox is one more thing to hit and one more thing to read. */
+.ptile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 2px solid transparent;
+  background: transparent;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.ptile.is-selected::after {
+  border-color: var(--accent);
+  background: rgba(232, 24, 110, 0.22);
+}
 
-.contrib__empty {
+.ptile__ctl {
+  position: absolute;
+  top: 4px;
+  width: 1.65rem;
+  height: 1.65rem;
+  border: 0;
+  padding: 0;
+  background: rgba(12, 12, 10, 0.62);
+  color: #F5F4F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+.ptile__ctl svg { width: 0.85rem; height: 0.85rem; }
+.ptile__ctl--zoom { left: 4px; }
+.ptile__ctl--remove { right: 4px; }
+.ptile__ctl:hover { background: var(--accent); }
+.ptile:hover .ptile__ctl,
+.ptile__ctl:focus-visible { opacity: 1; }
+.ptile__ctl:disabled { cursor: default; }
+
+/* This page is opened on phones far more than anywhere else on the site, and a
+   hover-revealed control is simply unreachable there. */
+@media (hover: none) {
+  .ptile__ctl { opacity: 1; }
+}
+
+.empty {
   font-family: var(--font-sans);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 
+/* ── Note ───────────────────────────────────────────────────────────────── */
+.notebox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-width: 42rem;
+  margin-top: 0.75rem;
+}
+.notebox__area {
+  resize: vertical;
+  min-height: 4.5rem;
+  line-height: 1.6;
+}
+
+/* ── Full-size viewer ───────────────────────────────────────────────────── */
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(12, 12, 10, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.viewer__img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.viewer__close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid rgba(245, 244, 240, 0.3);
+  background: transparent;
+  color: #F5F4F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.viewer__close svg { width: 1rem; height: 1rem; }
+.viewer__close:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Confirm dialog body ────────────────────────────────────────────────── */
+.confirm-text {
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--dark);
+}
+.confirm-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.4rem; }
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  z-index: 320;
+  background: var(--dark);
+  color: #F5F4F0;
+  padding: 0.65rem 1.1rem;
+  font-family: var(--font-sans);
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+  max-width: calc(100vw - 2rem);
+  text-align: center;
+}
+.toast-enter-active,
+.toast-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.toast-enter-from,
+.toast-leave-to { opacity: 0; transform: translate(-50%, 0.5rem); }
+
 @media (max-width: 640px) {
-  .contrib { padding: 3.5rem 1.1rem 4rem; }
-  .contrib__credit { grid-template-columns: 1fr; }
+  .stage__body { padding: 2.25rem 1.1rem 2.5rem; }
+  .welcome { padding: 2rem 1.1rem 3rem; }
+  .about { padding: 1.15rem; }
+  .panel { padding: 2.5rem 1.1rem 3rem; }
 }
 </style>

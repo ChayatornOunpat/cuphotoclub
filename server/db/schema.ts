@@ -163,6 +163,13 @@ export const collectionContributors = sqliteTable('collection_contributors', {
   codeHash: text('code_hash').notNull(),
   displayName: text('display_name'), // null = anonymous
   contact: text('contact'), // admin-only, optional
+  // Whether this person agreed to be credited by their handle when a photo of
+  // theirs is published. Separate from displayName having a value: someone can
+  // give us a name to reach them by without wanting it printed.
+  creditHandle: integer('credit_handle', { mode: 'boolean' }).default(false),
+  // Free-text note the contributor leaves with their batch — context about the
+  // photos, not a caption on any one of them. Admin-only, like contact.
+  note: text('note'),
   createdAt,
   lastSeenAt: integer('last_seen_at', { mode: 'timestamp' })
 }, table => [
