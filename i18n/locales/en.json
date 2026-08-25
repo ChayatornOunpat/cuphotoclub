@@ -1184,6 +1184,10 @@
     "needsNumber": "Enter a number of 1 or more."
   },
   "adminPool": {
+    "downloadSelected": "Download",
+    "downloading": "Downloading {done}/{total}",
+    "downloadedN": "Downloaded {n} photo(s). WebP files were converted to JPEG.",
+    "downloadFailed": "Download failed. Some files may not have saved.",
     "changeAlbum": "Album",
     "unlinked": "Not linked",
     "albumChanged": "Album changed. Approved photos show as missing until you re-add them.",

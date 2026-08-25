@@ -206,6 +206,90 @@ async function repair() {
   }
 }
 
+// ── Batch download ──────────────────────────────────────────────────────────
+// Sequential on purpose. Each download streams a full-size original through the
+// Worker, so firing forty at once is forty concurrent buffered responses; one
+// at a time keeps that flat and gives an honest progress count.
+//
+// WebP is converted to JPEG in the browser: the uploader's compressor emits
+// WebP, and the places these photos end up (Instagram, print shops, older
+// tools) still want JPEG. Doing it on a canvas costs nothing — no Worker
+// memory, and none of the Cloudflare image-transform quota, which is reserved
+// for bounded public surfaces.
+const downloading = ref(0)
+const downloadTotal = ref(0)
+
+async function toJpeg(blob: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(blob)
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return blob
+    // JPEG has no alpha; without a white ground a transparent PNG/WebP would
+    // come out with black edges.
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(bitmap, 0, 0)
+    const out = await new Promise<Blob | null>(resolve =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.92)
+    )
+    return out ?? blob
+  } finally {
+    bitmap.close()
+  }
+}
+
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // Revoking immediately can cancel the save in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+function fileNameFor(item: PoolItem, ext: string) {
+  const who = (item.displayName || t('adminPool.anonymous')).replace(/[^\w-]+/g, '-').slice(0, 40)
+  return `${who}-${item.id.slice(0, 8)}.${ext}`
+}
+
+async function downloadSelected() {
+  const ids = [...selected.value]
+  if (!ids.length || downloading.value) return
+  const items = (pool.value?.items ?? []).filter(item => ids.includes(item.id))
+  error.value = ''
+  downloadTotal.value = items.length
+  downloading.value = 0
+
+  try {
+    for (const item of items) {
+      // ?confirm=1 is what marks it used — same contract as the single-file link.
+      const res = await fetch(item.downloadUrl)
+      if (!res.ok) throw new Error(String(res.status))
+      let blob = await res.blob()
+      let ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+      if (blob.type === 'image/webp') {
+        blob = await toJpeg(blob)
+        ext = 'jpg'
+      }
+      saveBlob(blob, fileNameFor(item, ext))
+      downloading.value++
+    }
+    notice.value = t('adminPool.downloadedN', { n: items.length })
+    await refresh()
+  } catch (e) {
+    error.value = errMsg(e, t('adminPool.downloadFailed'))
+  } finally {
+    downloading.value = 0
+    downloadTotal.value = 0
+  }
+}
+
 // ── Delete (removes the submission itself, not just its decision) ───────────
 const confirmDelete = ref(false)
 async function deleteSelected() {
@@ -435,6 +519,11 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
         </button>
         <button type="button" class="btn" :disabled="busy" @click="decideSelected('pending')">
           {{ t('adminPool.unreview') }}
+        </button>
+        <button type="button" class="btn" :disabled="busy || downloadTotal > 0" @click="downloadSelected">
+          {{ downloadTotal
+            ? t('adminPool.downloading', { done: downloading, total: downloadTotal })
+            : t('adminPool.downloadSelected') }}
         </button>
         <button v-if="!confirmDelete" type="button" class="btn btn--danger" @click="confirmDelete = true">
           {{ t('adminPool.delete') }}

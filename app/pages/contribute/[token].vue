@@ -443,19 +443,25 @@ useSeoMeta({
   <div v-else class="contrib">
     <!-- ── Stage 1: welcome ─────────────────────────────────────────────── -->
     <template v-if="stage === 'welcome'">
-      <header class="stage" :class="{ 'stage--cover': coverSrc }">
-        <!-- One bounded image per page load, so the transform budget applies. -->
-        <AppImg
-          v-if="coverSrc"
-          class="stage__cover"
-          :src="coverSrc"
-          :alt="heading"
-          sizes="100vw md:720px"
-          eager
-          optimize
-        />
-        <div class="stage__body">
+      <!-- One dark surface, not a banner over a paper page: the cover is the
+           left half on desktop and the top band on mobile, and everything that
+           follows sits on the same ground. -->
+      <div class="wstage" :class="{ 'wstage--cover': coverSrc }">
+        <div class="wstage__art">
+          <!-- One bounded image per page load, so the transform budget applies. -->
+          <AppImg
+            v-if="coverSrc"
+            class="wstage__cover"
+            :src="coverSrc"
+            :alt="heading"
+            sizes="100vw md:60vw"
+            eager
+            optimize
+          />
           <p class="mark"><span class="mark__cu">CU</span>PHOTOCLUB</p>
+        </div>
+
+        <div class="wstage__panel">
           <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
           <h1 class="stage__title">{{ heading }}</h1>
           <p v-if="metaParts.length" class="stage__meta">
@@ -464,32 +470,31 @@ useSeoMeta({
             </span>
           </p>
           <p v-if="description" class="stage__desc">{{ description }}</p>
-        </div>
-      </header>
-      <div class="cut-line" />
 
-      <div class="welcome">
-        <p v-if="!open" class="alert">{{ t('contribute.closed') }}</p>
+          <div class="cut-line cut-line--inset" />
 
-        <section class="about">
-          <h2 class="about__title">{{ t('contribute.codeAboutTitle') }}</h2>
-          <i18n-t class="about__body" keypath="contribute.codeAboutBody" tag="p" scope="global">
-            <template #code>
-              <code class="about__code">{{ t('contribute.codePlaceholder') }}</code>
-            </template>
-            <template #screenshot>
-              <strong class="about__strong">{{ t('contribute.codeAboutScreenshot') }}</strong>
-            </template>
-          </i18n-t>
-        </section>
+          <p v-if="!open" class="alert alert--dark">{{ t('contribute.closed') }}</p>
 
-        <div class="actions">
-          <button v-if="open" type="button" class="btn btn--fill" @click="stage = 'create'">
-            {{ t('contribute.getCode') }}
-          </button>
-          <button type="button" class="btn btn--ghost" @click="stage = 'claim'">
-            {{ t('contribute.haveCode') }}
-          </button>
+          <section class="about about--dark">
+            <h2 class="about__title">{{ t('contribute.codeAboutTitle') }}</h2>
+            <i18n-t class="about__body" keypath="contribute.codeAboutBody" tag="p" scope="global">
+              <template #code>
+                <code class="about__code">{{ t('contribute.codePlaceholder') }}</code>
+              </template>
+              <template #screenshot>
+                <strong class="about__strong">{{ t('contribute.codeAboutScreenshot') }}</strong>
+              </template>
+            </i18n-t>
+          </section>
+
+          <div class="actions">
+            <button v-if="open" type="button" class="btn btn--fill" @click="stage = 'create'">
+              {{ t('contribute.getCode') }}
+            </button>
+            <button type="button" class="btn btn--ghost" @click="stage = 'claim'">
+              {{ t('contribute.haveCode') }}
+            </button>
+          </div>
         </div>
       </div>
     </template>
@@ -921,16 +926,101 @@ useSeoMeta({
   background: var(--accent);
 }
 
-/* ── Welcome body, on paper ─────────────────────────────────────────────── */
-.welcome {
-  width: 100%;
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
+/* ── Welcome: one dark surface ──────────────────────────────────────────────
+   Mobile stacks (cover band, then content); desktop splits (cover left,
+   content right). The min-heights matter because a collection often has no
+   description — without them the panel collapses to a strip. */
+.wstage {
+  position: relative;
+  background: var(--hero-bg);
+  color: #F5F4F0;
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  min-height: 100vh;
+  min-height: 100svh;
 }
+.wstage__art {
+  position: relative;
+  flex: none;
+  min-height: 40vh;
+  overflow: hidden;
+}
+/* No cover: the club's own gradient, a deliberate treatment rather than a
+   stand-in for a missing photo. */
+.wstage:not(.wstage--cover) .wstage__art::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--dark) 0%, #2A1A24 55%, var(--accent) 220%);
+}
+/* AppImg's root element is the <img> itself, so this targets it directly. */
+.wstage__cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Fades the photo into the panel below, and keeps the mark legible on any
+   image the admin happens to upload. */
+.wstage__art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(12, 12, 10, 0.28) 0%, rgba(12, 12, 10, 0.1) 38%, var(--hero-bg) 100%);
+}
+.wstage__art .mark {
+  position: absolute;
+  z-index: 2;
+  top: 1.15rem;
+  left: 1.5rem;
+  margin: 0;
+}
+.wstage__panel {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  margin-top: -3.25rem;
+  padding: 0 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.cut-line--inset { margin: 1.5rem 0 0.35rem; }
+
+.about--dark {
+  border-color: rgba(245, 244, 240, 0.16);
+  background: rgba(245, 244, 240, 0.05);
+}
+.about--dark .about__title { color: rgba(245, 244, 240, 0.7); }
+.about--dark .about__body { color: rgba(245, 244, 240, 0.82); }
+.about--dark .about__strong { color: #F5F4F0; }
+.alert--dark { color: rgba(245, 244, 240, 0.85); }
+
+@media (min-width: 900px) {
+  .wstage {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    align-items: stretch;
+  }
+  .wstage__art { min-height: 100%; }
+  /* Sideways on desktop: the seam is now the vertical edge between the photo
+     and the panel, not the bottom of a banner. */
+  .wstage__art::after {
+    background: linear-gradient(to right, rgba(12, 12, 10, 0.05) 45%, rgba(12, 12, 10, 0.5) 100%);
+  }
+  .wstage__panel {
+    margin-top: 0;
+    padding: 4rem 3.25rem;
+    justify-content: center;
+    max-width: 34rem;
+  }
+  .wstage__panel .actions { flex-wrap: nowrap; }
+  .wstage__panel .actions .btn { flex: 1; }
+}
+
+/* .about is shared: dark on the welcome stage (.about--dark), paper elsewhere. */
 .about {
   border: 1px solid var(--subtle);
   background: var(--paper);
@@ -986,9 +1076,7 @@ useSeoMeta({
 .btn:disabled { opacity: 0.45; cursor: default; }
 
 /* The ghost button needs ink, not paper-white, once it sits on paper. */
-.welcome .btn--ghost,
 .panel .btn--ghost { border-color: var(--subtle); color: var(--dark); }
-.welcome .btn--ghost:hover,
 .panel .btn--ghost:hover { border-color: var(--accent); color: var(--accent); }
 
 .linkbtn {
