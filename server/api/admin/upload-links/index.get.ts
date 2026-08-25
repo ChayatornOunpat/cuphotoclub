@@ -37,10 +37,26 @@ export default defineEventHandler(async (event) => {
     : []
   const peopleByLink = new Map(contributors.map(row => [row.linkId, Number(row.total)]))
 
+  // The album each collection feeds, so the overview can state the linkage
+  // rather than making an admin open the pool to find out. One album store read
+  // per linked collection; a club runs a handful at a time.
+  const albums = new Map<string, { id: string, slug: string, title: string, visibility: string } | null>()
+  for (const link of links) {
+    if (!link.albumId || albums.has(link.albumId)) continue
+    const album = await linkedAlbum(link.albumId)
+    albums.set(link.albumId, album
+      ? { id: album.id, slug: album.slug, title: album.title, visibility: album.visibility }
+      : null)
+  }
+
   return links.map(link => ({
     ...link,
     open: isLinkOpen(link),
     photoCount: byLink.get(link.id) ?? 0,
-    contributorCount: peopleByLink.get(link.id) ?? 0
+    contributorCount: peopleByLink.get(link.id) ?? 0,
+    // null when nothing is linked yet, or when the album was deleted out from
+    // under the collection — the UI distinguishes those two.
+    album: link.albumId ? (albums.get(link.albumId) ?? null) : null,
+    albumMissing: Boolean(link.albumId) && !albums.get(link.albumId!)
   }))
 })

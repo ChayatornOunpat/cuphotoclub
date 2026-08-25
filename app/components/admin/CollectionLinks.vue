@@ -26,6 +26,8 @@ interface CollectionLink {
   expiresAt: string | null
   photoCount: number
   contributorCount: number
+  album: { id: string, slug: string, title: string, visibility: string } | null
+  albumMissing: boolean
 }
 
 const endpoint = '/api/admin/upload-links'
@@ -245,6 +247,23 @@ function dateInput(value: string | null) {
               {{ metaLine(link) || t('adminUploadLinks.noDate') }}
             </p>
             <h3 class="row__label">{{ link.label }}</h3>
+
+            <!-- Where this collection's approved photos go. Stated here so the
+                 overview answers it without opening the pool. -->
+            <p class="dest">
+              <span class="dest__arrow" aria-hidden="true">→</span>
+              <template v-if="link.album">
+                <NuxtLink class="dest__name" :to="localePath(`/admin/albums/${link.album.slug}`)">
+                  {{ link.album.title || t('adminUploadLinks.untitled') }}
+                </NuxtLink>
+                <span
+                  class="dest__pill"
+                  :class="link.album.visibility === 'draft' ? 'dest__pill--draft' : 'dest__pill--live'"
+                >{{ link.album.visibility === 'draft' ? t('adminPool.draft') : t('adminPool.published') }}</span>
+              </template>
+              <span v-else-if="link.albumMissing" class="dest__warn">{{ t('adminUploadLinks.albumMissing') }}</span>
+              <span v-else class="dest__none">{{ t('adminUploadLinks.albumNone') }}</span>
+            </p>
 
             <div class="row__url">
               <code class="row__code">{{ publicUrl(link) }}</code>
@@ -531,6 +550,31 @@ function dateInput(value: string | null) {
   color: var(--dark);
   margin: 0;
 }
+
+.dest {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.dest__arrow { color: var(--subtle); }
+.dest__name { color: var(--dark); font-weight: 500; text-decoration: none; }
+.dest__name:hover { color: var(--accent); }
+.dest__none { font-style: italic; }
+.dest__warn { color: #9A6B1F; }
+.dest__pill {
+  font-size: 0.46rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border: 1px solid currentColor;
+  padding: 0.14rem 0.34rem;
+}
+.dest__pill--draft { color: var(--muted); }
+.dest__pill--live { color: var(--accent); }
 
 .row__url { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .row__code {

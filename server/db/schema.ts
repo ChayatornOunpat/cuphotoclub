@@ -126,6 +126,14 @@ export const collectionLinks = sqliteTable('collection_links', {
   // no reference between the two tables.
   eventDate: integer('event_date', { mode: 'timestamp' }),
   location: text('location'),
+  // The album approved photos land in. Created as a draft alongside the
+  // collection so there is always somewhere for a photo to go — approving is
+  // then one copy + one row, never "pick a destination first". Nullable because
+  // collections created before this existed have none until first approve, and
+  // because an album can be deleted out from under it (dangling is detected and
+  // offered a relink rather than being prevented by an FK the album store,
+  // which is not a relational table, could not enforce anyway).
+  albumId: text('album_id'),
   status: text('status', { enum: ['open', 'closed'] }).notNull().default('open'),
   // Optional second factor. No admin UI ships for this yet — a link's token is
   // the credential; this exists so adding one later is not a migration.
@@ -196,10 +204,28 @@ export const collectionSubmissions = sqliteTable('collection_submissions', {
   hash: text('hash').notNull(),
   size: integer('size').notNull().default(0),
   type: text('type').notNull(),
+  // The admin's decision. Stored rather than inferred, so a review pass resumes
+  // after a refresh and a reversal days later is possible.
+  //   pending  — not looked at yet
+  //   approved — copied into the album
+  //   rejected — deliberately not used; the row stays so the call is reversible
+  review: text('review', { enum: ['pending', 'approved', 'rejected'] })
+    .notNull()
+    .default('pending'),
+  reviewedAt: integer('reviewed_at', { mode: 'timestamp' }),
+  reviewedBy: integer('reviewed_by').references(() => users.id),
+  // Where the approved copy lives: content-albums/<albumId>/<hash>.<ext>.
+  // Membership in the album is derived by matching this against the album's
+  // current cell srcs — which is what makes reordering, re-spanning, style
+  // changes and manual edits in the album canvas all safe. "Approved" and
+  // "currently in the album" are two facts that may legitimately differ.
+  albumKey: text('album_key'),
   publishedTo: text('published_to'),
   publishedAt: integer('published_at', { mode: 'timestamp' }),
   createdAt
 }, table => [
+  // The pool page filters by link + decision on every load.
+  index('collection_submissions_link_review_idx').on(table.linkId, table.review),
   // Content-addressed keys mean re-sending the same photo yields the same key.
   // One person's duplicate must stay one row, or it double-counts against their
   // cap; two *different* people sharing a key still get a row each.
