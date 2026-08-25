@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -6,6 +6,9 @@ const bodySchema = z.object({
   label: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(500).nullable().optional(),
   coverR2Key: z.string().nullable().optional(),
+  // The album approved photos land in. null unlinks; the next approval then
+  // creates a fresh draft. Validated below — a bad id would dangle silently.
+  albumId: z.string().min(1).nullable().optional(),
   eventDate: z.string().nullable().optional(),
   location: z.string().trim().max(200).nullable().optional(),
   requireName: z.boolean().optional(),
@@ -44,6 +47,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Reject an album id that does not resolve rather than storing a dangling one.
+  if (input.albumId) {
+    const target = await albumStore.get(input.albumId)
+    if (!target) throw createError({ statusCode: 404, message: 'Album not found.' })
+  }
+
   const [updated] = await db
     .update(schema.collectionLinks)
     .set({
@@ -51,6 +60,7 @@ export default defineEventHandler(async (event) => {
       ...(input.label !== undefined ? { label: input.label } : {}),
       ...(input.description !== undefined ? { description: input.description } : {}),
       ...(input.coverR2Key !== undefined ? { coverR2Key: input.coverR2Key } : {}),
+      ...(input.albumId !== undefined ? { albumId: input.albumId } : {}),
       ...(input.eventDate !== undefined ? { eventDate: input.eventDate ? new Date(input.eventDate) : null } : {}),
       ...(input.location !== undefined ? { location: input.location } : {}),
       ...(input.requireName !== undefined ? { requireName: input.requireName } : {}),
@@ -73,6 +83,30 @@ export default defineEventHandler(async (event) => {
   // the image that is still in use. Same order as the events cover.
   if (input.coverR2Key !== undefined && existing.coverR2Key && existing.coverR2Key !== input.coverR2Key) {
     await blob.delete(existing.coverR2Key).catch(() => {})
+  }
+
+  // Photos already approved were copied into the previous album's folder.
+  // Point their keys at the new album so the pool reports them as missing from
+  // it, and "Re-add to album" copies them across — rather than leaving the new
+  // album referencing images that live under the old album's id.
+  if (input.albumId !== undefined && input.albumId !== existing.albumId) {
+    const approved = await db
+      .select({
+        id: schema.collectionSubmissions.id,
+        hash: schema.collectionSubmissions.hash,
+        type: schema.collectionSubmissions.type
+      })
+      .from(schema.collectionSubmissions)
+      .where(and(
+        eq(schema.collectionSubmissions.linkId, linkId),
+        eq(schema.collectionSubmissions.review, 'approved')
+      ))
+    for (const row of approved) {
+      await db
+        .update(schema.collectionSubmissions)
+        .set({ albumKey: input.albumId ? albumKeyFor(input.albumId, row.hash, row.type) : null })
+        .where(eq(schema.collectionSubmissions.id, row.id))
+    }
   }
 
   await recordAdminAudit(actor, {

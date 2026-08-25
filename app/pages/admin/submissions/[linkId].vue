@@ -82,6 +82,9 @@ function setQuery(patch: Record<string, string | number | undefined>) {
   router.push({ query: { ...route.query, page: undefined, ...patch } })
 }
 
+interface AlbumOption { id: string, slug: string, title: string, visibility: string }
+const { data: albums } = await useFetch<AlbumOption[]>('/api/admin/albums')
+
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
@@ -92,6 +95,30 @@ function errMsg(e: unknown, fb: string) {
 const album = computed(() => pool.value?.album ?? null)
 const counts = computed(() => pool.value?.counts ?? { pending: 0, approved: 0, rejected: 0, all: 0 })
 const missing = computed(() => pool.value?.missingFromAlbum ?? 0)
+
+// ── Which album this collection feeds ───────────────────────────────────────
+// Switching is allowed with photos already approved. Their copies stay in the
+// old album's folder — the server repoints their keys at the new album, the
+// pool then reports them as missing from it, and "Re-add to album" copies them
+// across. Clearing the old folder and the old album is a manual job.
+const changingAlbum = ref(false)
+async function changeAlbum(value: string) {
+  if (changingAlbum.value) return
+  changingAlbum.value = true
+  error.value = ''
+  try {
+    await $fetch<{ id: string }>(`/api/admin/upload-links/${linkId.value}`, {
+      method: 'PATCH',
+      body: { albumId: value || null }
+    })
+    notice.value = value ? t('adminPool.albumChanged') : t('adminPool.albumUnlinked')
+    await refresh()
+  } catch (e) {
+    error.value = errMsg(e, t('adminPool.albumChangeFailed'))
+  } finally {
+    changingAlbum.value = false
+  }
+}
 
 // ── Selection ───────────────────────────────────────────────────────────────
 const selected = ref(new Set<string>())
@@ -304,8 +331,24 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
           <span v-if="album.visibility === 'draft'"> · {{ t('adminPool.notPublicYet') }}</span>
         </p>
       </div>
-      <div v-if="album" class="dest__acts">
-        <NuxtLink class="btn" :to="localePath(`/admin/albums/${album.slug}`)">{{ t('adminPool.openAlbum') }}</NuxtLink>
+      <div class="dest__acts">
+        <label class="dest__pick">
+          <span class="dest__pick-label">{{ t('adminPool.changeAlbum') }}</span>
+          <select
+            class="dest__select"
+            :value="album?.id ?? ''"
+            :disabled="changingAlbum"
+            @change="changeAlbum(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">{{ t('adminPool.unlinked') }}</option>
+            <option v-for="entry in albums ?? []" :key="entry.id" :value="entry.id">
+              {{ entry.title || entry.slug }}{{ entry.visibility === 'draft' ? ` · ${t('adminPool.draft')}` : '' }}
+            </option>
+          </select>
+        </label>
+        <NuxtLink v-if="album" class="btn" :to="localePath(`/admin/albums/${album.slug}`)">
+          {{ t('adminPool.openAlbum') }}
+        </NuxtLink>
       </div>
     </section>
 
@@ -556,6 +599,26 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
 }
 .dest__pill--draft { color: var(--muted); }
 .dest__pill--live { color: var(--accent); }
+
+.dest__acts { display: flex; align-items: end; gap: 0.6rem; flex-wrap: wrap; }
+.dest__pick { display: flex; flex-direction: column; gap: 0.2rem; }
+.dest__pick-label {
+  font-family: var(--font-sans);
+  font-size: 0.46rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dest__select {
+  border: 1px solid var(--subtle);
+  background: #fff;
+  padding: 0.32rem 0.45rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  color: var(--dark);
+  max-width: 15rem;
+}
+.dest__select:focus { outline: none; border-color: var(--accent); }
 
 .diverge {
   display: flex;

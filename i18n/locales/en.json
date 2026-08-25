@@ -1184,6 +1184,11 @@
     "needsNumber": "Enter a number of 1 or more."
   },
   "adminPool": {
+    "changeAlbum": "Album",
+    "unlinked": "Not linked",
+    "albumChanged": "Album changed. Approved photos show as missing until you re-add them.",
+    "albumUnlinked": "Album unlinked. The next approval creates a new draft.",
+    "albumChangeFailed": "Could not change the album.",
     "destLabel": "Approved photos go to",
     "openAlbum": "Open album",
     "noAlbumYet": "No album linked yet — one is created when you approve the first photo.",
