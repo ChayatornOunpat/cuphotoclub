@@ -816,7 +816,13 @@ function onDrop(e: DragEvent) {
           {{ t('uploader.dragHere') }}
           <button type="button" class="r2up__pick" @click="chooseFiles">{{ t('uploader.browse') }}</button>
         </p>
-        <p class="r2up__hint">{{ t('uploader.hintR2', { mb: maxBytesLabel }) }}</p>
+        <!-- With compression on there is no input-size limit to state: the cap is
+             checked against the *compressed* file, and a 3040px re-encode never
+             approaches it. Naming a ceiling here only reads as one on the file
+             being picked. Compression off is the case where it really applies. -->
+        <p class="r2up__hint">
+          {{ autoCompress ? t('uploader.hintR2Compressed') : t('uploader.hintR2', { mb: maxBytesLabel }) }}
+        </p>
       </template>
       <p v-else class="r2up__full">{{ t('uploader.limitReached') }}</p>
 

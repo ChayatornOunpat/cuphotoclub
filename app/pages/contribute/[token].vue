@@ -536,14 +536,14 @@ useSeoMeta({
 
           <div class="cut-line cut-line--inset" />
 
-          <p v-if="!open" class="alert alert--dark">{{ t('contribute.closed') }}</p>
+          <p v-if="!open" class="alert">{{ t('contribute.closed') }}</p>
 
           <!-- Returning visitor: who this browser currently is, and the way out
                if that is the wrong person. -->
           <template v-if="stage === 'resume'">
-            <p v-if="errorMessage" class="alert alert--dark">{{ errorMessage }}</p>
+            <p v-if="errorMessage" class="alert">{{ errorMessage }}</p>
 
-            <section class="whois">
+            <section class="card whois">
               <h2 class="whois__title">{{ t('contribute.resumeWhoTitle') }}</h2>
               <!-- Anonymous is a real answer here, not a missing value: most
                    contributors never type a name, so it is said plainly rather
@@ -581,7 +581,7 @@ useSeoMeta({
           </template>
 
           <template v-else>
-            <section class="about about--dark">
+            <section class="card about">
               <h2 class="about__title">{{ t('contribute.codeAboutTitle') }}</h2>
               <i18n-t class="about__body" keypath="contribute.codeAboutBody" tag="p" scope="global">
                 <template #code>
@@ -609,6 +609,7 @@ useSeoMeta({
     <!-- ── Stage 2a: get your code ──────────────────────────────────────── -->
     <section v-else-if="stage === 'create'" class="panel">
       <div class="panel__inner">
+        <p class="mark"><span class="mark__cu">CU</span>PHOTOCLUB</p>
         <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
         <h1 class="panel__title">{{ t('contribute.createTitle') }}</h1>
 
@@ -673,6 +674,7 @@ useSeoMeta({
     <!-- ── Stage 2b: code issued ────────────────────────────────────────── -->
     <section v-else-if="stage === 'issued'" class="panel">
       <div class="panel__inner">
+        <p class="mark"><span class="mark__cu">CU</span>PHOTOCLUB</p>
         <p class="eyebrow-line">{{ t('contribute.codeLabel') }}</p>
 
         <button type="button" class="codeframe" :aria-label="t('contribute.copyCodeAria')" @click="copyCode">
@@ -699,6 +701,7 @@ useSeoMeta({
     <!-- ── Stage 2c: enter a code ───────────────────────────────────────── -->
     <section v-else-if="stage === 'claim'" class="panel">
       <div class="panel__inner">
+        <p class="mark"><span class="mark__cu">CU</span>PHOTOCLUB</p>
         <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
         <h1 class="panel__title">{{ t('contribute.claimTitle') }}</h1>
 
@@ -734,23 +737,26 @@ useSeoMeta({
 
     <!-- ── Stage 3: upload ──────────────────────────────────────────────── -->
     <template v-else>
-      <!-- Sticky because the counter, the code and the selection actions all
-           have to stay reachable while someone scrolls a wall of thumbnails. -->
-      <div class="topbar">
-        <div class="topbar__row topbar__row--title">
-          <div class="topbar__id">
-            <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
-            <p class="topbar__label">{{ heading }}</p>
-          </div>
-          <button
-            v-if="me?.code"
-            type="button"
-            class="chip"
-            :aria-label="t('contribute.copyCodeAria')"
-            @click="copyCode"
-          >{{ me.code }}</button>
-        </div>
+      <!-- The working screen is the same dark surface as the two before it:
+           same mark, same eyebrow, same serif line, same accent cut. Arriving
+           here should read as the next room, not as a different site. -->
+      <header class="whead">
+        <p class="mark"><span class="mark__cu">CU</span>PHOTOCLUB</p>
+        <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
+        <h1 class="whead__title">{{ heading }}</h1>
+        <p v-if="metaParts.length" class="stage__meta">
+          <span v-for="(part, i) in metaParts" :key="`${i}-${part}`">
+            <span v-if="i" class="stage__meta-sep" aria-hidden="true"> · </span>{{ part }}
+          </span>
+        </p>
+      </header>
+      <div class="cut-line" />
 
+      <!-- Sticky, and now carrying only what has to stay reachable while a wall
+           of thumbnails scrolls past: the tally, the code, the selection. The
+           collection's name went up into the head, where it has room to be set
+           properly and can afford to scroll away. -->
+      <div class="topbar">
         <div v-if="selectionCount" class="topbar__row topbar__row--select">
           <span class="topbar__count">{{ t('contribute.selectedCount', { n: selectionCount }) }}</span>
           <div class="topbar__actions">
@@ -764,9 +770,18 @@ useSeoMeta({
           <span class="topbar__count" :class="{ 'is-full': atLimit }">
             {{ t('contribute.counter', { used, max: link.maxPerContributor }) }}
           </span>
-          <button v-if="mine.length" type="button" class="minibtn" @click="selectAll">
-            {{ t('contribute.selectAll') }}
-          </button>
+          <div class="topbar__actions">
+            <button v-if="mine.length" type="button" class="minibtn" @click="selectAll">
+              {{ t('contribute.selectAll') }}
+            </button>
+            <button
+              v-if="me?.code"
+              type="button"
+              class="chip"
+              :aria-label="t('contribute.copyCodeAria')"
+              @click="copyCode"
+            >{{ me.code }}</button>
+          </div>
         </div>
 
         <div
@@ -784,9 +799,10 @@ useSeoMeta({
         <p v-if="errorMessage" class="alert">{{ errorMessage }}</p>
         <p v-if="!open" class="alert alert--quiet">{{ t('contribute.closed') }}</p>
 
-        <!-- The dropzone is the page while nothing has landed, and a strip once
-             the grid has something to show. -->
-        <div v-if="open && !atLimit" class="zone" :class="mine.length ? 'zone--compact' : 'zone--full'">
+        <!-- Full height whether or not the wall has anything on it. Shrinking it
+             to a strip after the first photo takes the target away at exactly the
+             point someone is dropping a second batch. -->
+        <div v-if="open && !atLimit" class="zone">
           <AdminR2ImageUploader
             v-model="uploadedKeys"
             :endpoint-base="`${api}/sessions`"
@@ -852,7 +868,7 @@ useSeoMeta({
         </ul>
         <p v-else-if="!loadingMine" class="empty">{{ t('contribute.empty') }}</p>
 
-        <section v-if="open" class="notebox">
+        <section v-if="open" class="card notebox">
           <label class="field__label" for="contrib-note">{{ t('contribute.noteLabel') }}</label>
           <textarea
             id="contrib-note"
@@ -917,7 +933,24 @@ useSeoMeta({
 </template>
 
 <style scoped>
-.contrib { display: flex; flex-direction: column; }
+/* Every stage of this page now sits on one ground. The welcome introduced it,
+   the returning-visitor screen kept it, and the working screen no longer breaks
+   out of it into a paper form — see the note above the upload template. */
+.contrib {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--hero-bg);
+  color: #F5F4F0;
+}
+
+/* The one translucent card on this page. Three users: "what is a code" on the
+   welcome, "this device is sending as" on the returning screen, and the note
+   box on the working screen. */
+.card {
+  border: 1px solid rgba(245, 244, 240, 0.16);
+  background: rgba(245, 244, 240, 0.05);
+}
 
 /* ── The dark stage (welcome header + not-found) ────────────────────────── */
 .stage {
@@ -1094,23 +1127,12 @@ useSeoMeta({
   flex-direction: column;
   gap: 0.7rem;
 }
+.cut-line { flex: none; }
 .cut-line--inset { margin: 1.5rem 0 0.35rem; }
 
-.about--dark {
-  border-color: rgba(245, 244, 240, 0.16);
-  background: rgba(245, 244, 240, 0.05);
-}
-.about--dark .about__title { color: rgba(245, 244, 240, 0.7); }
-.about--dark .about__body { color: rgba(245, 244, 240, 0.82); }
-.about--dark .about__strong { color: #F5F4F0; }
-.alert--dark { color: rgba(245, 244, 240, 0.85); }
-
 /* ── "Is this still you?" ────────────────────────────────────
-   Sits on the welcome's dark panel, so it borrows .about--dark's ground rather
-   than inventing a second card treatment for the same surface. */
+   Takes .card's ground; only its own spacing and type live here. */
 .whois {
-  border: 1px solid rgba(245, 244, 240, 0.16);
-  background: rgba(245, 244, 240, 0.05);
   padding: 1.25rem 1.5rem 1.4rem;
   max-width: 48rem;
   display: flex;
@@ -1203,10 +1225,9 @@ useSeoMeta({
   .wstage__panel .actions .btn { flex: 1; }
 }
 
-/* .about is shared: dark on the welcome stage (.about--dark), paper elsewhere. */
+/* Every declaration for this box lives here, background included, so nothing
+   can quietly out-order the ground it sets. */
 .about {
-  border: 1px solid var(--subtle);
-  background: var(--paper);
   padding: 1.4rem 1.5rem;
   max-width: 48rem;
 }
@@ -1215,14 +1236,14 @@ useSeoMeta({
   font-size: 0.5rem;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--muted);
   margin-bottom: 0.85rem;
+  color: rgba(245, 244, 240, 0.7);
 }
 .about__body {
   font-family: var(--font-serif);
   font-size: 1rem;
   line-height: 1.75;
-  color: var(--dark);
+  color: rgba(245, 244, 240, 0.82);
 }
 .about__code {
   font-family: var(--font-latin-sans);
@@ -1231,7 +1252,7 @@ useSeoMeta({
   color: var(--accent);
   white-space: nowrap;
 }
-.about__strong { font-weight: 600; color: var(--dark); }
+.about__strong { font-weight: 600; color: #F5F4F0; }
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 .actions { display: flex; flex-wrap: wrap; gap: 0.7rem; }
@@ -1262,28 +1283,28 @@ useSeoMeta({
 .btn--ghost:hover { border-color: var(--accent); color: var(--accent); }
 .btn:disabled { opacity: 0.45; cursor: default; }
 
-/* The ghost button needs ink, not paper-white, once it sits on paper. */
-.panel .btn--ghost { border-color: var(--subtle); color: var(--dark); }
-.panel .btn--ghost:hover { border-color: var(--accent); color: var(--accent); }
-
 .linkbtn {
   border: 0;
   background: transparent;
   padding: 0.4rem 0;
   font-family: var(--font-sans);
   font-size: 0.68rem;
-  color: var(--muted);
+  color: rgba(245, 244, 240, 0.55);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
 }
 .linkbtn:hover { color: var(--accent); }
 
-/* ── Identity panels ────────────────────────────────────────────────────── */
+/* ── Identity panels ──────────────────────────────────────────────────────
+   The steps between the welcome and the working screen. They are the same dark
+   room, narrower: one column, the mark at the top of it, and nothing else
+   competing with the single thing being asked for. */
 .panel {
-  min-height: 70vh;
+  flex: 1;
+  min-height: 100vh;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   padding: 3.5rem 1.25rem 4rem;
 }
@@ -1294,18 +1315,19 @@ useSeoMeta({
   flex-direction: column;
   gap: 1.15rem;
 }
+.panel__inner .mark { margin-bottom: 0.6rem; }
 .panel__title {
   font-family: var(--font-serif);
   font-size: clamp(1.7rem, 5vw, 2.3rem);
   font-weight: 300;
   line-height: 1.1;
-  color: var(--dark);
+  color: #F5F4F0;
 }
 .panel__lead {
   font-family: var(--font-serif);
   font-size: 1rem;
   line-height: 1.7;
-  color: var(--dark);
+  color: rgba(245, 244, 240, 0.82);
 }
 
 .field { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -1314,18 +1336,27 @@ useSeoMeta({
   font-size: 0.5rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: rgba(245, 244, 240, 0.6);
 }
+/* An inset well rather than a white box: the field reads as a hole cut in the
+   surface, which is the only way a form can sit on this ground without
+   becoming the brightest thing on the screen. */
 .field__input {
   width: 100%;
-  border: 1px solid var(--subtle);
-  background: #fff;
+  border: 1px solid rgba(245, 244, 240, 0.18);
+  background: rgba(12, 12, 10, 0.5);
   padding: 0.7rem 0.8rem;
   font-family: var(--font-serif);
   font-size: 0.95rem;
-  color: var(--dark);
+  color: #F5F4F0;
+  transition: border-color 0.18s, background-color 0.18s;
 }
-.field__input:focus { outline: none; border-color: var(--accent); }
+.field__input::placeholder { color: rgba(245, 244, 240, 0.34); }
+.field__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(12, 12, 10, 0.72);
+}
 .field__input--code {
   font-family: var(--font-latin-sans);
   letter-spacing: 0.14em;
@@ -1335,7 +1366,7 @@ useSeoMeta({
   font-family: var(--font-sans);
   font-size: 0.68rem;
   line-height: 1.55;
-  color: var(--muted);
+  color: rgba(245, 244, 240, 0.5);
 }
 .field__saved { color: var(--accent); }
 .field__error {
@@ -1360,8 +1391,8 @@ useSeoMeta({
   flex: none;
   width: 2.6rem;
   height: 1.3rem;
-  border: 1px solid var(--subtle);
-  background: #fff;
+  border: 1px solid rgba(245, 244, 240, 0.18);
+  background: rgba(12, 12, 10, 0.5);
   display: block;
   position: relative;
   transition: border-color 0.18s, background-color 0.18s;
@@ -1373,7 +1404,7 @@ useSeoMeta({
   left: 2px;
   width: calc(1.3rem - 6px);
   height: calc(1.3rem - 6px);
-  background: var(--muted);
+  background: rgba(245, 244, 240, 0.45);
   transition: transform 0.18s, background-color 0.18s;
 }
 .switch__box.is-on .switch__knob {
@@ -1383,7 +1414,7 @@ useSeoMeta({
 .switch__label {
   font-family: var(--font-sans);
   font-size: 0.8rem;
-  color: var(--dark);
+  color: rgba(245, 244, 240, 0.85);
 }
 
 /* ── Code issued ────────────────────────────────────────────────────────── */
@@ -1403,26 +1434,51 @@ useSeoMeta({
   font-size: clamp(1.25rem, 6.5vw, 2.1rem);
   font-weight: 500;
   letter-spacing: 0.14em;
-  color: var(--dark);
+  color: #F5F4F0;
   word-break: break-all;
+  transition: color 0.15s;
 }
+.codeframe:hover .codeframe__value { color: var(--accent); }
 .warn {
   border-left: 2px solid var(--accent);
   padding: 0.55rem 0 0.55rem 0.9rem;
   font-family: var(--font-sans);
   font-size: 0.82rem;
   line-height: 1.7;
-  color: var(--muted);
+  color: rgba(245, 244, 240, 0.55);
 }
-.warn__strong { font-weight: 600; color: var(--dark); }
+.warn__strong { font-weight: 600; color: #F5F4F0; }
 
-/* ── Sticky top bar ─────────────────────────────────────────────────────── */
+/* ── Working screen head ────────────────────────────────────────────────────
+   The collection's name gets set the way the two screens before it set theirs,
+   with room to wrap, and it is allowed to scroll away — only the rail below has
+   to stay. The accent cut closes it, same as on the welcome. */
+.whead {
+  max-width: 1180px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2.4rem 1.1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.whead .mark { margin-bottom: 1.1rem; }
+.whead__title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.9rem, 4.5vw, 2.9rem);
+  font-weight: 300;
+  line-height: 1.08;
+  color: #F5F4F0;
+}
+
+/* ── Sticky rail ────────────────────────────────────────────────────────── */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: var(--body-bg);
-  border-bottom: 1px solid var(--subtle);
+  /* Opaque: thumbnails scroll under this. */
+  background: var(--hero-bg);
+  border-bottom: 1px solid rgba(245, 244, 240, 0.14);
   padding: 0.7rem 1.1rem 0;
 }
 .topbar__row {
@@ -1434,51 +1490,42 @@ useSeoMeta({
   gap: 0.75rem;
   padding-bottom: 0.55rem;
 }
-.topbar__row--title { align-items: flex-start; }
-.topbar__id { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
-.topbar__label {
-  font-family: var(--font-serif);
-  font-size: 1rem;
-  line-height: 1.2;
-  color: var(--dark);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .topbar__count {
   font-family: var(--font-sans);
   font-size: 0.62rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: rgba(245, 244, 240, 0.55);
 }
 .topbar__count.is-full { color: var(--accent); }
 .topbar__row--select .topbar__count { color: var(--accent); }
-.topbar__actions { display: flex; gap: 0.4rem; }
+.topbar__actions { display: flex; align-items: center; gap: 0.4rem; }
 
+/* The code, always one tap from wherever they have scrolled to. Accent, because
+   it is the one thing on this screen they may need to carry away. */
 .chip {
   flex: none;
-  border: 1px solid var(--subtle);
+  border: 1px solid rgba(232, 24, 110, 0.5);
   background: transparent;
   padding: 0.35rem 0.6rem;
   font-family: var(--font-latin-sans);
   font-size: 0.62rem;
   letter-spacing: 0.1em;
-  color: var(--dark);
+  color: var(--accent);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
-.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip:hover { background: var(--accent); border-color: var(--accent); color: #F5F4F0; }
 
 .minibtn {
-  border: 1px solid var(--subtle);
+  border: 1px solid rgba(245, 244, 240, 0.22);
   background: transparent;
   padding: 0.32rem 0.65rem;
   font-family: var(--font-sans);
   font-size: 0.5rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--dark);
+  color: rgba(245, 244, 240, 0.8);
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
@@ -1486,12 +1533,14 @@ useSeoMeta({
 .minibtn:disabled { opacity: 0.5; cursor: default; }
 .minibtn--accent { border-color: var(--accent); color: var(--accent); }
 
-/* The hairline under both rows: how full their allowance is, at a glance. */
+/* The hairline under the rail: how full their allowance is, at a glance. Once
+   the head has scrolled away this is the accent rule pinned to the top of the
+   viewport, which is why it is the same 2px as the cut above it. */
 .meter {
   max-width: 1180px;
   margin: 0 auto;
   height: 2px;
-  background: var(--subtle);
+  background: rgba(245, 244, 240, 0.14);
   overflow: hidden;
 }
 .meter__fill {
@@ -1516,20 +1565,51 @@ useSeoMeta({
 .alert {
   border-left: 2px solid var(--accent);
   padding: 0.6rem 0.9rem;
-  background: var(--paper);
+  background: rgba(245, 244, 240, 0.05);
   font-family: var(--font-sans);
   font-size: 0.8rem;
   line-height: 1.6;
-  color: var(--dark);
+  color: rgba(245, 244, 240, 0.85);
 }
-.alert--quiet { border-left-color: var(--subtle); color: var(--muted); }
+.alert--quiet {
+  border-left-color: rgba(245, 244, 240, 0.28);
+  color: rgba(245, 244, 240, 0.55);
+}
 
-/* The uploader owns its own dropzone markup, so both sizes are set through its
-   root. Large while nothing has been sent; a strip once photos exist. */
-.zone--full :deep(.r2up__zone) { min-height: 15rem; }
-.zone--compact :deep(.r2up__zone) { min-height: 0; padding: 0.85rem 1rem; }
-.zone--compact :deep(.r2up__icon),
-.zone--compact :deep(.r2up__hint) { display: none; }
+/* ── Dropzone ───────────────────────────────────────────────────────────────
+   R2ImageUploader is an admin component and is styled for paper. Rather than
+   fork it, its surfaces are re-pointed here: the same dashed rectangle it
+   always drew, in this page's ink. */
+.zone :deep(.r2up__zone) {
+  min-height: 15rem;
+  border-color: rgba(245, 244, 240, 0.22);
+  background: rgba(245, 244, 240, 0.04);
+}
+.zone :deep(.r2up__zone:hover),
+.zone :deep(.r2up__zone.is-drag-over) {
+  border-color: var(--accent);
+  background: rgba(232, 24, 110, 0.1);
+}
+.zone :deep(.r2up__zone.is-uploading:hover) {
+  border-color: rgba(245, 244, 240, 0.22);
+  background: rgba(245, 244, 240, 0.04);
+}
+.zone :deep(.r2up__icon) { color: rgba(245, 244, 240, 0.4); }
+.zone :deep(.r2up__label) { color: rgba(245, 244, 240, 0.78); }
+.zone :deep(.r2up__hint),
+.zone :deep(.r2up__full),
+.zone :deep(.r2up__note) { color: rgba(245, 244, 240, 0.45); }
+.zone :deep(.r2up__uploading-count) { color: rgba(245, 244, 240, 0.45); }
+.zone :deep(.r2up__uploading-count strong) { color: #F5F4F0; }
+.zone :deep(.r2up__uploading-meter) { background: rgba(245, 244, 240, 0.16); }
+.zone :deep(.r2up__cancel) {
+  border-color: rgba(245, 244, 240, 0.22);
+  color: rgba(245, 244, 240, 0.7);
+}
+.zone :deep(.r2up__cancel:hover:not(:disabled)) { border-color: var(--accent); color: var(--accent); }
+/* The failure list keeps its own red, lifted off the dark ground. */
+.zone :deep(.r2up__error) { color: #FF8095; }
+.zone :deep(.r2up__failures) { background: rgba(176, 36, 60, 0.12); }
 
 /* ── Photo grid ─────────────────────────────────────────────────────────── */
 .pgrid {
@@ -1546,7 +1626,7 @@ useSeoMeta({
 .ptile {
   position: relative;
   aspect-ratio: 1 / 1;
-  background: var(--subtle);
+  background: rgba(245, 244, 240, 0.07);
 }
 .ptile__select {
   display: block;
@@ -1610,19 +1690,28 @@ useSeoMeta({
   .ptile__ctl { opacity: 1; }
 }
 
+/* Serif and given room, because on this ground a small grey sentence reads as
+   a rendering failure rather than as an answer. */
 .empty {
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  color: var(--muted);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: rgba(245, 244, 240, 0.42);
+  padding: 2.5rem 0;
 }
 
 /* ── Note ───────────────────────────────────────────────────────────────── */
+/* The note is the last thing on the screen and the only writing anyone does
+   here, so it gets the card rather than being left as a bare field floating at
+   the bottom of a photo wall. */
 .notebox {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
   max-width: 42rem;
-  margin-top: 0.75rem;
+  margin-top: 1.5rem;
+  padding: 1.25rem 1.5rem 1.4rem;
 }
 .notebox__area {
   resize: vertical;
@@ -1672,6 +1761,9 @@ useSeoMeta({
   color: var(--dark);
 }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.4rem; }
+.confirm-actions .minibtn { border-color: var(--subtle); color: var(--dark); }
+.confirm-actions .minibtn:hover { border-color: var(--accent); color: var(--accent); }
+.confirm-actions .minibtn--accent { border-color: var(--accent); color: var(--accent); }
 
 /* ── Toast ──────────────────────────────────────────────────────────────── */
 .toast {
@@ -1681,6 +1773,7 @@ useSeoMeta({
   transform: translateX(-50%);
   z-index: 320;
   background: var(--dark);
+  border: 1px solid rgba(245, 244, 240, 0.16);
   color: #F5F4F0;
   padding: 0.65rem 1.1rem;
   font-family: var(--font-sans);
@@ -1696,8 +1789,9 @@ useSeoMeta({
 
 @media (max-width: 640px) {
   .stage__body { padding: 2.25rem 1.1rem 2.5rem; }
-  .welcome { padding: 2rem 1.1rem 3rem; }
   .about { padding: 1.15rem; }
   .panel { padding: 2.5rem 1.1rem 3rem; }
+  .whead { padding: 1.9rem 1.1rem 1.25rem; }
+  .whois, .notebox { padding: 1.1rem 1.15rem 1.25rem; }
 }
 </style>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PhotoGridImage } from '~~/server/api/photogrid.get'
-import { consumePrewarmedPhotoGrid, PHOTO_GRID_BATCH_COUNT, prewarmPhotoGrid } from '~/utils/photoGridPreload'
+import { consumePrewarmedPhotoGrid, decodeGridImage, gridThumbSrc, GRID_WARM_DECODE_COUNT, PHOTO_GRID_BATCH_COUNT, prewarmPhotoGrid } from '~/utils/photoGridPreload'
 
 // Museum-wall photogrid: a dense wall of small thumbnails randomly sourced
 // from published albums, that keep crossfading to new photos over time.
@@ -342,30 +342,11 @@ function nextImage(): string | null {
 }
 
 async function preloadGridImage(src: string): Promise<PreloadedGridImage> {
-  const img = new Image()
-  img.decoding = 'async'
-  img.loading = 'eager'
-
-  const loaded = new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve()
-    img.onerror = () => reject(new Error(`Unable to preload photo grid image: ${src}`))
-  })
-
-  img.src = src
-  if (!img.complete) await loaded
-
-  // `onload` means the bytes arrived, but the next paint can still miss while
-  // the browser decodes. Wait for decode before Vue flips the visible face.
-  if (typeof img.decode === 'function') {
-    await img.decode().catch(() => undefined)
-  }
-
-  if (!img.naturalWidth || !img.naturalHeight) {
-    throw new Error(`Unable to read photo grid image dimensions: ${src}`)
-  }
-
+  // decodeGridImage dedupes concurrent requests for the same src and waits for
+  // full decode, so a face never flips visible against undecoded bytes.
+  const { width, height } = await decodeGridImage(gridThumbSrc(src))
   markFaceLoaded(src)
-  const ratio = img.naturalWidth / img.naturalHeight
+  const ratio = width / height
   ratioBySrc.set(src, ratio)
   return { ratio }
 }
@@ -604,6 +585,12 @@ async function ensureInitialLoad() {
   enqueueUnseen(batch)
   fillEmptyBlocks()
   initialLoaded = batch.length > 0 || queue.value.length > 0 || blocks.value.some(block => block.layers[block.activeLayer])
+  // Gate the swap timer on the next handful of queue images being fetched AND
+  // decoded (shared dedupe makes this free for tiles already downloading via
+  // fillEmptyBlocks), so the first cube flips animate against ready pixels.
+  await Promise.allSettled(
+    queue.value.slice(0, GRID_WARM_DECODE_COUNT).map(src => decodeGridImage(gridThumbSrc(src)))
+  )
   initialLoading = false
   if (shouldRun()) {
     start()
@@ -707,7 +694,7 @@ onBeforeUnmount(() => {
         <div class="cube" :class="{ 'is-flipped': block.activeLayer === 1 }">
           <img
             v-if="block.layers[0]"
-            :src="block.layers[0]"
+            :src="gridThumbSrc(block.layers[0])"
             alt=""
             loading="lazy"
             decoding="async"
@@ -717,7 +704,7 @@ onBeforeUnmount(() => {
           >
           <img
             v-if="block.layers[1]"
-            :src="block.layers[1]"
+            :src="gridThumbSrc(block.layers[1])"
             alt=""
             loading="lazy"
             decoding="async"

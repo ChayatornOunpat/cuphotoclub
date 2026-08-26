@@ -10,8 +10,10 @@ useHead({
     lang: () => locale.value
   },
   link: [
-    { rel: 'icon', type: 'image/jpeg', href: '/club-icon.jpg' },
-    { rel: 'apple-touch-icon', href: '/club-icon.jpg' }
+    { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico', sizes: '48x48' },
+    { rel: 'icon', type: 'image/png', href: '/icon-192.png', sizes: '192x192' },
+    { rel: 'icon', type: 'image/png', href: '/icon-512.png', sizes: '512x512' },
+    { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' }
   ],
   script: [
     {

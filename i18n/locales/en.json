@@ -559,7 +559,8 @@
   "uploader": {
     "dragHere": "Drag photos here or",
     "browse": "browse",
-    "hintR2": "JPG · PNG · WebP · HEIC — compressed upload up to {mb} MB per file",
+    "hintR2": "JPG · PNG · WebP · HEIC — up to {mb} MB per file",
+    "hintR2Compressed": "JPG · PNG · WebP · HEIC",
     "hint15": "JPG, PNG, WebP — up to 15 MB per file",
     "uploading": "Uploading {done}/{total}…",
     "uploadingKicker": "Uploading",
@@ -1136,7 +1137,6 @@
     "limitNotice": "You have sent all {max} photos for this collection. Remove one to make room."
   },
   "adminUploadLinks": {
-    "albumSelf": "Album",
     "albumNone": "No album yet — created when you approve the first photo",
     "albumMissing": "Linked album was deleted",
     "groupDetails": "Details",

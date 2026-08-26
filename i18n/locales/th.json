@@ -559,7 +559,8 @@
   "uploader": {
     "dragHere": "ลากรูปภาพมาวาง หรือ",
     "browse": "เลือกไฟล์",
-    "hintR2": "JPG · PNG · WebP · HEIC — อัปโหลดหลังบีบอัดได้สูงสุด {mb} MB ต่อไฟล์",
+    "hintR2": "JPG · PNG · WebP · HEIC — ไม่เกิน {mb} MB ต่อไฟล์",
+    "hintR2Compressed": "JPG · PNG · WebP · HEIC",
     "hint15": "รองรับ JPG, PNG, WebP — สูงสุด 15MB ต่อไฟล์",
     "uploading": "กำลังอัปโหลด {done}/{total}…",
     "uploadingKicker": "กำลังอัปโหลด",
@@ -1136,7 +1137,6 @@
     "limitNotice": "คุณส่งครบ {max} รูปในคอลเลกชันนี้แล้ว ลบรูปออกสักรูปเพื่อเพิ่มที่ว่าง"
   },
   "adminUploadLinks": {
-    "albumSelf": "อัลบั้ม",
     "albumNone": "ยังไม่มีอัลบั้ม จะสร้างเมื่ออนุมัติรูปแรก",
     "albumMissing": "อัลบั้มที่เชื่อมไว้ถูกลบแล้ว",
     "groupDetails": "รายละเอียด",

@@ -67,6 +67,11 @@ export default defineNuxtConfig({
     },
     '/images/**': { headers: { 'Cache-Control': 'public, max-age=31536000, immutable' } },
     '/api/settings': { cache: { maxAge: 60 } },
+    // photogrid reads every album's full rows JSON per request — without this
+    // cache it can take 1–30s on cold isolates and leaves the Featured Work
+    // wall blank while the client waits. 60s staleness is fine: the client
+    // shuffles its sample anyway.
+    '/api/photogrid': { cache: { maxAge: 60 } },
 
     // These public pages have no auth-dependent SSR (no page/component reads a
     // session), so serve them from an edge cache and revalidate in the

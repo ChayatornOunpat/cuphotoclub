@@ -177,14 +177,11 @@ async function copyLink(link: CollectionLink) {
   }
 }
 
-// An album created for a collection inherits its name, so printing it here
-// would say the same words twice on one line. When they match, the generic
-// word plus the draft/published pill carries the same information without the
-// stutter — and it starts showing the real name the moment either is renamed.
+// The album's own name, always — it is a different object from the collection
+// even when it was created with the same title, and the name is what an admin
+// looks for when they open the album list.
 function albumLabel(link: CollectionLink) {
-  const title = link.album?.title?.trim()
-  if (!title) return t('adminUploadLinks.untitled')
-  return title === link.label.trim() ? t('adminUploadLinks.albumSelf') : title
+  return link.album?.title?.trim() || t('adminUploadLinks.untitled')
 }
 
 // Date · place, both optional. formatDate is the site's one date formatter
