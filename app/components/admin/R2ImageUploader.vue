@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { isAllowedUploadExt } from '~~/shared/uploadFileTypes'
+
 const { t } = useI18n()
 
 // Tuned in /admin/image-lab against real camera files: 3040 clears a
@@ -121,6 +123,12 @@ interface UploadManifestItem {
   status?: string
 }
 
+interface PrepFailure {
+  file: File
+  prepFailed: true
+  prepError: string
+}
+
 // Queue-order stamp sent with each upload. R2's uploadedAt records completion
 // time, which scrambles under parallel uploads. Stamp from the original file
 // index before compression/upload workers start, so 300+ file batches remain
@@ -190,6 +198,19 @@ async function contentHash(file: File) {
 
 function fileExt(file: File) {
   return file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+}
+
+// Extension, not MIME type: raw camera files (.cr2, .nef, .arw, .dng, ...) get
+// sniffed by the OS/browser as all sorts of things — sometimes empty, sometimes
+// an image/* type for TIFF-based raw formats — so a MIME check alone lets them
+// through inconsistently. The extension is what we actually control.
+function isAllowedPhotoFile(file: File) {
+  return isAllowedUploadExt(fileExt(file))
+}
+
+function isHeicFile(file: File) {
+  const ext = fileExt(file)
+  return ext === 'heic' || ext === 'heif'
 }
 
 // Upload failures arrive as $fetch FetchError, raw Error, or whatever a Worker
@@ -316,6 +337,21 @@ function supportsWebpEncode() {
   return webpEncodeProbe
 }
 
+// createImageBitmap() cannot decode HEIC/HEIF outside Safari, so every other
+// browser throws inside compressImage(). iOS often transcodes to JPEG when a
+// file is picked through <input type="file">, but a HEIC arriving from a Mac
+// Finder drag, an Android file manager, or Safari's own "keep original" export
+// setting will not — so decode it explicitly first, unconditionally (not just
+// when auto-compress is on), since an undecoded HEIC is unusable on the wall
+// either way.
+async function convertHeic(file: File): Promise<File> {
+  const { default: heic2any } = await import('heic2any')
+  const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 })
+  const blob = Array.isArray(result) ? result[0]! : result
+  const name = file.name.replace(/[.][^.]+$/, '') + '.jpg'
+  return new File([blob], name, { type: 'image/jpeg' })
+}
+
 async function compressImage(file: File): Promise<File> {
   const bmp = await createImageBitmap(file)
   let w = bmp.width, h = bmp.height
@@ -387,17 +423,40 @@ function chooseFiles() {
 }
 
 async function createUploadSessionBatch(files: File[], sessionStart: number, sequenceBase: number) {
-  const prepared = await mapWithConcurrency(files, UPLOAD_CONCURRENCY, async (file, index) => {
-    const toUpload = autoCompress.value && file.size > COMPRESS_MIN_BYTES ? await compressImage(file) : file
-    return {
-      file,
-      toUpload,
-      hash: await contentHash(toUpload),
-      key: '',
-      seq: uploadOrderSeq(sequenceBase, sessionStart + index),
-      exists: false
+  const prepared = await mapWithConcurrency<File, UploadManifestItem | PrepFailure>(
+    files,
+    UPLOAD_CONCURRENCY,
+    async (file, index) => {
+      try {
+        const decoded = isHeicFile(file) ? await convertHeic(file) : file
+        const toUpload = autoCompress.value && decoded.size > COMPRESS_MIN_BYTES ? await compressImage(decoded) : decoded
+        return {
+          file,
+          toUpload,
+          hash: await contentHash(toUpload),
+          key: '',
+          seq: uploadOrderSeq(sequenceBase, sessionStart + index),
+          exists: false
+        }
+      } catch (err) {
+        const failure: PrepFailure = {
+          file,
+          prepFailed: true,
+          prepError: isHeicFile(file) ? t('uploader.errHeicFailed') : uploadErrorMessage(err)
+        }
+        return failure
+      }
     }
-  })
+  )
+
+  // A HEIC decode failure (or any other per-file prep error) only takes out
+  // that one file — record it and keep the rest of the batch moving, rather
+  // than failing every file in the session over one bad input.
+  for (const item of prepared) {
+    if ('prepFailed' in item) markUploadFailed(item.file, item.prepError)
+  }
+  const okItems = prepared.filter((item): item is UploadManifestItem => !('prepFailed' in item))
+  if (!okItems.length) return []
 
   const session = await $fetch<{
     id: string
@@ -406,7 +465,7 @@ async function createUploadSessionBatch(files: File[], sessionStart: number, seq
     method: 'POST',
     body: {
       prefix: props.prefix,
-      files: prepared.map(item => ({
+      files: okItems.map(item => ({
         id: prepareId(item.file),
         name: item.file.name,
         hash: item.hash,
@@ -418,7 +477,7 @@ async function createUploadSessionBatch(files: File[], sessionStart: number, seq
   })
 
   const manifest = new Map(session.items.map(item => [item.id, item]))
-  return prepared.map((item) => {
+  return okItems.map((item) => {
     const match = manifest.get(prepareId(item.file))
     return {
       ...item,
@@ -654,7 +713,7 @@ async function upload(files: File[], retry = false) {
   }
 
   duplicateCount.value = 0
-  const photos = files.filter(file => file.type.startsWith('image/'))
+  const photos = files.filter(isAllowedPhotoFile)
   rejectedCount.value = files.length - photos.length
   const images = uniqueUncompleted(photos)
   if (!images.length) return

@@ -584,7 +584,8 @@
     "errBusy": "The server is busy. The upload stopped — retry the failed files in a moment.",
     "errNetwork": "Network request failed. Check your connection and retry this file.",
     "errTooLarge": "Still over {mb} MB after compression.",
-    "errUnknown": "Upload failed without a message from the server."
+    "errUnknown": "Upload failed without a message from the server.",
+    "errHeicFailed": "Could not convert this HEIC/HEIF photo. Try re-exporting it as JPEG and uploading again."
   },
   "uploadDock": {
     "uploading": "Uploading photos",

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isAllowedUploadExt } from '~~/shared/uploadFileTypes'
 
 // Contributor manifest — the public twin of
 // server/api/admin/upload/sessions/index.post.ts.
@@ -62,6 +63,12 @@ export default defineEventHandler(async (event) => {
     const hash = sanitizeUploadHash(file.hash)
     const key = hashedUploadKey(prefix, hash, ext)
     if (!key) throw createError({ statusCode: 400, message: 'ข้อมูลไฟล์ไม่ถูกต้อง' })
+    // Extension, not MIME type: file.type is client-reported and raw camera
+    // formats often arrive with no MIME type at all, which used to skip this
+    // check entirely (`file.type &&` guard below was the loophole).
+    if (!isAllowedUploadExt(ext)) {
+      throw createError({ statusCode: 400, message: 'รองรับเฉพาะไฟล์รูปภาพ' })
+    }
     if (file.type && !file.type.startsWith('image/')) {
       throw createError({ statusCode: 400, message: 'รองรับเฉพาะไฟล์รูปภาพ' })
     }
