@@ -64,5 +64,6 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  invalidateR2Inventory()
   return { key: item.key, status: item.status }
 })

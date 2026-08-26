@@ -56,5 +56,6 @@ export default defineEventHandler(async (event) => {
       inUse
     }
   })
+  invalidateR2Inventory()
   return { ok: true, trashed: true }
 })

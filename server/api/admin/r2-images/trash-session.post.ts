@@ -45,6 +45,7 @@ export default defineEventHandler(async (event) => {
   const blocked = evaluated.length - trashed
 
   if (trashed) {
+    invalidateR2Inventory()
     await recordAdminAudit(actor, {
       action: 'trash',
       entityType: 'media',

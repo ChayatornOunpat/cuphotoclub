@@ -29,5 +29,6 @@ export default defineEventHandler(async (event) => {
     }
   })
 
+  invalidateR2Inventory()
   return { ok: true, restored: keys.length }
 })

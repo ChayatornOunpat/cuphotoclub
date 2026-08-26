@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
 import type { BlobObject } from '@nuxthub/core/blob'
 
 interface ImageUsage {
@@ -16,6 +16,14 @@ interface R2InventoryImage {
   orderAt: number
   albums: ImageUsage[]
   usages: ImageUsage[]
+}
+
+interface R2InventoryResponse {
+  prefix: string
+  total: number
+  linkedToAlbums: number
+  referenced: number
+  images: R2InventoryImage[]
 }
 
 function addUsage(map: Map<string, ImageUsage[]>, key: string | null | undefined, usage: ImageUsage) {
@@ -40,11 +48,49 @@ async function listImageBlobs(prefix?: string): Promise<BlobObject[]> {
   return blobs
 }
 
+interface EditorialAlbumRef {
+  id: string
+  title: string
+  coverSrc: string
+  srcs: string[]
+}
+
+// The inventory only needs each album's id, title, cover and the image srcs
+// buried in its layout rows. albumStore.list() would pull and JSON.parse every
+// album's full rows_json — the same multi-second cost that made /api/photogrid
+// time out. Push the extraction into SQLite instead (json_each, the same
+// technique migration 0022 uses for photo_count) and return bare srcs.
+async function listEditorialAlbumRefs(): Promise<EditorialAlbumRef[]> {
+  const rows = await db.all<{ id: string, title: string, cover_src: string, srcs: string | null }>(sql`
+    SELECT a.id,
+           a.title,
+           a.cover_src,
+           (
+             SELECT group_concat(c.value ->> '$.src', char(10))
+             FROM json_each(a.rows_json) AS r,
+                  json_each(r.value -> '$.cells') AS c
+             WHERE c.value ->> '$.type' = 'image'
+               AND trim(coalesce(c.value ->> '$.src', '')) <> ''
+           ) AS srcs
+    FROM content_albums AS a
+  `)
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    coverSrc: row.cover_src ?? '',
+    srcs: row.srcs ? row.srcs.split('\n') : []
+  }))
+}
+
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
 
   const query = getQuery(event)
   const prefix = String(query.prefix || '').replace(/[^a-z0-9/_-]/gi, '') || undefined
+
+  const cacheKey = prefix ?? ''
+  const cached = getCachedR2Inventory<R2InventoryResponse>(cacheKey)
+  if (cached) return cached
 
   const [blobs, galleryPhotos, posts, events, members, heroRows, historyRows, clubroomRows, editorialAlbums, trashedKeys] = await Promise.all([
     listImageBlobs(prefix),
@@ -80,7 +126,7 @@ export default defineEventHandler(async (event) => {
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'heroImages')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'clubroomImage')),
-    albumStore.list(),
+    listEditorialAlbumRefs(),
     trashedKeySet()
   ])
 
@@ -169,9 +215,8 @@ export default defineEventHandler(async (event) => {
       href: `/admin/albums/${album.id}`,
       role: 'editorial cover'
     })
-    for (const cell of album.rows.flatMap(row => row.cells)) {
-      if (cell.type !== 'image') continue
-      addUsage(otherUsage, cell.src, {
+    for (const src of album.srcs) {
+      addUsage(otherUsage, src, {
         kind: 'editorial-album',
         label: album.title,
         href: `/admin/albums/${album.id}`,
@@ -220,11 +265,13 @@ export default defineEventHandler(async (event) => {
 
   images.sort((a, b) => b.orderAt - a.orderAt || a.key.localeCompare(b.key))
 
-  return {
+  const response: R2InventoryResponse = {
     prefix: prefix ?? '',
     total: images.length,
     linkedToAlbums: images.filter(image => image.albums.length > 0).length,
     referenced: images.filter(image => image.albums.length > 0 || image.usages.length > 0).length,
     images
   }
+  setCachedR2Inventory(cacheKey, response)
+  return response
 })

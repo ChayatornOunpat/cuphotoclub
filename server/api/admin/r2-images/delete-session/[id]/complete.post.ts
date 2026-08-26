@@ -61,5 +61,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  if (deleted.length) invalidateR2Inventory()
+
   return r2DeleteSessionSummary(session)
 })
