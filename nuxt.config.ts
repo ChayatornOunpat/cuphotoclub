@@ -214,7 +214,12 @@ export default defineNuxtConfig({
   image: {
     domains: ['picsum.photos', 'localhost', 'cuphotoclub.com', 'www.cuphotoclub.com', 'cuphotoclub.pages.dev'],
     cloudflare: { baseURL: '/' },
-    quality: 80
+    quality: 80,
+    // @nuxt/image's default screens top out at 1536 (2xl). A `sizes` entry
+    // keyed past that — e.g. "3xl:60vw" — has no breakpoint to resolve
+    // against and silently drops, capping every responsive image's largest
+    // srcset candidate at ~1536*fraction regardless of real desktop width.
+    screens: { '3xl': 1920 }
   },
 
   icon: {

@@ -411,23 +411,34 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 // ── Note ────────────────────────────────────────────────────────────────────
+// Explicit save button, not save-on-blur: closing the tab without ever
+// blurring the textarea used to lose the note silently. noteDirty gates the
+// button so it only sends when the text actually changed since the last save.
+const noteDirty = computed(() => (noteInput.value.trim() || null) !== (me.value?.note ?? null))
+const noteFlashing = ref(false)
 const noteSaved = ref(false)
 const savingNote = ref(false)
+const noteSaveLabel = computed(() => (noteSaved.value ? t('contribute.noteSaved') : t('contribute.noteSave')))
+const noteSaveChars = computed(() => [...noteSaveLabel.value])
 let noteFlashTimer: ReturnType<typeof setTimeout> | null = null
+let noteSavedTimer: ReturnType<typeof setTimeout> | null = null
 
-// Saves on blur with a flash, matching how the name field has always behaved. A
-// submit button here would read as "send my photos", which it is not.
 async function saveNote() {
-  if (!open.value || savingNote.value) return
-  if ((noteInput.value.trim() || null) === (me.value?.note ?? null)) return
+  if (!open.value || savingNote.value || !noteDirty.value) return
   savingNote.value = true
   errorMessage.value = ''
   try {
     await $fetch(`${api.value}/me`, { method: 'PATCH', body: { note: noteInput.value } })
     await refreshState()
-    noteSaved.value = true
     if (noteFlashTimer) clearTimeout(noteFlashTimer)
-    noteFlashTimer = setTimeout(() => { noteSaved.value = false }, 1800)
+    if (noteSavedTimer) clearTimeout(noteSavedTimer)
+    noteSaved.value = false
+    noteFlashing.value = true
+    noteFlashTimer = setTimeout(() => {
+      noteFlashing.value = false
+      noteSaved.value = true
+      noteSavedTimer = setTimeout(() => { noteSaved.value = false }, 1800)
+    }, 260)
   } catch (err) {
     errorMessage.value = apiMessage(err, t('contribute.saveFailed'))
   } finally {
@@ -440,6 +451,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   if (toastTimer) clearTimeout(toastTimer)
   if (noteFlashTimer) clearTimeout(noteFlashTimer)
+  if (noteSavedTimer) clearTimeout(noteSavedTimer)
 })
 
 // ── Header presentation ─────────────────────────────────────────────────────
@@ -477,8 +489,14 @@ const metaLine = computed(() => (
 ))
 
 useSeoMeta({
-  title: () => t('contribute.title'),
-  // An upload link is not something to index or preview socially.
+  title: () => heading.value,
+  ogTitle: () => heading.value,
+  // Left unset, chat apps that unfurl this link fall back to scraping the
+  // "what is a code" explainer paragraph — instructions, not a description.
+  description: () => t('contribute.metaDescription'),
+  ogDescription: () => t('contribute.metaDescription'),
+  // Still not meant to be indexed or searched — just previewed decently
+  // when someone pastes the link into Line or Discord.
   robots: 'noindex, nofollow'
 })
 </script>
@@ -516,7 +534,7 @@ useSeoMeta({
             class="wstage__cover"
             :src="coverSrc"
             :alt="heading"
-            sizes="100vw md:60vw"
+            sizes="100vw md:60vw 3xl:60vw"
             eager
             optimize
           />
@@ -877,12 +895,26 @@ useSeoMeta({
             rows="3"
             maxlength="2000"
             :placeholder="t('contribute.notePlaceholder')"
-            @blur="saveNote"
           />
-          <p class="field__hint">
-            <span v-if="noteSaved" class="field__saved">{{ t('contribute.saved') }}</span>
-            <span v-else>{{ t('contribute.noteHint') }}</span>
-          </p>
+          <div class="notebox__foot">
+            <p class="field__hint">{{ t('contribute.noteHint') }}</p>
+            <button
+              type="button"
+              class="notebox__save"
+              :class="{ 'is-dirty': noteDirty, 'is-flashing': noteFlashing, 'is-saved': noteSaved }"
+              :disabled="!noteDirty || savingNote"
+              @click="saveNote"
+            >
+              <span class="notebox__save-flash" aria-hidden="true" />
+              <span class="notebox__save-corner notebox__save-corner--tl" aria-hidden="true" />
+              <span class="notebox__save-corner notebox__save-corner--tr" aria-hidden="true" />
+              <span class="notebox__save-corner notebox__save-corner--bl" aria-hidden="true" />
+              <span class="notebox__save-corner notebox__save-corner--br" aria-hidden="true" />
+              <span :key="noteSaveLabel" class="notebox__save-txt">
+                <span v-for="(ch, i) in noteSaveChars" :key="i" :style="{ '--i': i }">{{ ch === ' ' ? ' ' : ch }}</span>
+              </span>
+            </button>
+          </div>
         </section>
       </div>
     </template>
@@ -1368,7 +1400,6 @@ useSeoMeta({
   line-height: 1.55;
   color: rgba(245, 244, 240, 0.5);
 }
-.field__saved { color: var(--accent); }
 .field__error {
   font-family: var(--font-sans);
   font-size: 0.72rem;
@@ -1726,6 +1757,92 @@ useSeoMeta({
   resize: vertical;
   min-height: 4.5rem;
   line-height: 1.6;
+}
+.notebox__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Darkroom stamp: crop-mark corners lock in and the label develops in, letter
+   by letter, like a contact print catching light — this is the one action in
+   the whole flow that actually reaches another person, so it gets a moment
+   the auto-save-on-blur it replaces never had. */
+.notebox__save {
+  position: relative;
+  flex-shrink: 0;
+  border: 1px solid rgba(245, 244, 240, 0.3);
+  background: transparent;
+  padding: 0.5rem 0.85rem;
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #F5F4F0;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.1s ease, border-color 0.25s ease, color 0.25s ease, opacity 0.2s ease;
+}
+.notebox__save:disabled {
+  color: rgba(245, 244, 240, 0.4);
+  border-color: rgba(245, 244, 240, 0.16);
+  cursor: default;
+}
+.notebox__save.is-dirty:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.notebox__save:active:not(:disabled) { transform: scale(0.96); }
+.notebox__save.is-saved { border-color: var(--accent); color: var(--accent); }
+
+.notebox__save-corner {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--accent);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.35s cubic-bezier(.2, .8, .3, 1.3);
+}
+.notebox__save-corner--tl { top: -1px; left: -1px; border-right: 0; border-bottom: 0; transform: translate(3px, 3px); }
+.notebox__save-corner--tr { top: -1px; right: -1px; border-left: 0; border-bottom: 0; transform: translate(-3px, 3px); }
+.notebox__save-corner--bl { bottom: -1px; left: -1px; border-right: 0; border-top: 0; transform: translate(3px, -3px); }
+.notebox__save-corner--br { bottom: -1px; right: -1px; border-left: 0; border-top: 0; transform: translate(-3px, -3px); }
+.notebox__save.is-saved .notebox__save-corner { opacity: 1; transform: translate(0, 0); }
+
+.notebox__save-flash {
+  position: absolute;
+  inset: 0;
+  background: #F5F4F0;
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.notebox__save.is-flashing .notebox__save-flash {
+  opacity: 0.9;
+  animation: notebox-strobe 0.28s cubic-bezier(.3, 0, .2, 1);
+}
+@keyframes notebox-strobe {
+  0% { transform: translateX(-100%); opacity: 0.9; }
+  55% { transform: translateX(0%); opacity: 0.55; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+
+.notebox__save-txt { position: relative; display: inline-block; }
+.notebox__save-txt span { display: inline-block; }
+.notebox__save.is-saved .notebox__save-txt span {
+  opacity: 0;
+  transform: translateY(3px);
+  animation: notebox-develop 0.28s ease forwards;
+  animation-delay: calc(var(--i) * 28ms);
+}
+@keyframes notebox-develop { to { opacity: 1; transform: translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .notebox__save, .notebox__save-corner, .notebox__save-flash, .notebox__save.is-saved .notebox__save-txt span {
+    transition: none !important;
+    animation: none !important;
+  }
+  .notebox__save.is-saved .notebox__save-txt span { opacity: 1; transform: none; }
 }
 
 /* ── Full-size viewer ───────────────────────────────────────────────────── */

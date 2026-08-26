@@ -95,6 +95,11 @@ useHead(localeHead)
 
 @media (max-width: 640px) {
   .endstrip__inner { flex-direction: column; align-items: flex-start; }
+  /* flex: 1 1 16rem was written for the row layout above, where 16rem is a
+     sensible basis *width*. In a column flex container the same rule reads
+     its basis as a *height* instead, reserving 16rem of empty vertical space
+     under the one-line blurb — the "huge gap before the footer links" bug. */
+  .endstrip__line { flex: none; }
   .endstrip__aside { margin-left: 0; }
 }
 </style>
