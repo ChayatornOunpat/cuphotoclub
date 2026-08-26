@@ -1483,6 +1483,7 @@ useSeoMeta({
   position: sticky;
   top: 0;
   z-index: 20;
+  width: 100%;
   max-width: 1180px;
   margin: 0 auto;
   /* Opaque: thumbnails scroll under this. */
