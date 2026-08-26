@@ -394,22 +394,6 @@ function dateInput(value: string | null) {
         </div>
 
         <div v-if="editingId === link.id" class="row__edit">
-          <!-- Sits above the fields, not below them, so it is reachable without
-               scrolling past Details/When & Where/Limits first. Its own state
-               is the only feedback needed: pink once the draft actually
-               differs from what's saved, grey and inert otherwise. -->
-          <div class="edit__bar">
-            <button
-              type="button"
-              class="edit__save"
-              :class="{ 'is-dirty': isDirty(link) }"
-              :disabled="!isDirty(link) || busy"
-              @click="saveLink(link)"
-            >
-              {{ t('admin.save') }}
-            </button>
-          </div>
-
           <!-- Cover gets its own rail. As a full-width row capped at 320px it
                left most of the panel empty, which is what made this panel read
                as unfinished. Optional: collections are standalone, so there is
@@ -476,7 +460,7 @@ function dateInput(value: string | null) {
               </label>
             </div>
 
-            <div class="grp grp--three">
+            <div class="grp grp--limits">
               <span class="grp__head">{{ t('adminUploadLinks.groupLimits') }}</span>
               <label class="f">
                 <span class="f__label">{{ t('adminUploadLinks.perPerson') }}</span>
@@ -513,6 +497,19 @@ function dateInput(value: string | null) {
                   </span>
                 </button>
               </div>
+
+              <!-- Right beside the field it's most often changed alongside —
+                   grey and inert until isDirty() says the draft actually
+                   differs from what's saved, then pink. -->
+              <button
+                type="button"
+                class="edit__save"
+                :class="{ 'is-dirty': isDirty(link) }"
+                :disabled="!isDirty(link) || busy"
+                @click="saveLink(link)"
+              >
+                {{ t('admin.save') }}
+              </button>
             </div>
           </div>
         </div>
@@ -781,7 +778,6 @@ function dateInput(value: string | null) {
 
 /* Full-width row above the cover/fields — .row__edit auto-places it into its
    own implicit row 1, pushing .edit__cover/.edit__groups into row 2. */
-.edit__bar { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
 .edit__cover { display: flex; flex-direction: column; gap: var(--gap-tight); }
 .edit__groups { display: flex; flex-direction: column; gap: var(--gap-group); }
 
@@ -791,7 +787,10 @@ function dateInput(value: string | null) {
   gap: var(--gap-field);
   align-items: end;
 }
-.grp--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Two flexible number fields, then the switch and Save at their natural
+   width — Save sits beside "require a name" rather than floating alone. */
+.grp--limits { grid-template-columns: repeat(2, minmax(0, 1fr)) auto auto; }
+.grp--limits .edit__save { align-self: end; }
 
 /* The group's name carries the hairline, so the rule doubles as the separator
    and the panel needs no boxes to show its structure. */
@@ -811,7 +810,8 @@ function dateInput(value: string | null) {
 @media (max-width: 860px) {
   .row__edit { grid-template-columns: 1fr; gap: var(--gap-group); }
   .edit__cover { max-width: 240px; }
-  .grp, .grp--three { grid-template-columns: 1fr; }
+  .grp, .grp--limits { grid-template-columns: 1fr; }
+  .grp--limits .edit__save { align-self: stretch; }
 }
 
 .eul__create {
