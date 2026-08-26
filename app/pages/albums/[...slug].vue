@@ -31,6 +31,9 @@ const styleComponent = computed(() => styles[album.value!.style] ?? AlbumEssay)
 
 // Social link previews: without og:description/og:image scrapers fall back to
 // scraping the nav text and the favicon. Image URLs must be absolute.
+//
+// Always the club blurb, never album.excerpt — most album excerpts are
+// internal-facing (credits, shoot notes) and read oddly as a link preview.
 const origin = useSiteOrigin()
 const fallbackDescription = useSeoFallbackDescription()
 const coverUrl = computed(() => {
@@ -44,8 +47,8 @@ const coverUrl = computed(() => {
 useSeoMeta({
   title: () => album.value?.title?.replace(/\n+/g, ' '),
   ogTitle: () => album.value?.title?.replace(/\n+/g, ' '),
-  description: () => album.value?.excerpt || fallbackDescription.value,
-  ogDescription: () => album.value?.excerpt || fallbackDescription.value,
+  description: () => fallbackDescription.value,
+  ogDescription: () => fallbackDescription.value,
   ogImage: () => coverUrl.value,
   twitterImage: () => coverUrl.value,
   ogType: 'article',
