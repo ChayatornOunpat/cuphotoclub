@@ -124,6 +124,23 @@ reach any admin surface, and stops working the moment the admin closes the link.
 is not a security event — that person just manages nothing further, and an admin handles any
 later removal by hand.
 
+### The cookie outlives the person holding it
+
+These links are opened at the venue, on whatever phone is nearest, and that phone gets passed
+around. So a returning browser is not dropped straight into the working screen: it lands on a
+full-page **"is this still you?"** — the same dark surface as the welcome, showing the name the
+cookie is sending as, the photo count, and the claim code one last time.
+
+Two ways out, and only two. *Yes, that's me* opens the working screen. *Someone else — start
+fresh* calls `DELETE /api/contribute/[token]/me`, which drops this browser's cookie entry and
+nothing else: the contributor row, their photos and their code all survive, and the code walks
+them back in from any device. That is why the code is on screen above the button — the
+plaintext lives in the cookie being dropped, and this is its last showing. The endpoint needs
+no rate limit; it touches the sealed cookie only, with no D1 or KV write to burn.
+
+It returns to `welcome` rather than to the create form, because the next person may be new or
+may be arriving with a code of their own, and the welcome already offers both doors.
+
 ### Anonymous is still the default
 
 Signing in is not a thing here, so anonymity is unchanged: `displayName` stays nullable and
@@ -256,6 +273,7 @@ GET    /api/contribute/[token]                  -> link state (open? name requir
 POST   /api/contribute/[token]/claim            -> redeem a code on a new device
 GET    /api/contribute/[token]/me               -> my identity + my claim code (if cookie holds it)
 PATCH  /api/contribute/[token]/me               -> change display name / anonymous / contact
+DELETE /api/contribute/[token]/me               -> let go of this browser's identity (§2)
 GET    /api/contribute/[token]/mine             -> my submissions
 PATCH  /api/contribute/[token]/mine/[id]        -> edit caption
 DELETE /api/contribute/[token]/mine/[id]        -> remove, while unpublished

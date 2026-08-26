@@ -302,6 +302,12 @@ export const contentAlbums = sqliteTable('content_albums', {
   dark: integer('dark', { mode: 'boolean' }).notNull().default(false),
   placement: text('placement').$type<Placement>().notNull(),
   coverSrc: text('cover_src').notNull().default(''),
+  // Derived from `rows` on every write (see albumStore.writeAlbum). List views
+  // need only a cover and a photo count, and reading `rows_json` for 139 albums
+  // pulled ~3MB out of D1 per request; these two columns let the list queries
+  // skip the JSON blob entirely.
+  autoCoverSrc: text('auto_cover_src').notNull().default(''),
+  photoCount: integer('photo_count').notNull().default(0),
   rows: text('rows_json', { mode: 'json' }).$type<AlbumRow[]>().notNull().default(sql`'[]'`),
   textDefaults: text('text_defaults_json', { mode: 'json' }).$type<{ align?: TextAlign, font?: TextFont }>(),
   createdAt,

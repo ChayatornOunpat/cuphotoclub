@@ -172,7 +172,7 @@ async function toggleCategoryMenu() {
   if (categoriesLoaded.value || categoriesLoading.value) return
   categoriesLoading.value = true
   try {
-    const albums = await $fetch<Array<{ category?: string }>>('/api/admin/albums')
+    const albums = await $fetch('/api/admin/albums/picker')
     existingCategories.value = [...new Set(albums.map(a => (a.category || '').trim()).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b))
     categoriesLoaded.value = true

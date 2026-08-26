@@ -1,5 +1,7 @@
-import { desc, eq, sql } from 'drizzle-orm'
-import type { Album, AlbumInput } from '~~/shared/types'
+import { and, asc, desc, eq, or, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
+import type { Album, AlbumInput, AlbumListItem, AlbumPickerItem, AlbumRow, ContentStatus } from '~~/shared/types'
 import { readContentAlbums } from './contentAlbumFiles'
 
 // Unicode-aware: keep letters (incl. Thai), digits, and combining marks (Thai
@@ -12,6 +14,18 @@ function slugify(s: string): string {
 
 function withoutOrderPrefix(s: string): string {
   return s.replace(/^\d+-/, '')
+}
+
+// The two things every list view needs out of `rows`. They are stored as their
+// own columns (auto_cover_src / photo_count) so listing albums never has to read
+// the rows JSON — see the comment on the schema columns.
+function imageCells(rows: AlbumRow[] | null | undefined) {
+  return (rows ?? []).flatMap(row => row.cells).filter(cell => cell.type === 'image' && cell.src)
+}
+
+function derivedFromRows(rows: AlbumRow[] | null | undefined) {
+  const images = imageCells(rows)
+  return { autoCoverSrc: images[0]?.src ?? '', photoCount: images.length }
 }
 
 // Find a slug not already taken by a *different* album. `exceptId` lets an album
@@ -30,9 +44,9 @@ async function uniqueSlug(base: string, exceptId?: string): Promise<string> {
   }
 }
 
-type AlbumRow = typeof schema.contentAlbums.$inferSelect
+type AlbumDbRow = typeof schema.contentAlbums.$inferSelect
 
-function rowToAlbum(row: AlbumRow): Album {
+function rowToAlbum(row: AlbumDbRow): Album {
   return {
     id: row.id,
     slug: row.slug || row.id,
@@ -56,6 +70,7 @@ function rowToAlbum(row: AlbumRow): Album {
 
 async function writeAlbum(album: Album): Promise<void> {
   const now = new Date()
+  const derived = derivedFromRows(album.rows)
   const values = {
     id: album.id,
     slug: album.slug,
@@ -71,6 +86,8 @@ async function writeAlbum(album: Album): Promise<void> {
     dark: album.dark ?? false,
     placement: album.placement,
     coverSrc: album.coverSrc,
+    autoCoverSrc: derived.autoCoverSrc,
+    photoCount: derived.photoCount,
     rows: album.rows,
     textDefaults: album.textDefaults ?? null,
     updatedAt: now
@@ -95,6 +112,8 @@ async function writeAlbum(album: Album): Promise<void> {
         dark: values.dark,
         placement: values.placement,
         coverSrc: values.coverSrc,
+        autoCoverSrc: values.autoCoverSrc,
+        photoCount: values.photoCount,
         rows: values.rows,
         textDefaults: values.textDefaults,
         updatedAt: now
@@ -133,6 +152,7 @@ function seedFromContentOnce(): Promise<void> {
             style: album.style,
             placement: album.placement,
             coverSrc: album.coverSrc,
+            ...derivedFromRows(album.rows),
             rows: album.rows
           })
           .onConflictDoNothing({ target: schema.contentAlbums.id })
@@ -146,7 +166,167 @@ function seedFromContentOnce(): Promise<void> {
   return seedPromise
 }
 
+export type AlbumListSort = 'newest' | 'oldest' | 'title' | 'category' | 'modified'
+
+export interface AlbumListQuery {
+  /** Case-insensitive match against title / category / location / excerpt. */
+  q?: string
+  sort?: AlbumListSort
+  /** Omit to get every album; set to page the result. */
+  limit?: number
+  offset?: number
+  /** Restrict to these visibilities (the public archive passes ['public']). */
+  visibility?: ContentStatus[]
+}
+
+// Every column except `rows_json`. Selecting these explicitly is the whole point
+// of listMeta: the rows blob is ~3MB across the album table and no list view
+// needs it.
+const listColumns = {
+  id: schema.contentAlbums.id,
+  slug: schema.contentAlbums.slug,
+  title: schema.contentAlbums.title,
+  category: schema.contentAlbums.category,
+  date: schema.contentAlbums.date,
+  dateEnd: schema.contentAlbums.dateEnd,
+  published: schema.contentAlbums.published,
+  visibility: schema.contentAlbums.visibility,
+  location: schema.contentAlbums.location,
+  excerpt: schema.contentAlbums.excerpt,
+  style: schema.contentAlbums.style,
+  dark: schema.contentAlbums.dark,
+  placement: schema.contentAlbums.placement,
+  coverSrc: schema.contentAlbums.coverSrc,
+  autoCoverSrc: schema.contentAlbums.autoCoverSrc,
+  photoCount: schema.contentAlbums.photoCount,
+  textDefaults: schema.contentAlbums.textDefaults,
+  updatedAt: schema.contentAlbums.updatedAt
+}
+
+type ListRow = { [K in keyof typeof listColumns]: AlbumDbRow[K] }
+
+function rowToListItem(row: ListRow): AlbumListItem {
+  return {
+    id: row.id,
+    slug: row.slug || row.id,
+    title: row.title,
+    category: row.category,
+    date: row.date,
+    dateEnd: row.dateEnd ?? undefined,
+    published: row.published,
+    visibility: row.visibility ?? 'public',
+    location: row.location ?? undefined,
+    excerpt: row.excerpt,
+    style: row.style,
+    dark: row.dark,
+    placement: row.placement,
+    // Resolved server-side so callers never need `rows` to show a thumbnail.
+    coverSrc: row.coverSrc || row.autoCoverSrc || '',
+    photoCount: row.photoCount,
+    textDefaults: row.textDefaults ?? undefined,
+    updatedAt: row.updatedAt?.toISOString()
+  }
+}
+
+function listOrderBy(sort: AlbumListSort) {
+  const c = schema.contentAlbums
+  if (sort === 'oldest') return [asc(c.published), asc(c.id)]
+  if (sort === 'title') return [asc(c.title), asc(c.id)]
+  if (sort === 'category') return [asc(c.category), desc(c.published), asc(c.id)]
+  if (sort === 'modified') return [desc(c.updatedAt), asc(c.id)]
+  return [desc(c.published), asc(c.id)]
+}
+
+function listWhere(query: AlbumListQuery) {
+  const c = schema.contentAlbums
+  const clauses: (SQL | undefined)[] = []
+
+  if (query.visibility?.length) {
+    clauses.push(or(...query.visibility.map(value => eq(c.visibility, value))))
+  }
+
+  const term = query.q?.trim().toLowerCase()
+  if (term) {
+    // Backslash-escape the LIKE wildcards (and the escape char itself) so a
+    // literal % or _ typed into the search box matches itself. SQLite only
+    // honours that with an explicit ESCAPE clause, hence the raw comparison.
+    const pattern = `%${term.replace(/[\\%_]/g, ch => `\\${ch}`)}%`
+    const matches = (col: AnySQLiteColumn) =>
+      sql`lower(coalesce(${col}, '')) LIKE ${pattern} ESCAPE '\\'`
+    clauses.push(or(
+      matches(c.title),
+      matches(c.category),
+      matches(c.location),
+      matches(c.excerpt),
+      matches(c.style)
+    ))
+  }
+
+  // The seeded demo albums point every image at picsum.photos, so excluding
+  // them is a cover check. Done in SQL rather than after the fact so `total`
+  // and the paged slice agree. (Production never seeds them — see
+  // seedFromContentOnce — this only matters for a local db run with real-data
+  // mode on.)
+  if (realDataOnly()) {
+    clauses.push(sql`${c.coverSrc} NOT LIKE '%picsum.photos%' AND ${c.autoCoverSrc} NOT LIKE '%picsum.photos%'`)
+  }
+
+  return clauses.length ? and(...clauses) : undefined
+}
+
 export const albumStore = {
+  /**
+   * Albums without their `rows` — for archives, admin tables, the home feed and
+   * the sitemap. Pass `limit`/`offset` to page; `total` is the count before
+   * paging so callers can render a pager. Use `list()` only when you genuinely
+   * need every photo (R2 reference scans, the photo grid).
+   */
+  async listMeta(query: AlbumListQuery = {}): Promise<{ items: AlbumListItem[], total: number }> {
+    await seedFromContentOnce()
+    const where = listWhere(query)
+
+    const rowsQuery = db
+      .select(listColumns)
+      .from(schema.contentAlbums)
+      .where(where)
+      .orderBy(...listOrderBy(query.sort ?? 'newest'))
+
+    const [rows, countRows] = await Promise.all([
+      query.limit === undefined
+        ? rowsQuery
+        : rowsQuery.limit(query.limit).offset(query.offset ?? 0),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.contentAlbums)
+        .where(where)
+    ])
+
+    const items = rows.map(rowToListItem)
+    return { items, total: countRows[0]?.count ?? items.length }
+  },
+
+  /** How many albums exist, for dashboards that only render the number. */
+  async count(): Promise<number> {
+    await seedFromContentOnce()
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.contentAlbums)
+      .where(listWhere({}))
+    return row?.count ?? 0
+  },
+
+  /** id/title/slug for album dropdowns — the smallest useful payload. */
+  async listPicker(): Promise<AlbumPickerItem[]> {
+    await seedFromContentOnce()
+    const c = schema.contentAlbums
+    const rows = await db
+      .select({ id: c.id, slug: c.slug, title: c.title, category: c.category, visibility: c.visibility })
+      .from(c)
+      .where(listWhere({}))
+      .orderBy(desc(c.published), asc(c.id))
+    return rows.map(row => ({ ...row, slug: row.slug || row.id, visibility: row.visibility ?? 'public' }))
+  },
+
   async list(): Promise<Album[]> {
     await seedFromContentOnce()
     const rows = await db

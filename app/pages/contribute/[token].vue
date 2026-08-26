@@ -2,6 +2,8 @@
 // Participant upload page. Three stages rather than one flat form:
 //
 //   1. welcome  — what this collection is, and what a claim code is for.
+//                 A browser that already holds an identity gets `resume`
+//                 instead: same surface, asking whether it is still them.
 //   2. identity — mint a code (optionally with a name / contact / credit
 //                 consent), or adopt one typed from another device.
 //   3. upload   — the working screen: sticky counter, dropzone, photo grid.
@@ -104,10 +106,14 @@ const meterRatio = computed(() => {
 })
 
 // ── Stage machine ───────────────────────────────────────────────────────────
-type Stage = 'welcome' | 'create' | 'issued' | 'claim' | 'upload'
-// Someone who already has an identity in this browser lands straight on the
-// working screen; the welcome is for a first visit, not a returning tab.
-const stage = ref<Stage>(me.value ? 'upload' : 'welcome')
+type Stage = 'welcome' | 'resume' | 'create' | 'issued' | 'claim' | 'upload'
+// A browser that already holds an identity is asked to confirm it before the
+// working screen opens, rather than being dropped into someone else's batch.
+// These links are opened at the venue on whatever phone is nearest, so the
+// cookie routinely outlives the person who made it — and the only visible
+// consequence of getting it wrong is a wall of photos that are not yours, with
+// a delete button on every one. The welcome is still for a genuine first visit.
+const stage = ref<Stage>(me.value ? 'resume' : 'welcome')
 
 const errorMessage = ref('')
 function apiMessage(err: unknown, fallback: string) {
@@ -282,6 +288,50 @@ async function onUploaded() {
   await Promise.all([refreshState(), refreshMine()])
 }
 
+// ── Returning visitor ───────────────────────────────────────────────────────
+// The cookie says who this browser is; only the person holding it knows whether
+// that is still true.
+const resumeName = computed(() => me.value?.displayName?.trim() || '')
+
+function continueAsMe() {
+  stage.value = 'upload'
+  refreshMine()
+}
+
+const switching = ref(false)
+
+// "Not me" drops this browser's cookie entry and nothing else: the previous
+// contributor keeps their row, their photos and their code, and can walk back in
+// on any device by typing it. Which is also why the screen above this shows the
+// code one last time — the plaintext lives in the cookie being dropped.
+//
+// Back to `welcome`, not straight to `create`: the next person may be new, or
+// may be arriving with a code of their own, and the welcome already offers both.
+async function useAnotherIdentity() {
+  if (switching.value) return
+  switching.value = true
+  errorMessage.value = ''
+  try {
+    await $fetch(`${api.value}/me`, { method: 'DELETE' })
+    // Everything the old identity left behind goes with it, or the next person
+    // finds someone else's name pre-filled and someone else's photos on screen.
+    mine.value = []
+    selectedIds.value = []
+    uploadedKeys.value = []
+    seeded.value = false
+    nameInput.value = ''
+    contactInput.value = ''
+    creditHandle.value = false
+    noteInput.value = ''
+    await refreshState()
+    stage.value = 'welcome'
+  } catch (err) {
+    errorMessage.value = apiMessage(err, t('contribute.switchFailed'))
+  } finally {
+    switching.value = false
+  }
+}
+
 // ── Selection ───────────────────────────────────────────────────────────────
 const selectionCount = computed(() => selectedIds.value.length)
 
@@ -414,6 +464,18 @@ const eventDateText = computed(() => {
 })
 const metaParts = computed(() => [eventDateText.value, link.value.location || ''].filter(Boolean))
 
+// The welcome and the returning-visitor screen share one surface, so they share
+// its header too — but they are asking different things. The welcome introduces
+// a collection, and leads with its name. `resume` asks one question, leads with
+// that, and demotes the collection name to the meta line where it still answers
+// "which link is this?" without competing with the question.
+const headingText = computed(() => (
+  stage.value === 'resume' ? t('contribute.resumeTitle') : heading.value
+))
+const metaLine = computed(() => (
+  stage.value === 'resume' ? [heading.value, ...metaParts.value] : metaParts.value
+))
+
 useSeoMeta({
   title: () => t('contribute.title'),
   // An upload link is not something to index or preview socially.
@@ -441,8 +503,8 @@ useSeoMeta({
   </div>
 
   <div v-else class="contrib">
-    <!-- ── Stage 1: welcome ─────────────────────────────────────────────── -->
-    <template v-if="stage === 'welcome'">
+    <!-- ── Stage 1: welcome, or "is this still you?" ────────────────────── -->
+    <template v-if="stage === 'welcome' || stage === 'resume'">
       <!-- One dark surface, not a banner over a paper page: the cover is the
            left half on desktop and the top band on mobile, and everything that
            follows sits on the same ground. -->
@@ -463,38 +525,83 @@ useSeoMeta({
 
         <div class="wstage__panel">
           <p class="eyebrow-line">{{ t('contribute.eyebrow') }}</p>
-          <h1 class="stage__title">{{ heading }}</h1>
-          <p v-if="metaParts.length" class="stage__meta">
-            <span v-for="(part, i) in metaParts" :key="part">
+          <h1 class="stage__title">{{ headingText }}</h1>
+          <p v-if="metaLine.length" class="stage__meta">
+            <span v-for="(part, i) in metaLine" :key="`${i}-${part}`">
               <span v-if="i" class="stage__meta-sep" aria-hidden="true"> · </span>{{ part }}
             </span>
           </p>
-          <p v-if="description" class="stage__desc">{{ description }}</p>
+          <p v-if="stage === 'resume'" class="stage__desc">{{ t('contribute.resumeLead') }}</p>
+          <p v-else-if="description" class="stage__desc">{{ description }}</p>
 
           <div class="cut-line cut-line--inset" />
 
           <p v-if="!open" class="alert alert--dark">{{ t('contribute.closed') }}</p>
 
-          <section class="about about--dark">
-            <h2 class="about__title">{{ t('contribute.codeAboutTitle') }}</h2>
-            <i18n-t class="about__body" keypath="contribute.codeAboutBody" tag="p" scope="global">
-              <template #code>
-                <code class="about__code">{{ t('contribute.codePlaceholder') }}</code>
-              </template>
-              <template #screenshot>
-                <strong class="about__strong">{{ t('contribute.codeAboutScreenshot') }}</strong>
-              </template>
-            </i18n-t>
-          </section>
+          <!-- Returning visitor: who this browser currently is, and the way out
+               if that is the wrong person. -->
+          <template v-if="stage === 'resume'">
+            <p v-if="errorMessage" class="alert alert--dark">{{ errorMessage }}</p>
 
-          <div class="actions">
-            <button v-if="open" type="button" class="btn btn--fill" @click="stage = 'create'">
-              {{ t('contribute.getCode') }}
-            </button>
-            <button type="button" class="btn btn--ghost" @click="stage = 'claim'">
-              {{ t('contribute.haveCode') }}
-            </button>
-          </div>
+            <section class="whois">
+              <h2 class="whois__title">{{ t('contribute.resumeWhoTitle') }}</h2>
+              <!-- Anonymous is a real answer here, not a missing value: most
+                   contributors never type a name, so it is said plainly rather
+                   than left as a blank line to puzzle over. -->
+              <p class="whois__name" :class="{ 'whois__name--anon': !resumeName }">
+                {{ resumeName || t('contribute.resumeAnonymous') }}
+              </p>
+              <p class="whois__meta">{{ t('contribute.counter', { used, max: link.maxPerContributor }) }}</p>
+
+              <!-- Their last look at the code before "not me" drops it. Absent
+                   for someone who arrived by typing one — they already have it. -->
+              <button
+                v-if="me?.code"
+                type="button"
+                class="whois__code"
+                :aria-label="t('contribute.copyCodeAria')"
+                @click="copyCode"
+              >
+                <span class="whois__code-label">{{ t('contribute.codeLabel') }}</span>
+                <span class="whois__code-value">{{ me.code }}</span>
+              </button>
+            </section>
+
+            <div class="actions actions--answer">
+              <button type="button" class="btn btn--fill" @click="continueAsMe">
+                {{ t('contribute.resumeYes') }}
+              </button>
+              <button type="button" class="btn btn--ghost" :disabled="switching" @click="useAnotherIdentity">
+                {{ switching ? t('contribute.resumeSwitching') : t('contribute.resumeNo') }}
+              </button>
+            </div>
+            <p class="whois__warn">
+              {{ me?.code ? t('contribute.resumeSwitchWarn') : t('contribute.resumeSwitchWarnNoCode') }}
+            </p>
+          </template>
+
+          <template v-else>
+            <section class="about about--dark">
+              <h2 class="about__title">{{ t('contribute.codeAboutTitle') }}</h2>
+              <i18n-t class="about__body" keypath="contribute.codeAboutBody" tag="p" scope="global">
+                <template #code>
+                  <code class="about__code">{{ t('contribute.codePlaceholder') }}</code>
+                </template>
+                <template #screenshot>
+                  <strong class="about__strong">{{ t('contribute.codeAboutScreenshot') }}</strong>
+                </template>
+              </i18n-t>
+            </section>
+
+            <div class="actions">
+              <button v-if="open" type="button" class="btn btn--fill" @click="stage = 'create'">
+                {{ t('contribute.getCode') }}
+              </button>
+              <button type="button" class="btn btn--ghost" @click="stage = 'claim'">
+                {{ t('contribute.haveCode') }}
+              </button>
+            </div>
+          </template>
         </div>
       </div>
     </template>
@@ -998,6 +1105,82 @@ useSeoMeta({
 .about--dark .about__strong { color: #F5F4F0; }
 .alert--dark { color: rgba(245, 244, 240, 0.85); }
 
+/* ── "Is this still you?" ────────────────────────────────────
+   Sits on the welcome's dark panel, so it borrows .about--dark's ground rather
+   than inventing a second card treatment for the same surface. */
+.whois {
+  border: 1px solid rgba(245, 244, 240, 0.16);
+  background: rgba(245, 244, 240, 0.05);
+  padding: 1.25rem 1.5rem 1.4rem;
+  max-width: 48rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.whois__title {
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(245, 244, 240, 0.6);
+  margin-bottom: 0.5rem;
+}
+.whois__name {
+  font-family: var(--font-serif);
+  font-size: clamp(1.25rem, 4.5vw, 1.6rem);
+  font-weight: 300;
+  line-height: 1.2;
+  color: #F5F4F0;
+  overflow-wrap: anywhere;
+}
+/* Italic, not muted-to-the-edge: anonymous is what most people choose, so it
+   reads as an answer rather than as a field someone forgot to fill in. */
+.whois__name--anon { font-style: italic; color: rgba(245, 244, 240, 0.7); }
+.whois__meta {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(245, 244, 240, 0.55);
+}
+.whois__code {
+  margin-top: 0.9rem;
+  border: 0;
+  border-top: 1px solid rgba(245, 244, 240, 0.16);
+  background: transparent;
+  padding: 0.85rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: left;
+  cursor: pointer;
+}
+.whois__code-label {
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(245, 244, 240, 0.5);
+}
+.whois__code-value {
+  font-family: var(--font-latin-sans);
+  font-size: clamp(1rem, 4.5vw, 1.3rem);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  word-break: break-all;
+  transition: color 0.15s;
+}
+.whois__code:hover .whois__code-value { color: #F5F4F0; }
+
+.whois__warn {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: rgba(245, 244, 240, 0.5);
+  max-width: 46ch;
+}
+
 @media (min-width: 900px) {
   .wstage {
     display: grid;
@@ -1052,6 +1235,10 @@ useSeoMeta({
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 .actions { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+/* Two answers to one question, so neither may end up the smaller target: a row
+   apiece on a phone, and equal columns once the 900px rule below takes over
+   with the higher specificity it already has. */
+.actions--answer .btn { flex: 1 1 100%; }
 .actions--stack { flex-direction: column; align-items: stretch; margin-top: 0.5rem; }
 
 .btn {

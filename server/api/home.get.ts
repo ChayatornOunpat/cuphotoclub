@@ -53,7 +53,10 @@ export default defineEventHandler(async () => {
 
   const [albumRows, contentAlbumList, postList, events] = await Promise.all([
     albumRowsQuery,
-    albumStore.list(),
+    // Metadata only: the feed needs a cover and a photo count, both of which are
+    // stored as columns. Reading every album's `rows` JSON for that was ~3MB of
+    // D1 traffic on a page that renders a handful of cards.
+    albumStore.listMeta({ visibility: ['public'] }),
     postStore.list(),
     eventsQuery
   ])
@@ -77,15 +80,15 @@ export default defineEventHandler(async () => {
   // "Lego-grid" albums built in the canvas editor (schema.contentAlbums, via albumStore) are a
   // separate system from the relational galleries above (schema.albums/photos) — merge both so
   // the home feed reflects everything admins actually publish. See CLAUDE.md / schema.ts comments.
-  const contentAlbums = contentAlbumList
-    .filter(a => a.visibility === 'public')
+  const contentAlbums = contentAlbumList.items
     .map(a => ({
       id: 0,
       slug: a.id,
       title: a.title,
       eventDate: a.published || a.date,
-      coverKey: a.coverSrc || (a.rows ?? []).flatMap(r => r.cells).find(c => c.type === 'image' && c.src)?.src || null,
-      photoCount: (a.rows ?? []).flatMap(r => r.cells).filter(c => c.type === 'image' && c.src).length,
+      // listMeta already resolves the cover (explicit, else first image).
+      coverKey: a.coverSrc || null,
+      photoCount: a.photoCount,
       source: 'content' as const
     }))
 

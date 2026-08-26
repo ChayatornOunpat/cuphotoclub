@@ -3,19 +3,12 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { t } = useI18n()
 const localePath = useLocalePath()
-const [{ data: albums }, { data: posts }, { data: events }, { data: members }, { data: heroImages }, { data: historyImage }, { data: clubroomImage }, { data: poolStats }] = await Promise.all([
-  useFetch('/api/admin/albums'),
-  useFetch('/api/admin/posts'),
-  useFetch('/api/admin/events'),
-  useFetch('/api/admin/members'),
-  useFetch('/api/admin/hero-images'),
-  useFetch('/api/admin/history-image'),
-  useFetch('/api/admin/clubroom-image'),
-  // One row is enough — the endpoint returns the unfiltered total alongside.
-  useFetch<PoolStats>('/api/admin/submissions', { query: { perPage: 1 } })
-])
-
-interface PoolStats { total: number }
+// Every card on this page renders a single number, so it takes a single
+// endpoint of count(*) queries. Fetching the eight underlying list endpoints
+// instead meant downloading every album (rows JSON and all) to show a count.
+// The card that opens the collections list counts collections — every other
+// card counts whatever is on the page it links to.
+const { data: stats } = await useFetch('/api/admin/stats')
 const { user } = useUserSession()
 const canManage = computed(() => user.value?.role === 'owner' || user.value?.role === 'admin')
 
@@ -23,7 +16,7 @@ const primarySections = computed(() => [
   {
     key: 'albums',
     title: t('admin.albums'),
-    count: albums.value?.length ?? 0,
+    count: stats.value?.albums ?? 0,
     meta: t('admin.galleryWork'),
     to: localePath('/admin/albums'),
     newTo: localePath('/admin/albums/new'),
@@ -32,7 +25,7 @@ const primarySections = computed(() => [
   {
     key: 'posts',
     title: t('admin.posts'),
-    count: posts.value?.length ?? 0,
+    count: stats.value?.posts ?? 0,
     meta: t('admin.editorialWriting'),
     to: localePath('/admin/posts'),
     newTo: localePath('/admin/posts/new'),
@@ -41,14 +34,14 @@ const primarySections = computed(() => [
   {
     key: 'activities',
     title: t('admin.activities'),
-    count: events.value?.length ?? 0,
+    count: stats.value?.events ?? 0,
     meta: t('admin.activityWork'),
     to: localePath('/admin/activities')
   },
   {
     key: 'submissions',
     title: t('adminPool.title'),
-    count: poolStats.value?.total ?? 0,
+    count: stats.value?.collections ?? 0,
     meta: t('adminPool.sub'),
     to: localePath('/admin/submissions')
   }
@@ -67,14 +60,14 @@ const secondarySections = computed<SecondarySection[]>(() => [
   {
     key: 'members',
     title: t('admin.membersTitle'),
-    count: members.value?.length ?? 0,
+    count: stats.value?.members ?? 0,
     meta: t('admin.memberWork'),
     to: localePath('/admin/members')
   },
   {
     key: 'heroImages',
     title: t('admin.heroImagesTitle'),
-    count: heroImages.value?.images?.length ?? 0,
+    count: stats.value?.heroImages ?? 0,
     meta: t('admin.heroImagesMeta'),
     to: localePath('/admin/hero-images')
   },
@@ -83,7 +76,7 @@ const secondarySections = computed<SecondarySection[]>(() => [
     // currently have an image set.
     key: 'landingImages',
     title: t('admin.landingImagesTitle'),
-    count: (historyImage.value?.image ? 1 : 0) + (clubroomImage.value?.image ? 1 : 0),
+    count: stats.value?.landingImages ?? 0,
     meta: t('admin.landingImagesMeta'),
     to: localePath('/admin/landing-images')
   },

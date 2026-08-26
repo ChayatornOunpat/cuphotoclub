@@ -3,7 +3,6 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 
 const { t } = useI18n()
 const localePath = useLocalePath()
-const { data: albums, refresh } = await useFetch('/api/admin/albums')
 const deleting = ref('')
 const confirmTarget = ref<{ id: string; title: string } | null>(null)
 const deleteError = ref('')
@@ -11,10 +10,36 @@ const query = ref('')
 const SORT_STORAGE_KEY = 'admin-albums-sort'
 const PAGE_SIZE_STORAGE_KEY = 'admin-albums-page-size'
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const
-const sortBy = ref('newest')
+const SORT_OPTIONS = ['newest', 'modified', 'oldest', 'title', 'category'] as const
+type SortOption = typeof SORT_OPTIONS[number]
+const sortBy = ref<SortOption>('newest')
 const viewMode = ref<'list' | 'cards'>('list')
 const pageSize = ref<number>(25)
 const page = ref(1)
+
+// Searching, sorting and paging all happen in SQL — the page holds one slice of
+// the library, not the whole thing. Typing is debounced so a search costs one
+// request per pause rather than one per keystroke.
+const debouncedQuery = ref('')
+let queryTimer: ReturnType<typeof setTimeout> | undefined
+watch(query, (value) => {
+  if (queryTimer) clearTimeout(queryTimer)
+  queryTimer = setTimeout(() => { debouncedQuery.value = value }, 300)
+})
+onBeforeUnmount(() => { if (queryTimer) clearTimeout(queryTimer) })
+
+const { data, refresh } = await useFetch('/api/admin/albums', {
+  query: computed(() => ({
+    q: debouncedQuery.value.trim() || undefined,
+    sort: sortBy.value,
+    page: page.value,
+    pageSize: pageSize.value
+  }))
+})
+const albums = computed(() => data.value?.items ?? [])
+// Albums matching the current search; `libraryTotal` is the whole library.
+const matchTotal = computed(() => data.value?.total ?? 0)
+const libraryTotal = computed(() => data.value?.totalAll ?? 0)
 
 function visibilityLabel(value?: string) {
   if (value === 'draft') return t('adminForm.visDraft')
@@ -61,58 +86,20 @@ function localizedAlbumBase(path: string) {
   return localePath(path).replace(/\/$/, '')
 }
 
-function modifiedValue(album: NonNullable<typeof albums.value>[number]) {
-  return album.updatedAt || album.published
-}
-
-const visibleAlbums = computed(() => {
-  const q = query.value.trim().toLowerCase()
-  const rows = [...(albums.value ?? [])]
-    .filter((album) => {
-      if (!q) return true
-      return [album.title, album.category, album.location, album.excerpt, album.style, visibilityLabel(album.visibility)]
-        .some(value => String(value ?? '').toLowerCase().includes(q))
-    })
-
-  return rows.sort((a, b) => {
-    if (sortBy.value === 'modified') return modifiedValue(b).localeCompare(modifiedValue(a))
-    if (sortBy.value === 'oldest') return a.published.localeCompare(b.published)
-    if (sortBy.value === 'title') return a.title.localeCompare(b.title)
-    if (sortBy.value === 'category') return a.category.localeCompare(b.category)
-    return b.published.localeCompare(a.published)
-  })
-})
-
-// Client-side paging: the whole list is already fetched, so search/sort still
-// run across every album — only the rendered slice is capped. Without this the
-// table rendered all ~130 rows at once, which made it easy to read one row and
-// click another row's actions.
-const totalPages = computed(() => Math.max(1, Math.ceil(visibleAlbums.value.length / pageSize.value)))
-const pagedAlbums = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return visibleAlbums.value.slice(start, start + pageSize.value)
-})
-const pageStart = computed(() => (visibleAlbums.value.length ? (page.value - 1) * pageSize.value + 1 : 0))
-const pageEnd = computed(() => Math.min(visibleAlbums.value.length, page.value * pageSize.value))
+const totalPages = computed(() => Math.max(1, Math.ceil(matchTotal.value / pageSize.value)))
+const pageStart = computed(() => (matchTotal.value ? (page.value - 1) * pageSize.value + 1 : 0))
+const pageEnd = computed(() => Math.min(matchTotal.value, page.value * pageSize.value))
 
 // Searching, re-sorting or deleting can shrink the list out from under the
-// current page — clamp instead of showing an empty slice.
-watch([totalPages], () => {
+// current page — clamp instead of asking the server for an empty slice.
+watch(totalPages, () => {
   if (page.value > totalPages.value) page.value = totalPages.value
 })
-watch([query, sortBy], () => { page.value = 1 })
+watch([debouncedQuery, sortBy], () => { page.value = 1 })
 
 function goToPage(n: number) {
   page.value = Math.min(Math.max(1, n), totalPages.value)
   if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function coverFor(album: NonNullable<typeof albums.value>[number]) {
-  return album.coverSrc || album.rows.flatMap(r => r.cells).find(c => c.type === 'image' && c.src)?.src || ''
-}
-
-function imageCount(album: NonNullable<typeof albums.value>[number]) {
-  return album.rows.reduce((n, r) => n + r.cells.filter(c => c.type === 'image').length, 0)
 }
 
 function albumDateDisplay(album: NonNullable<typeof albums.value>[number]) {
@@ -138,7 +125,9 @@ if (import.meta.client) {
   onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
   const storedSort = localStorage.getItem(SORT_STORAGE_KEY)
-  if (storedSort) sortBy.value = storedSort
+  // Validated, not trusted: the value now goes into a query the server parses
+  // against a fixed enum, so a stale key would 400 the whole list.
+  if (SORT_OPTIONS.includes(storedSort as SortOption)) sortBy.value = storedSort as SortOption
   watch(sortBy, (value) => localStorage.setItem(SORT_STORAGE_KEY, value))
 
   const storedPageSize = Number(localStorage.getItem(PAGE_SIZE_STORAGE_KEY))
@@ -175,12 +164,12 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
       <div>
         <NuxtLink :to="localePath('/admin')" class="back">{{ t('admin.dashboard') }}</NuxtLink>
         <h1>{{ t('admin.albums') }}</h1>
-        <p class="sub">{{ t((albums?.length ?? 0) === 1 ? 'admin.albumCount' : 'admin.albumCountOther', { count: albums?.length ?? 0 }) }}</p>
+        <p class="sub">{{ t(libraryTotal === 1 ? 'admin.albumCount' : 'admin.albumCountOther', { count: libraryTotal }) }}</p>
       </div>
       <NuxtLink :to="localePath('/admin/albums/new')" class="btn-solid">{{ t('admin.newAlbum') }}</NuxtLink>
     </div>
 
-    <div v-if="albums && albums.length" class="tools">
+    <div v-if="libraryTotal" class="tools">
       <label class="search">
         <span>{{ t('admin.search') }}</span>
         <!-- The UA's own search-cancel button is un-themable, so it's hidden in
@@ -217,17 +206,17 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
       </div>
     </div>
 
-    <p v-if="albums && albums.length" class="result-count">
-      {{ t('admin.showingRange', { from: pageStart, to: pageEnd, total: visibleAlbums.length }) }}
-      <span v-if="query.trim()"> · {{ t('admin.ofTotal', { total: albums.length }) }}</span>
+    <p v-if="libraryTotal" class="result-count">
+      {{ t('admin.showingRange', { from: pageStart, to: pageEnd, total: matchTotal }) }}
+      <span v-if="query.trim()"> · {{ t('admin.ofTotal', { total: libraryTotal }) }}</span>
     </p>
 
-    <table v-if="albums && albums.length && visibleAlbums.length && viewMode === 'list'" class="tbl">
+    <table v-if="albums.length && viewMode === 'list'" class="tbl">
       <thead>
         <tr><th>{{ t('admin.tableTitle') }}</th><th>{{ t('admin.tableCategory') }}</th><th>{{ t('admin.tableVisibility') }}</th><th>{{ t('admin.tableStyle') }}</th><th>{{ t('admin.tableFrames') }}</th><th>{{ t('admin.tableDate') }}</th><th /></tr>
       </thead>
       <tbody>
-        <tr v-for="a in pagedAlbums" :key="a.id">
+        <tr v-for="a in albums" :key="a.id">
           <td class="t-title" :class="{ 't-title--draft': !a.title }">
             {{ a.title || t('admin.untitledDraft') }}
             <!-- The slug is what Preview/Edit actually open. Showing it makes a
@@ -253,7 +242,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
             </span>
           </td>
           <td><span class="pill">{{ a.style }}</span></td>
-          <td>{{ imageCount(a) }}</td>
+          <td>{{ a.photoCount }}</td>
           <td class="t-muted">{{ albumDateDisplay(a) }}</td>
           <td class="t-actions">
             <NuxtLink :to="previewPath(a)" class="link" target="_blank" rel="noopener noreferrer">{{ t('admin.preview') }}</NuxtLink>
@@ -266,9 +255,9 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
       </tbody>
     </table>
 
-    <section v-else-if="albums && albums.length && visibleAlbums.length" class="cards">
-      <article v-for="a in pagedAlbums" :key="a.id" class="card">
-        <img v-if="coverFor(a)" :src="coverFor(a) as string" :alt="a.title">
+    <section v-else-if="albums.length" class="cards">
+      <article v-for="a in albums" :key="a.id" class="card">
+        <img v-if="a.coverSrc" :src="a.coverSrc" :alt="a.title">
         <div class="card__body">
           <p class="card__meta">{{ a.category }} · {{ albumDateDisplay(a) }}</p>
           <h2 :class="{ 'card__title--draft': !a.title }">{{ a.title || t('admin.untitledDraft') }}</h2>
@@ -288,7 +277,7 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
                 <Icon :name="copiedId === a.id ? 'heroicons:check' : 'heroicons:link'" class="icon-chip__icon" />
               </button>
             </span>
-            <span>{{ imageCount(a) }} {{ t('common.frames') }}</span>
+            <span>{{ a.photoCount }} {{ t('common.frames') }}</span>
             <span>{{ a.style }}</span>
           </div>
           <div class="card__actions">
@@ -302,10 +291,10 @@ useHead({ title: () => `${t('admin.albums')} - Admin` })
       </article>
     </section>
 
-    <p v-else-if="albums && albums.length" class="empty">{{ t('admin.noMatches') }}</p>
+    <p v-else-if="libraryTotal" class="empty">{{ t('admin.noMatches') }}</p>
     <p v-else class="empty">{{ t('admin.noAlbums') }} <NuxtLink :to="localePath('/admin/albums/new')">{{ t('admin.createFirst') }}</NuxtLink></p>
 
-    <nav v-if="albums && albums.length && visibleAlbums.length" class="pager" :aria-label="t('admin.pagination')">
+    <nav v-if="albums.length" class="pager" :aria-label="t('admin.pagination')">
       <label class="pager__size">
         <span>{{ t('admin.perPage') }}</span>
         <select v-model.number="pageSize">

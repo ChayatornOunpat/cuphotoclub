@@ -180,7 +180,11 @@ async function rememberContributor(event: H3Event, linkId: string, contributorId
   }))
 }
 
-async function forgetContributor(event: H3Event, linkId: string) {
+// Drop this browser's claim on one link. The contributor row and everything
+// they sent are untouched — only the cookie entry goes, so the identity is
+// still reachable with its claim code. Used both when the row has vanished
+// underneath a stale cookie and when someone hands the page to the next person.
+export async function forgetContributor(event: H3Event, linkId: string) {
   const session = await contributorSession(event)
   await session.update((data) => {
     const entries = Object.entries(data.links ?? {}).filter(([key]) => key !== linkId)

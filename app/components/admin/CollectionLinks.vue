@@ -177,6 +177,16 @@ async function copyLink(link: CollectionLink) {
   }
 }
 
+// An album created for a collection inherits its name, so printing it here
+// would say the same words twice on one line. When they match, the generic
+// word plus the draft/published pill carries the same information without the
+// stutter — and it starts showing the real name the moment either is renamed.
+function albumLabel(link: CollectionLink) {
+  const title = link.album?.title?.trim()
+  if (!title) return t('adminUploadLinks.untitled')
+  return title === link.label.trim() ? t('adminUploadLinks.albumSelf') : title
+}
+
 // Date · place, both optional. formatDate is the site's one date formatter
 // (app/utils/format.ts) — the same dd/mm/yy the albums table uses, read in UTC.
 function metaLine(link: CollectionLink) {
@@ -186,9 +196,9 @@ function metaLine(link: CollectionLink) {
   return parts.join(' · ')
 }
 
-// <input type="date"> only accepts yyyy-MM-dd, but the API returns ISO. Slice
-// in UTC to match how the contribute page formats it — using the local date
-// parts would shift the day either side of midnight.
+// UiDateInput's model is yyyy-MM-dd, but the API returns a full ISO timestamp.
+// Slice in UTC to match how the date is rendered everywhere else — using the
+// local date parts would shift the day either side of midnight.
 function dateInput(value: string | null) {
   if (!value) return ''
   const d = new Date(value)
@@ -246,24 +256,26 @@ function dateInput(value: string | null) {
             <p class="row__meta" :class="{ 'row__meta--empty': !metaLine(link) }">
               {{ metaLine(link) || t('adminUploadLinks.noDate') }}
             </p>
-            <h3 class="row__label">{{ link.label }}</h3>
-
-            <!-- Where this collection's approved photos go. Stated here so the
-                 overview answers it without opening the pool. -->
-            <p class="dest">
-              <span class="dest__arrow" aria-hidden="true">→</span>
-              <template v-if="link.album">
-                <NuxtLink class="dest__name" :to="localePath(`/admin/albums/${link.album.slug}`)">
-                  {{ link.album.title || t('adminUploadLinks.untitled') }}
-                </NuxtLink>
-                <span
-                  class="dest__pill"
-                  :class="link.album.visibility === 'draft' ? 'dest__pill--draft' : 'dest__pill--live'"
-                >{{ link.album.visibility === 'draft' ? t('adminPool.draft') : t('adminPool.published') }}</span>
-              </template>
-              <span v-else-if="link.albumMissing" class="dest__warn">{{ t('adminUploadLinks.albumMissing') }}</span>
-              <span v-else class="dest__none">{{ t('adminUploadLinks.albumNone') }}</span>
-            </p>
+            <!-- Title, then where its approved photos go — on one line so the
+                 overview answers "which album" without opening the pool, and
+                 without the album claiming a heading of its own. -->
+            <div class="row__titleline">
+              <h3 class="row__label">{{ link.label }}</h3>
+              <span class="row__sep" aria-hidden="true">/</span>
+              <span class="dest">
+                <template v-if="link.album">
+                  <NuxtLink class="dest__name" :to="localePath(`/admin/albums/${link.album.slug}`)">
+                    {{ albumLabel(link) }}
+                  </NuxtLink>
+                  <span
+                    class="dest__pill"
+                    :class="link.album.visibility === 'draft' ? 'dest__pill--draft' : 'dest__pill--live'"
+                  >{{ link.album.visibility === 'draft' ? t('adminPool.draft') : t('adminPool.published') }}</span>
+                </template>
+                <span v-else-if="link.albumMissing" class="dest__warn">{{ t('adminUploadLinks.albumMissing') }}</span>
+                <span v-else class="dest__none">{{ t('adminUploadLinks.albumNone') }}</span>
+              </span>
+            </div>
 
             <div class="row__url">
               <code class="row__code">{{ publicUrl(link) }}</code>
@@ -377,12 +389,15 @@ function dateInput(value: string | null) {
               <span class="grp__head">{{ t('adminUploadLinks.groupWhen') }}</span>
               <label class="f">
                 <span class="f__label">{{ t('adminUploadLinks.date') }}</span>
-                <input
-                  class="f__input"
-                  type="date"
-                  :value="dateInput(link.eventDate)"
-                  @change="patchLink(link, { eventDate: String(($event.target as HTMLInputElement).value) || null })"
-                >
+                <!-- UiDateInput, not a native date input: the native control
+                     renders in the browser's locale (mm/dd/yyyy on a US
+                     machine) and cannot be reformatted. This is the same
+                     DD/MM/YYYY masked field the album and activity editors
+                     use, backed by an ISO value. -->
+                <UiDateInput
+                  :model-value="dateInput(link.eventDate)"
+                  @update:model-value="value => patchLink(link, { eventDate: value || null })"
+                />
               </label>
               <label class="f">
                 <span class="f__label">{{ t('adminUploadLinks.location') }}</span>
@@ -551,16 +566,25 @@ function dateInput(value: string | null) {
   margin: 0;
 }
 
-.dest {
+.row__titleline {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+.row__sep { color: var(--subtle); font-family: var(--font-sans); font-size: 0.8rem; }
+
+/* Set in the UI face, not the serif, so it reads as metadata beside the title
+   rather than a second heading. */
+.dest {
+  display: inline-flex;
+  align-items: baseline;
   gap: 0.4rem;
   flex-wrap: wrap;
   font-family: var(--font-sans);
   font-size: 0.72rem;
   color: var(--muted);
 }
-.dest__arrow { color: var(--subtle); }
 .dest__name { color: var(--dark); font-weight: 500; text-decoration: none; }
 .dest__name:hover { color: var(--accent); }
 .dest__none { font-style: italic; }

@@ -211,6 +211,15 @@ function seedIfEmpty(): Promise<void> {
 }
 
 export const postStore = {
+  /** How many posts exist, for dashboards that only render the number. */
+  async count(): Promise<number> {
+    await seedIfEmpty()
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.contentPosts)
+    return row?.count ?? 0
+  },
+
   async list(): Promise<Post[]> {
     await seedIfEmpty()
     const rows = await db

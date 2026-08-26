@@ -197,8 +197,8 @@ const activityLibraryPrefix = computed(() =>
   editing.value ? `events/${editing.value.id}` : 'events'
 )
 
-// /api/admin/albums returns every album in full (rows and all), so it is
-// fetched on first picker open rather than with the page.
+// Fetched on first picker open rather than with the page — the list is only
+// needed once someone actually opens the image library.
 const albumSources = ref<{ label: string, prefix: string }[]>([])
 let albumsRequested = false
 
@@ -206,7 +206,7 @@ async function ensureAlbumSources() {
   if (albumsRequested) return
   albumsRequested = true
   try {
-    const albums = await $fetch<Array<{ id: string, title: string }>>('/api/admin/albums')
+    const albums = await $fetch('/api/admin/albums/picker')
     albumSources.value = albums.map(album => ({
       label: t('adminActivities.sourceAlbum', { name: album.title }),
       prefix: `content-albums/${album.id}`

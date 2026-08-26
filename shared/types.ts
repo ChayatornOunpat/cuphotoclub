@@ -59,6 +59,18 @@ export interface Album {
 /** Fields the admin supplies when creating/updating. `id`/`slug` are server-managed. */
 export type AlbumInput = Omit<Album, 'id' | 'slug' | 'updatedAt'>
 
+/**
+ * An album as it appears in a list (archive, admin table, home feed, sitemap).
+ * Deliberately without `rows`: list views only ever need a cover and a photo
+ * count, and reading every album's `rows` JSON to derive those pulled megabytes
+ * out of D1 per request. `coverSrc` here is already resolved — the explicit
+ * cover if set, otherwise the album's first image.
+ */
+export type AlbumListItem = Omit<Album, 'rows'> & { photoCount: number }
+
+/** The subset an album picker/dropdown needs. */
+export type AlbumPickerItem = Pick<Album, 'id' | 'slug' | 'title' | 'category' | 'visibility'>
+
 // ─── Post block types ──────────────────────────────────────────────────────
 
 export type PostBlockType =

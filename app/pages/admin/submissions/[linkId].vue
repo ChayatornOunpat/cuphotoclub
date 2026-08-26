@@ -82,8 +82,7 @@ function setQuery(patch: Record<string, string | number | undefined>) {
   router.push({ query: { ...route.query, page: undefined, ...patch } })
 }
 
-interface AlbumOption { id: string, slug: string, title: string, visibility: string }
-const { data: albums } = await useFetch<AlbumOption[]>('/api/admin/albums')
+const { data: albums } = await useFetch('/api/admin/albums/picker')
 
 const busy = ref(false)
 const error = ref('')
