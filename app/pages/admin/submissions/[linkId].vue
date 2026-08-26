@@ -122,6 +122,18 @@ const contributorNotes = computed<ContributorNote[]>(() => {
 })
 const notesCollapsed = ref(false)
 
+// Clicking a note's thumbnail spotlights the matching tile in the grid rather
+// than filtering it out — the point is "here's the photo this refers to",
+// and a filter would hide the context of what else that contributor sent.
+const highlightedItemId = ref('')
+function highlightPhoto(id: string) {
+  highlightedItemId.value = highlightedItemId.value === id ? '' : id
+  if (!highlightedItemId.value) return
+  nextTick(() => {
+    document.getElementById(`pool-tile-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+}
+
 // ── Which album this collection feeds ───────────────────────────────────────
 // Switching is allowed with photos already approved. Their copies stay in the
 // old album's folder — the server repoints their keys at the new album, the
@@ -377,10 +389,19 @@ function skip() {
 }
 
 function onKey(e: KeyboardEvent) {
-  if (!reviewing.value || e.metaKey || e.ctrlKey || e.altKey) return
+  if (e.metaKey || e.ctrlKey || e.altKey) return
   const tag = (e.target as HTMLElement | null)?.tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
   const key = e.key.toLowerCase()
+
+  if (previewItem.value) {
+    if (key === 'escape') { e.preventDefault(); previewItem.value = null }
+    else if (key === 'arrowleft') { e.preventDefault(); previewStep(-1) }
+    else if (key === 'arrowright') { e.preventDefault(); previewStep(1) }
+    return
+  }
+
+  if (!reviewing.value) return
   if (key === 'a') { e.preventDefault(); reviewDecide('approved') }
   else if (key === 'r') { e.preventDefault(); reviewDecide('rejected') }
   else if (key === 's') { e.preventDefault(); skip() }
@@ -405,6 +426,22 @@ function stateOf(item: PoolItem) {
 
 function kb(bytes: number) {
   return bytes >= 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.round(bytes / 1000)} KB`
+}
+
+// ── Fullscreen preview ───────────────────────────────────────────────────────
+// Separate from Focused Review: no decision attached, just "let me look at
+// this one bigger" from anywhere in the grid, so it steps through whatever
+// list the grid is currently showing rather than only the pending queue.
+const previewItem = ref<PoolItem | null>(null)
+const previewIndex = computed(() => {
+  if (!previewItem.value) return -1
+  return (pool.value?.items ?? []).findIndex(entry => entry.id === previewItem.value?.id)
+})
+function previewStep(delta: number) {
+  const items = pool.value?.items ?? []
+  const next = previewIndex.value + delta
+  if (next < 0 || next >= items.length) return
+  previewItem.value = items[next]!
 }
 
 const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
@@ -498,10 +535,10 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
           </template>
         </div>
         <div class="rev__acts">
-          <button type="button" class="btn btn--primary" :disabled="!current" @click="reviewDecide('approved')">
+          <button type="button" class="btn btn--approve" :disabled="!current" @click="reviewDecide('approved')">
             {{ t('adminPool.approve') }} <span class="rev__key">A</span>
           </button>
-          <button type="button" class="btn btn--danger" :disabled="!current" @click="reviewDecide('rejected')">
+          <button type="button" class="btn btn--reject" :disabled="!current" @click="reviewDecide('rejected')">
             {{ t('adminPool.reject') }} <span class="rev__key">R</span>
           </button>
           <button type="button" class="btn" :disabled="queue.length < 2" @click="skip">
@@ -538,10 +575,10 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
       <div v-if="selected.size" class="bar">
         <span class="bar__count">{{ t('adminPool.selected', { n: selected.size }) }}</span>
         <button type="button" class="btn" @click="clearSelection">{{ t('adminPool.clear') }}</button>
-        <button type="button" class="btn btn--primary" :disabled="busy" @click="decideSelected('approved')">
+        <button type="button" class="btn btn--approve" :disabled="busy" @click="decideSelected('approved')">
           {{ t('adminPool.approve') }}
         </button>
-        <button type="button" class="btn" :disabled="busy" @click="decideSelected('rejected')">
+        <button type="button" class="btn btn--reject" :disabled="busy" @click="decideSelected('rejected')">
           {{ t('adminPool.reject') }}
         </button>
         <button type="button" class="btn" :disabled="busy" @click="decideSelected('pending')">
@@ -570,9 +607,10 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
       <ul v-if="pool?.items.length" class="grid">
         <li
           v-for="item in pool.items"
+          :id="`pool-tile-${item.id}`"
           :key="item.id"
           class="tile"
-          :class="[`is-${stateOf(item)}`, { 'is-selected': selected.has(item.id) }]"
+          :class="[`is-${stateOf(item)}`, { 'is-selected': selected.has(item.id), 'is-highlighted': highlightedItemId === item.id }]"
         >
           <button
             type="button"
@@ -586,6 +624,14 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
             <span v-if="stateOf(item) !== 'pending'" class="tile__flag">
               {{ t(`adminPool.state_${stateOf(item)}`) }}
             </span>
+          </button>
+          <button
+            type="button"
+            class="tile__preview"
+            :aria-label="t('adminPool.previewPhoto')"
+            @click="previewItem = item"
+          >
+            <Icon name="heroicons:arrows-pointing-out" />
           </button>
           <div class="tile__foot">
             <span class="tile__by">{{ item.displayName || t('adminPool.anonymous') }}</span>
@@ -613,17 +659,14 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
     </div>
 
     <div v-if="contributorNotes.length" class="split__notes">
-      <button
-        type="button"
-        class="split__handle"
-        :aria-label="notesCollapsed ? t('adminPool.notesExpand') : t('adminPool.notesCollapse')"
-        @click="notesCollapsed = !notesCollapsed"
-      >
-        <span class="split__handle-arrow" aria-hidden="true" />
-      </button>
-
       <div class="split__notes-body">
-        <p class="split__notes-head"><b>{{ contributorNotes.length }}</b> {{ t('adminPool.notesHead', { n: contributorNotes.length }) }}</p>
+        <div class="split__notes-head">
+          <p class="split__notes-count"><b>{{ contributorNotes.length }}</b> {{ t('adminPool.notesHead') }}</p>
+          <button type="button" class="split__collapse" @click="notesCollapsed = true">
+            {{ t('adminPool.notesCollapse') }}
+            <span class="split__collapse-icon" aria-hidden="true" />
+          </button>
+        </div>
         <div class="cardlist">
           <div v-for="entry in contributorNotes" :key="entry.contributorId" class="ncard">
             <div class="ncard__body">
@@ -635,14 +678,17 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
               </div>
               <p class="ncard__note">{{ entry.note }}</p>
               <div class="ncard__photos">
-                <img
+                <button
                   v-for="photo in entry.photos.slice(0, 4)"
                   :key="photo.id"
+                  type="button"
                   class="ncard__thumb"
-                  :src="photo.previewUrl"
-                  alt=""
-                  loading="lazy"
+                  :class="{ 'is-active': highlightedItemId === photo.id }"
+                  :aria-label="t('adminPool.highlightPhoto')"
+                  @click="highlightPhoto(photo.id)"
                 >
+                  <img :src="photo.previewUrl" alt="" loading="lazy">
+                </button>
                 <span v-if="entry.photos.length > 4" class="ncard__thumb-more">+{{ entry.photos.length - 4 }}</span>
               </div>
             </div>
@@ -660,6 +706,35 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
         <span class="split__collapsed-label">{{ t('adminPool.notesLabel') }}</span>
       </button>
     </div>
+    </div>
+
+    <div v-if="previewItem" class="preview" @click.self="previewItem = null">
+      <img class="preview__img" :src="previewItem.previewUrl" alt="">
+      <div class="preview__meta">
+        <span class="preview__who">{{ previewItem.displayName || t('adminPool.anonymous') }}</span>
+        <span class="preview__size">{{ kb(previewItem.size) }}</span>
+      </div>
+      <button type="button" class="preview__close" :aria-label="t('adminPool.closePreview')" @click="previewItem = null">
+        <Icon name="heroicons:x-mark" />
+      </button>
+      <button
+        v-if="previewIndex > 0"
+        type="button"
+        class="preview__nav preview__nav--prev"
+        :aria-label="t('adminPool.prevPhoto')"
+        @click="previewStep(-1)"
+      >
+        <Icon name="heroicons:chevron-left" />
+      </button>
+      <button
+        v-if="pool && previewIndex < pool.items.length - 1"
+        type="button"
+        class="preview__nav preview__nav--next"
+        :aria-label="t('adminPool.nextPhoto')"
+        @click="previewStep(1)"
+      >
+        <Icon name="heroicons:chevron-right" />
+      </button>
     </div>
 
     <p class="pool__foot">{{ t('adminPool.nothingPublic') }}</p>
@@ -894,12 +969,17 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
   gap: 0.9rem;
 }
 .tile {
+  position: relative;
   border: 1px solid var(--subtle);
   background: #fff;
   display: flex;
   flex-direction: column;
 }
 .tile.is-selected { border-color: var(--accent); }
+/* Spotlighted from a note's thumbnail — a ring, not the same border-color
+   change as is-selected, so "picked for bulk action" and "here's the photo
+   that note refers to" never read as the same state. */
+.tile.is-highlighted { box-shadow: 0 0 0 3px var(--accent); z-index: 1; }
 .tile.is-rejected .tile__img { filter: grayscale(1); opacity: 0.5; }
 .tile.is-gone .tile__img { opacity: 0.75; }
 .tile__pick {
@@ -930,6 +1010,29 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
   color: #fff;
   font-size: 0.8rem;
 }
+/* Sibling of .tile__pick, not nested inside it — a button inside a button
+   is invalid HTML, and this needs its own click target independent of the
+   select-toggle underneath it. */
+.tile__preview {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.4rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: rgba(26, 25, 24, 0.55);
+  color: #fff;
+  font-size: 0.72rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+.tile:hover .tile__preview,
+.tile__preview:focus-visible { opacity: 1; }
+.tile__preview:hover { background: var(--accent); }
 /* State reads as a label, not only a tint. */
 .tile__flag {
   position: absolute;
@@ -953,6 +1056,49 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
 .tile__meta { font-family: var(--font-sans); font-size: 0.58rem; color: var(--muted); }
 .tile__caption { font-family: var(--font-serif); font-size: 0.76rem; color: var(--muted); overflow-wrap: anywhere; }
 .tile__dl { align-self: flex-start; margin-top: 0.2rem; }
+
+/* ── Fullscreen preview ─────────────────────────────────────────────────── */
+.preview {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--hero-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+.preview__img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.preview__meta {
+  position: absolute;
+  left: 1.1rem;
+  bottom: 1rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-family: var(--font-sans);
+  color: rgba(245, 244, 240, 0.75);
+}
+.preview__who { font-family: var(--font-serif); font-size: 0.95rem; color: #F5F4F0; }
+.preview__size { font-size: 0.62rem; letter-spacing: 0.08em; }
+.preview__close,
+.preview__nav {
+  position: absolute;
+  border: 1px solid rgba(245, 244, 240, 0.3);
+  background: rgba(12, 12, 10, 0.5);
+  color: #F5F4F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.preview__close:hover,
+.preview__nav:hover { border-color: var(--accent); color: var(--accent); }
+.preview__close { top: 1rem; right: 1.1rem; width: 2.2rem; height: 2.2rem; font-size: 1rem; }
+.preview__nav { top: 50%; transform: translateY(-50%); width: 2.6rem; height: 2.6rem; font-size: 1.1rem; }
+.preview__nav--prev { left: 1.1rem; }
+.preview__nav--next { right: 1.1rem; }
 
 .pager { display: flex; align-items: center; gap: 0.6rem; }
 .pager__at { font-family: var(--font-sans); font-size: 0.62rem; color: var(--muted); }
@@ -979,56 +1125,69 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
 .split.is-collapsed .split__photos { flex-basis: 100%; }
 .split.is-collapsed .split__notes { flex-basis: 2.4rem; }
 
-.split__handle {
-  position: absolute;
-  top: 0.7rem;
-  left: -0.95rem;
-  width: 1.8rem;
-  height: 1.8rem;
-  border: 1px solid var(--subtle);
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 1;
-}
-.split__handle:hover { border-color: var(--accent); }
-.split__handle-arrow {
-  width: 0.4rem; height: 0.4rem;
-  border-right: 1.5px solid var(--dark);
-  border-bottom: 1.5px solid var(--dark);
-  transform: rotate(135deg);
-  transition: transform 0.22s ease;
-  margin-left: 0.15rem;
-}
-.split.is-collapsed .split__handle-arrow { transform: rotate(-45deg); margin-left: -0.1rem; }
-
-.split__notes-body { padding: 0.15rem 0.9rem 0.9rem 1.4rem; }
+.split__notes-body { padding: 0.15rem 0.9rem 0.9rem 1rem; }
 .split.is-collapsed .split__notes-body { display: none; }
 .split__notes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
   margin: 0 0 0.7rem;
+}
+.split__notes-count {
+  margin: 0;
   font-family: var(--font-sans);
   font-size: 0.56rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
 }
-.split__notes-head b { color: var(--dark); font-weight: 600; }
+.split__notes-count b { color: var(--dark); font-weight: 600; }
 
+/* A proper button, not a floating circle on the seam — matches .btn's own
+   register so it reads as "an action on this page", not a UI chrome widget. */
+.split__collapse {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--subtle);
+  background: none;
+  padding: 0.3rem 0.55rem;
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.split__collapse:hover { border-color: var(--accent); color: var(--accent); }
+.split__collapse-icon {
+  width: 0.35rem; height: 0.35rem;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+/* Collapsed: the whole rail is the button — the label itself is the control,
+   not a separate icon bolted onto muted text. */
 .split__collapsed-rail {
   display: none;
   position: absolute;
   inset: 0;
+  width: 100%;
   flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.55rem;
   padding-top: 1.1rem;
   border: 0;
   background: none;
   cursor: pointer;
+  transition: background-color 0.15s;
 }
 .split.is-collapsed .split__collapsed-rail { display: flex; }
+.split__collapsed-rail:hover { background: var(--paper); }
 .split__collapsed-count {
   width: 1.3rem; height: 1.3rem;
   background: var(--accent);
@@ -1040,11 +1199,13 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
 .split__collapsed-label {
   writing-mode: vertical-rl;
   font-family: var(--font-sans);
-  font-size: 0.52rem;
-  letter-spacing: 0.16em;
+  font-size: 0.54rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--dark);
 }
+.split__collapsed-rail:hover .split__collapsed-label { color: var(--accent); }
 
 /* ── Contributor note cards ─────────────────────────────────────────────── */
 .cardlist { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -1075,7 +1236,18 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
   color: var(--dark);
 }
 .ncard__photos { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.1rem; }
-.ncard__thumb { width: 2.2rem; height: 2.2rem; object-fit: cover; display: block; border: 1px solid var(--subtle); }
+.ncard__thumb {
+  width: 2.2rem; height: 2.2rem;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--subtle);
+  background: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.ncard__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ncard__thumb:hover { border-color: var(--accent); }
+.ncard__thumb.is-active { border: 2px solid var(--accent); }
 .ncard__thumb-more {
   width: 2.2rem; height: 2.2rem;
   display: flex; align-items: center; justify-content: center;
@@ -1106,6 +1278,14 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
 .btn:disabled { opacity: 0.5; cursor: default; }
 .btn--primary { border-color: var(--dark); }
 .btn--danger { border-color: var(--accent); color: var(--accent); }
+/* Approve/Reject/Delete are three different consequences and read as one
+   grey blur otherwise. Reject reuses the amber this page already uses for
+   "diverged/removed" states — soft and reversible, unlike Delete's accent
+   pink, which stays reserved for the one truly destructive action. */
+.btn--approve { border-color: #2F6B4F; color: #2F6B4F; }
+.btn--approve:hover { border-color: #24543D; color: #24543D; }
+.btn--reject { border-color: #9A6B1F; color: #9A6B1F; }
+.btn--reject:hover { border-color: #7A5518; color: #7A5518; }
 
 @media (max-width: 820px) {
   .rev { grid-template-columns: 1fr; }

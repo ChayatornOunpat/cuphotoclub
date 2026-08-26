@@ -18,6 +18,11 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
+  /* Without this, some Chromium builds apply their own heuristic recoloring
+     to an unstyled-looking button/text combo (thinking it forgot dark mode),
+     which is why deliberately-set colors like var(--dark) can render tinted
+     blue/orange in a screenshot that never appears in the actual CSS. */
+  color-scheme: light;
   --hero-bg: #0C0C0A;
   --body-bg: #F5F4F0;
   --dark:    #1A1918;
