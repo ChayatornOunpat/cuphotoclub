@@ -42,7 +42,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
         </header>
         <div v-if="post.image" class="std-hero" data-edit="image">
           <AppImg :src="post.image" :alt="post.title" width="1200" height="800"
-            sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" eager optimize />
+            sizes="sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw 3xl:100vw" eager optimize />
         </div>
       </template>
 

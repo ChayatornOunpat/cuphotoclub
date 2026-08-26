@@ -199,7 +199,7 @@ useSeoMeta({
     <!-- PAGE HEADER -->
     <header class="page-head" data-chrome-header>
       <div class="page-head__bg" data-parallax data-hero-dim>
-        <AppImg v-if="headerBg" :src="headerBg" alt="" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="page-head__img" eager optimize />
+        <AppImg v-if="headerBg" :src="headerBg" alt="" sizes="sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw 3xl:100vw" class="page-head__img" eager optimize />
       </div>
       <div class="page-head__body">
         <p class="page-head__kicker">{{ t('albums.pageKicker') }}</p>

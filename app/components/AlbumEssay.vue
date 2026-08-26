@@ -52,10 +52,10 @@ const totalImages = computed(() =>
 const pad = (n: number) => String(n).padStart(2, '0')
 
 function imgSizes(span: number): string {
-  if (span >= 6) return 'xs:100vw sm:100vw md:100vw lg:1380px'
-  if (span >= 4) return 'xs:100vw sm:100vw md:65vw lg:920px'
-  if (span >= 3) return 'xs:100vw sm:50vw lg:690px'
-  return 'xs:100vw sm:33vw lg:460px'
+  if (span >= 6) return 'sm:100vw md:100vw lg:1380px'
+  if (span >= 4) return 'sm:100vw md:65vw lg:920px'
+  if (span >= 3) return 'sm:50vw lg:690px'
+  return 'sm:33vw lg:460px'
 }
 
 // Face comes from a class rather than an inline style: the class rules in
@@ -84,10 +84,10 @@ const excerptStyle = computed(() => ({ textAlign: props.album.textDefaults?.alig
     <!-- COVER -->
     <header class="cover" :class="`cover--${coverOrientation}`" :data-chrome-header="album.dark ? undefined : true">
       <div class="cover__bg" data-parallax data-hero-dim>
-        <AppImg :src="album.coverSrc" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="cover__img" eager optimize />
+        <AppImg :src="album.coverSrc" :alt="album.title" sizes="sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw 3xl:100vw" class="cover__img" eager optimize />
       </div>
       <div v-if="coverOrientation !== 'landscape'" class="cover__subject" aria-hidden="true">
-        <AppImg :src="album.coverSrc" alt="" sizes="xs:100vw sm:70vw md:45vw lg:520px" class="cover__subject-img" eager optimize />
+        <AppImg :src="album.coverSrc" alt="" sizes="sm:70vw md:45vw lg:520px" class="cover__subject-img" eager optimize />
       </div>
       <span v-if="disableNavigation" class="cover__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="cover__back">{{ t('albums.coverBack') }}</NuxtLink>

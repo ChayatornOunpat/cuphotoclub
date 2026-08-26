@@ -75,10 +75,10 @@ function plateWidth(span: number) {
 }
 
 function plateSizes(span: number) {
-  if (span >= 6) return 'xs:100vw sm:100vw lg:1100px'
-  if (span >= 4) return 'xs:100vw sm:80vw lg:820px'
-  if (span >= 3) return 'xs:100vw sm:65vw lg:640px'
-  return 'xs:100vw sm:50vw lg:460px'
+  if (span >= 6) return 'sm:100vw lg:1100px'
+  if (span >= 4) return 'sm:80vw lg:820px'
+  if (span >= 3) return 'sm:65vw lg:640px'
+  return 'sm:50vw lg:460px'
 }
 </script>
 
@@ -102,7 +102,7 @@ function plateSizes(span: number) {
       </div>
 
       <div v-if="album.coverSrc" class="dk-head__print">
-        <AppImg :src="album.coverSrc" :alt="album.title" sizes="xs:100vw sm:70vw lg:720px" eager optimize />
+        <AppImg :src="album.coverSrc" :alt="album.title" sizes="sm:70vw lg:720px" eager optimize />
       </div>
       <div class="dk-head__scroll" aria-hidden="true" />
     </header>

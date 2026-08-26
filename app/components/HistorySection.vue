@@ -23,7 +23,7 @@ defineProps<{
         :alt="history.imageAlt"
         width="1800"
         height="1200"
-        sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw"
+        sizes="sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw 3xl:100vw"
         optimize
       />
     </div>

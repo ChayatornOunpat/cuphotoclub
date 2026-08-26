@@ -172,10 +172,10 @@ onUnmounted(() => {
     <!-- COMPACT HEADER -->
     <header class="head" :class="`head--${coverOrientation}`" :data-chrome-header="album.dark ? undefined : true">
       <div class="head__bg" data-parallax data-hero-dim>
-        <AppImg :src="cover" :alt="album.title" sizes="xs:100vw sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw" class="head__img" eager optimize />
+        <AppImg :src="cover" :alt="album.title" sizes="sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw 3xl:100vw" class="head__img" eager optimize />
       </div>
       <div v-if="coverOrientation !== 'landscape'" class="head__subject" aria-hidden="true">
-        <AppImg :src="cover" alt="" sizes="xs:100vw sm:70vw md:38vw lg:420px" class="head__subject-img" eager optimize />
+        <AppImg :src="cover" alt="" sizes="sm:70vw md:38vw lg:420px" class="head__subject-img" eager optimize />
       </div>
       <span v-if="disableNavigation" class="head__back is-disabled" aria-disabled="true">{{ t('albums.coverBack') }}</span>
       <NuxtLink v-else :to="localePath('/albums')" class="head__back">{{ t('albums.coverBack') }}</NuxtLink>
@@ -240,7 +240,7 @@ onUnmounted(() => {
           :class="{ 'is-admin-selected': selectedRow === ch.plate.row && (selectedCell === ch.plate.cell || selectedCell === undefined) }"
           @click="show(ch.plate.n - 1)"
         >
-          <AppImg :src="ch.plate.src" :alt="ch.plate.caption || album.title" sizes="xs:100vw sm:100vw lg:1330px" :eager="i === 0" />
+          <AppImg :src="ch.plate.src" :alt="ch.plate.caption || album.title" sizes="sm:100vw lg:1330px" :eager="i === 0" />
           <span class="plate__cap" :lang="ch.plate.caption ? textLang(ch.plate.caption) : undefined">
             {{ pad(ch.plate.n) }}<template v-if="ch.plate.caption"> · {{ ch.plate.caption }}</template>
           </span>
@@ -301,7 +301,7 @@ onUnmounted(() => {
           <Icon name="heroicons:chevron-left" />
         </button>
         <figure class="lb__figure">
-          <AppImg :src="current!.src" :alt="current!.caption || album.title" class="lb__img" sizes="xs:92vw sm:88vw md:84vw lg:1120px xl:1280px" />
+          <AppImg :src="current!.src" :alt="current!.caption || album.title" class="lb__img" sizes="sm:88vw md:84vw lg:1120px xl:1280px" />
           <figcaption v-if="current!.caption" class="lb__cap" :lang="textLang(current!.caption)">
             <span>{{ pad(idx + 1) }}</span>{{ current!.caption }}
           </figcaption>

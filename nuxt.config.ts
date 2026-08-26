@@ -215,11 +215,14 @@ export default defineNuxtConfig({
     domains: ['picsum.photos', 'localhost', 'cuphotoclub.com', 'www.cuphotoclub.com', 'cuphotoclub.pages.dev'],
     cloudflare: { baseURL: '/' },
     quality: 80,
-    // @nuxt/image's default screens top out at 1536 (2xl). A `sizes` entry
-    // keyed past that — e.g. "3xl:60vw" — has no breakpoint to resolve
-    // against and silently drops, capping every responsive image's largest
-    // srcset candidate at ~1536*fraction regardless of real desktop width.
-    screens: { '3xl': 1920 }
+    // @nuxt/image's default screens top out at 1536, named "2xl" — not "xxl".
+    // Several components' `sizes` props were written with "xxl:" (and "xs:",
+    // which was never a real key either), so those entries silently dropped:
+    // no error, just a missing srcset candidate. Aliasing "xxl" here revives
+    // every existing "xxl:" usage without touching each file. "3xl" is new —
+    // added so hero/cover images can reach a proper size on wider desktops
+    // too, the same fix applied to the contribute-link cover image.
+    screens: { xxl: 1536, '3xl': 1920 }
   },
 
   icon: {
