@@ -1489,7 +1489,7 @@ useSeoMeta({
   /* Opaque: thumbnails scroll under this. */
   background: var(--hero-bg);
   border-bottom: 1px solid rgba(245, 244, 240, 0.14);
-  padding: 0.7rem 1.1rem 0;
+  padding: 0.7rem 1.1rem 0.6rem;
 }
 .topbar__row {
   max-width: 1180px;
@@ -1567,7 +1567,7 @@ useSeoMeta({
   width: 100%;
   max-width: 1180px;
   margin: 0 auto;
-  padding: 1.1rem 1.1rem 4rem;
+  padding: 1.6rem 1.1rem 4rem;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
