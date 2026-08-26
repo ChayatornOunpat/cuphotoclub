@@ -31,12 +31,12 @@ function onPicked(keys: string[]) {
   <div>
     <div v-if="model" class="relative overflow-hidden rounded-md ring-1 ring-line">
       <img :src="`/images/${model}`" class="w-full object-cover" :class="aspect || 'aspect-[16/9]'" alt="">
-      <div class="absolute right-2 top-2 flex gap-1.5">
-        <button v-if="props.allowLibrary" type="button" class="rounded bg-white/90 p-1.5 text-ink-soft hover:bg-white hover:text-ink" :title="t('adminPicker.chooseFromLibrary')" @click="pickerOpen = true">
-          <Icon name="heroicons:photo" class="size-4" />
+      <div class="cover-actions">
+        <button v-if="props.allowLibrary" type="button" class="cover-actions__btn" :title="t('adminPicker.chooseFromLibrary')" @click="pickerOpen = true">
+          <Icon name="heroicons:photo" />
         </button>
-        <button type="button" class="rounded bg-white/90 p-1.5 text-red-600 hover:bg-white" @click="model = null">
-          <Icon name="heroicons:trash" class="size-4" />
+        <button type="button" class="cover-actions__btn cover-actions__btn--danger" :title="t('admin.delete')" @click="model = null">
+          <Icon name="heroicons:trash" />
         </button>
       </div>
     </div>
@@ -57,3 +57,32 @@ function onPicked(keys: string[]) {
     <AdminImagePickerModal v-if="props.allowLibrary" v-model="pickerOpen" :prefix="prefix || 'covers'" @select="onPicked" />
   </div>
 </template>
+
+<style scoped>
+/* Only this action-button group is scoped CSS — the rest of the component
+   still uses Tailwind. Not a full migration, just not adding more of it to
+   the one piece actually being restyled here. */
+.cover-actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.35rem;
+}
+.cover-actions__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid var(--subtle);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+.cover-actions__btn:hover { border-color: var(--dark); color: var(--dark); background: #fff; }
+.cover-actions__btn--danger { color: var(--accent); }
+.cover-actions__btn--danger:hover { border-color: var(--accent); background: #fff; }
+.cover-actions__btn :deep(svg) { width: 0.85rem; height: 0.85rem; }
+</style>

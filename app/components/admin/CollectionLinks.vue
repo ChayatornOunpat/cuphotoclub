@@ -176,6 +176,19 @@ function toggleEditor(link: CollectionLink) {
   else openEditor(link)
 }
 
+// Drives the Save button's own state: pink once something in the draft
+// differs from what's saved, grey and inert otherwise — so it never invites
+// a click that would send back exactly what's already there.
+function isDirty(link: CollectionLink) {
+  return editForm.label.trim() !== link.label
+    || (editForm.description.trim() || null) !== (link.description ?? null)
+    || editForm.eventDate !== dateInput(link.eventDate)
+    || (editForm.location.trim() || null) !== (link.location ?? null)
+    || editForm.maxPerContributor !== link.maxPerContributor
+    || editForm.maxTotal !== link.maxTotal
+    || editForm.requireName !== link.requireName
+}
+
 async function saveLink(link: CollectionLink) {
   if (busy.value) return
   // Same guards as createLink: the label is required, and clearing a number
@@ -381,6 +394,22 @@ function dateInput(value: string | null) {
         </div>
 
         <div v-if="editingId === link.id" class="row__edit">
+          <!-- Sits above the fields, not below them, so it is reachable without
+               scrolling past Details/When & Where/Limits first. Its own state
+               is the only feedback needed: pink once the draft actually
+               differs from what's saved, grey and inert otherwise. -->
+          <div class="edit__bar">
+            <button
+              type="button"
+              class="edit__save"
+              :class="{ 'is-dirty': isDirty(link) }"
+              :disabled="!isDirty(link) || busy"
+              @click="saveLink(link)"
+            >
+              {{ t('admin.save') }}
+            </button>
+          </div>
+
           <!-- Cover gets its own rail. As a full-width row capped at 320px it
                left most of the panel empty, which is what made this panel read
                as unfinished. Optional: collections are standalone, so there is
@@ -469,19 +498,21 @@ function dateInput(value: string | null) {
                   max="20000"
                 >
               </label>
-              <label class="f f--check">
-                <input v-model="editForm.requireName" type="checkbox">
+              <div class="f f--switch">
                 <span class="f__label">{{ t('adminUploadLinks.requireName') }}</span>
-              </label>
-            </div>
-
-            <!-- One explicit save: the panel edits a draft, so nothing is sent
-                 until this is pressed. The cover uploader above stays
-                 instant — it commits a finished upload, not a half-typed value. -->
-            <div class="edit__actions">
-              <button type="button" class="btn btn--primary" :disabled="busy" @click="saveLink(link)">
-                {{ t('admin.save') }}
-              </button>
+                <button
+                  type="button"
+                  class="switch"
+                  role="switch"
+                  :aria-checked="editForm.requireName"
+                  :aria-label="t('adminUploadLinks.requireName')"
+                  @click="editForm.requireName = !editForm.requireName"
+                >
+                  <span class="switch__box" :class="{ 'is-on': editForm.requireName }" aria-hidden="true">
+                    <span class="switch__knob" />
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -748,6 +779,9 @@ function dateInput(value: string | null) {
   border-top: 1px solid var(--subtle);
 }
 
+/* Full-width row above the cover/fields — .row__edit auto-places it into its
+   own implicit row 1, pushing .edit__cover/.edit__groups into row 2. */
+.edit__bar { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
 .edit__cover { display: flex; flex-direction: column; gap: var(--gap-tight); }
 .edit__groups { display: flex; flex-direction: column; gap: var(--gap-group); }
 
@@ -789,7 +823,7 @@ function dateInput(value: string | null) {
   border-bottom: 1px solid var(--subtle);
 }
 .f { display: flex; flex-direction: column; gap: var(--gap-tight, 0.3rem); }
-.f--check { flex-direction: row; align-items: center; gap: 0.4rem; }
+.f--switch { align-items: flex-start; }
 /* The cover preview is far taller than a text input — give it the full row so
    it does not stretch the whole auto-fit grid to its height. */
 /* .f--cover retired: the cover has its own column now (.edit__cover). */
@@ -833,14 +867,52 @@ function dateInput(value: string | null) {
 .f :deep(.ui-date-input button) { color: var(--muted); }
 .f :deep(.ui-date-input button:hover) { color: var(--dark); }
 
-.edit__actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 0.2rem;
-}
-.edit__actions .btn--primary {
+/* Grey and inert by default — accent pink only once isDirty() says the draft
+   actually differs from what's saved, so the button itself says whether
+   there's anything to send instead of always looking equally clickable. */
+.edit__save {
+  border: 1px solid var(--subtle);
+  background: transparent;
   padding: 0.62rem 1.4rem;
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: default;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
 }
+.edit__save.is-dirty {
+  border-color: var(--accent);
+  color: var(--accent);
+  cursor: pointer;
+}
+.edit__save.is-dirty:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.edit__save:disabled { opacity: 0.55; }
+
+/* A real switch, not a native checkbox — big enough to see and hit, and
+   themed instead of left to the browser/OS default. */
+.switch { border: 0; background: none; padding: 0.15rem 0; cursor: pointer; align-self: flex-start; }
+.switch__box {
+  position: relative;
+  display: block;
+  width: 2.7rem;
+  height: 1.4rem;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  transition: border-color 0.18s, background-color 0.18s;
+}
+.switch__box.is-on { border-color: var(--accent); background: var(--accent); }
+.switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(1.4rem - 6px);
+  height: calc(1.4rem - 6px);
+  background: var(--subtle);
+  transition: transform 0.18s, background-color 0.18s;
+}
+.switch__box.is-on .switch__knob { background: #fff; transform: translateX(1.3rem); }
 
 .btn {
   border: 1px solid var(--subtle);
