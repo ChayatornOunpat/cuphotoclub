@@ -1189,6 +1189,7 @@
     "preset_high": "High",
     "create": "Create link",
     "createFailed": "Could not create the link.",
+    "saved": "Saved.",
     "saveFailed": "Could not save that change.",
     "none": "No collection link yet.",
     "needsName": "Give the collection a name.",

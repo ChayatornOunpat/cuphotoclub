@@ -1463,6 +1463,13 @@ useSeoMeta({
   gap: 0.55rem;
 }
 .whead .mark { margin-bottom: 1.1rem; }
+/* The global .cut-line is a full-bleed divider elsewhere on the site; here it
+   follows a centered .whead, so it is capped to the same column instead of
+   running past the content to the screen edges. */
+.whead + .cut-line {
+  max-width: 1180px;
+  margin: 0 auto;
+}
 .whead__title {
   font-family: var(--font-serif);
   font-size: clamp(1.9rem, 4.5vw, 2.9rem);
@@ -1476,6 +1483,8 @@ useSeoMeta({
   position: sticky;
   top: 0;
   z-index: 20;
+  max-width: 1180px;
+  margin: 0 auto;
   /* Opaque: thumbnails scroll under this. */
   background: var(--hero-bg);
   border-bottom: 1px solid rgba(245, 244, 240, 0.14);
@@ -1709,7 +1718,6 @@ useSeoMeta({
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  max-width: 42rem;
   margin-top: 1.5rem;
   padding: 1.25rem 1.5rem 1.4rem;
 }

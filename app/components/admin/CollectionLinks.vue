@@ -72,7 +72,7 @@ async function createLink() {
     error.value = t('adminUploadLinks.needsName')
     return
   }
-  // Same guard as patchNumber: clearing a number input yields NaN via
+  // Same guard as saveLink: clearing a number input yields NaN via
   // v-model.number, which the server would reject — or worse, read as 0.
   if (!Number.isFinite(form.maxPerContributor) || form.maxPerContributor < 1
     || !Number.isFinite(form.maxTotal) || form.maxTotal < 1) {
@@ -147,21 +147,65 @@ async function patchLink(link: CollectionLink, body: Record<string, unknown>) {
   }
 }
 
+// Settings-panel drafts: fields edit locally and only reach the server when
+// Save is pressed, so a half-typed name or date never PATCHes mid-keystroke.
+const editForm = reactive({
+  label: '',
+  description: '',
+  eventDate: '',
+  location: '',
+  maxPerContributor: 100,
+  maxTotal: 2000,
+  requireName: false
+})
+
+function openEditor(link: CollectionLink) {
+  editingId.value = link.id
+  notice.value = ''
+  editForm.label = link.label
+  editForm.description = link.description ?? ''
+  editForm.eventDate = dateInput(link.eventDate)
+  editForm.location = link.location ?? ''
+  editForm.maxPerContributor = link.maxPerContributor
+  editForm.maxTotal = link.maxTotal
+  editForm.requireName = link.requireName
+}
+
+function toggleEditor(link: CollectionLink) {
+  if (editingId.value === link.id) editingId.value = ''
+  else openEditor(link)
+}
+
+async function saveLink(link: CollectionLink) {
+  if (busy.value) return
+  // Same guards as createLink: the label is required, and clearing a number
+  // input yields NaN via v-model.number, which the server would reject — or
+  // worse, read as 0.
+  if (!editForm.label.trim()) {
+    error.value = t('adminUploadLinks.needsName')
+    return
+  }
+  if (!Number.isFinite(editForm.maxPerContributor) || editForm.maxPerContributor < 1
+    || !Number.isFinite(editForm.maxTotal) || editForm.maxTotal < 1) {
+    error.value = t('adminUploadLinks.needsNumber')
+    return
+  }
+  await patchLink(link, {
+    label: editForm.label.trim(),
+    description: editForm.description.trim() || null,
+    eventDate: editForm.eventDate || null,
+    location: editForm.location.trim() || null,
+    maxPerContributor: Math.trunc(editForm.maxPerContributor),
+    maxTotal: Math.trunc(editForm.maxTotal),
+    requireName: editForm.requireName
+  })
+  if (!error.value) notice.value = t('adminUploadLinks.saved')
+}
+
 // useSiteOrigin() reads the configured site URL, so this renders identically on
 // server and client (no hydration mismatch) and the copied link points at the
 // real site even when an admin is on localhost.
 const origin = useSiteOrigin()
-// Clearing a number input gives '', and Number('') is 0 — which the server
-// would reject, or worse silently accept as a limit of zero.
-function patchNumber(link: CollectionLink, field: 'maxPerContributor' | 'maxTotal', e: Event) {
-  const raw = (e.target as HTMLInputElement).value.trim()
-  const value = Number(raw)
-  if (!raw || !Number.isFinite(value) || value < 1) {
-    error.value = t('adminUploadLinks.needsNumber')
-    return
-  }
-  return patchLink(link, { [field]: Math.trunc(value) })
-}
 
 function publicUrl(link: CollectionLink) {
   return `${origin}${localePath(`/contribute/${link.id}`)}`
@@ -292,7 +336,7 @@ function dateInput(value: string | null) {
               <NuxtLink class="link" :to="localePath(`/admin/submissions/${link.id}`)">
                 {{ t('adminUploadLinks.viewPool') }}
               </NuxtLink>
-              <button type="button" class="link" @click="editingId = editingId === link.id ? '' : link.id">
+              <button type="button" class="link" @click="toggleEditor(link)">
                 {{ t('adminUploadLinks.limits') }}
               </button>
               <button
@@ -362,22 +406,20 @@ function dateInput(value: string | null) {
               <label class="f">
                 <span class="f__label">{{ t('adminUploadLinks.newLabel') }}</span>
                 <input
+                  v-model="editForm.label"
                   class="f__input"
                   type="text"
                   maxlength="200"
-                  :value="link.label"
-                  @change="patchLink(link, { label: String(($event.target as HTMLInputElement).value).trim() || undefined })"
                 >
               </label>
               <label class="f">
                 <span class="f__label">{{ t('adminUploadLinks.newDescription') }}</span>
                 <input
+                  v-model="editForm.description"
                   class="f__input"
                   type="text"
                   maxlength="500"
-                  :value="link.description ?? ''"
                   :placeholder="t('adminUploadLinks.newDescriptionPlaceholder')"
-                  @change="patchLink(link, { description: String(($event.target as HTMLInputElement).value).trim() || null })"
                 >
               </label>
             </div>
@@ -391,20 +433,16 @@ function dateInput(value: string | null) {
                      machine) and cannot be reformatted. This is the same
                      DD/MM/YYYY masked field the album and activity editors
                      use, backed by an ISO value. -->
-                <UiDateInput
-                  :model-value="dateInput(link.eventDate)"
-                  @update:model-value="value => patchLink(link, { eventDate: value || null })"
-                />
+                <UiDateInput v-model="editForm.eventDate" />
               </label>
               <label class="f">
                 <span class="f__label">{{ t('adminUploadLinks.location') }}</span>
                 <input
+                  v-model="editForm.location"
                   class="f__input"
                   type="text"
                   maxlength="200"
-                  :value="link.location ?? ''"
                   :placeholder="t('adminUploadLinks.locationPlaceholder')"
-                  @change="patchLink(link, { location: String(($event.target as HTMLInputElement).value).trim() || null })"
                 >
               </label>
             </div>
@@ -414,33 +452,36 @@ function dateInput(value: string | null) {
               <label class="f">
                 <span class="f__label">{{ t('adminUploadLinks.perPerson') }}</span>
                 <input
+                  v-model.number="editForm.maxPerContributor"
                   class="f__input"
                   type="number"
                   min="1"
                   max="1000"
-                  :value="link.maxPerContributor"
-                  @change="patchNumber(link, 'maxPerContributor', $event)"
                 >
               </label>
               <label class="f">
                 <span class="f__label">{{ t('adminUploadLinks.perTotal') }}</span>
                 <input
+                  v-model.number="editForm.maxTotal"
                   class="f__input"
                   type="number"
                   min="1"
                   max="20000"
-                  :value="link.maxTotal"
-                  @change="patchNumber(link, 'maxTotal', $event)"
                 >
               </label>
               <label class="f f--check">
-                <input
-                  type="checkbox"
-                  :checked="link.requireName"
-                  @change="patchLink(link, { requireName: ($event.target as HTMLInputElement).checked })"
-                >
+                <input v-model="editForm.requireName" type="checkbox">
                 <span class="f__label">{{ t('adminUploadLinks.requireName') }}</span>
               </label>
+            </div>
+
+            <!-- One explicit save: the panel edits a draft, so nothing is sent
+                 until this is pressed. The cover uploader above stays
+                 instant — it commits a finished upload, not a half-typed value. -->
+            <div class="edit__actions">
+              <button type="button" class="btn btn--primary" :disabled="busy" @click="saveLink(link)">
+                {{ t('admin.save') }}
+              </button>
             </div>
           </div>
         </div>
@@ -774,6 +815,32 @@ function dateInput(value: string | null) {
   color: var(--dark);
 }
 .f__input:focus { outline: none; border-color: var(--accent); }
+/* Same treatment as the album editor: strip UiDateInput's Tailwind defaults so
+   the date field is visually identical to the neighbouring .f__input controls
+   (same border, height, typeface), calendar chip included. */
+.f :deep(.ui-date-input__text) {
+  min-height: 0;
+  padding: 0.4rem 2rem 0.4rem 0.5rem;
+  border: 1px solid var(--subtle);
+  border-radius: 0;
+  background: #fff;
+  color: var(--dark);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  outline: none;
+}
+.f :deep(.ui-date-input__text:focus) { outline: none; border-color: var(--accent); }
+.f :deep(.ui-date-input button) { color: var(--muted); }
+.f :deep(.ui-date-input button:hover) { color: var(--dark); }
+
+.edit__actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.2rem;
+}
+.edit__actions .btn--primary {
+  padding: 0.62rem 1.4rem;
+}
 
 .btn {
   border: 1px solid var(--subtle);
