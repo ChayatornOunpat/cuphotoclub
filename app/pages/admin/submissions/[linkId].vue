@@ -33,6 +33,7 @@ interface PoolItem {
   inAlbum: boolean
   publishedTo: string | null
   createdAt: string
+  contributorId: string
   displayName: string | null
   contact: string | null
   creditHandle: boolean | null
@@ -94,6 +95,32 @@ function errMsg(e: unknown, fb: string) {
 const album = computed(() => pool.value?.album ?? null)
 const counts = computed(() => pool.value?.counts ?? { pending: 0, approved: 0, rejected: 0, all: 0 })
 const missing = computed(() => pool.value?.missingFromAlbum ?? 0)
+
+// ── Contributor notes ────────────────────────────────────────────────────────
+// The note lives once on the contributor, but the pool query denormalises it
+// onto every one of their photos (see server/api/admin/submissions/index.get.ts)
+// so it can travel with a review decision. Regrouping by contributorId here is
+// what turns that back into "one note, N photos" instead of the same text
+// repeated per tile. Scoped to whatever's currently loaded — same page and
+// filter the grid itself is showing, not the whole collection.
+interface ContributorNote {
+  contributorId: string
+  displayName: string | null
+  note: string
+  photos: PoolItem[]
+}
+const contributorNotes = computed<ContributorNote[]>(() => {
+  const byContributor = new Map<string, ContributorNote>()
+  for (const item of pool.value?.items ?? []) {
+    const note = item.note?.trim()
+    if (!note) continue
+    const existing = byContributor.get(item.contributorId)
+    if (existing) existing.photos.push(item)
+    else byContributor.set(item.contributorId, { contributorId: item.contributorId, displayName: item.displayName, note, photos: [item] })
+  }
+  return [...byContributor.values()]
+})
+const notesCollapsed = ref(false)
 
 // ── Which album this collection feeds ───────────────────────────────────────
 // Switching is allowed with photos already approved. Their copies stay in the
@@ -485,7 +512,8 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
       </aside>
     </section>
 
-    <template v-else>
+    <div v-else class="split" :class="{ 'is-collapsed': notesCollapsed }">
+    <div class="split__photos">
       <!-- Filter tabs double as the collection's tallies. -->
       <div class="tabs">
         <button
@@ -582,7 +610,57 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
           @click="setQuery({ page: page + 1 })"
         >{{ t('adminPool.next') }}</button>
       </nav>
-    </template>
+    </div>
+
+    <div v-if="contributorNotes.length" class="split__notes">
+      <button
+        type="button"
+        class="split__handle"
+        :aria-label="notesCollapsed ? t('adminPool.notesExpand') : t('adminPool.notesCollapse')"
+        @click="notesCollapsed = !notesCollapsed"
+      >
+        <span class="split__handle-arrow" aria-hidden="true" />
+      </button>
+
+      <div class="split__notes-body">
+        <p class="split__notes-head"><b>{{ contributorNotes.length }}</b> {{ t('adminPool.notesHead', { n: contributorNotes.length }) }}</p>
+        <div class="cardlist">
+          <div v-for="entry in contributorNotes" :key="entry.contributorId" class="ncard">
+            <div class="ncard__body">
+              <div class="ncard__head">
+                <span class="ncard__name" :class="{ 'ncard__name--anon': !entry.displayName }">
+                  {{ entry.displayName || t('adminPool.anonymous') }}
+                </span>
+                <span class="ncard__count">{{ t('adminPool.notePhotoCount', { n: entry.photos.length }) }}</span>
+              </div>
+              <p class="ncard__note">{{ entry.note }}</p>
+              <div class="ncard__photos">
+                <img
+                  v-for="photo in entry.photos.slice(0, 4)"
+                  :key="photo.id"
+                  class="ncard__thumb"
+                  :src="photo.previewUrl"
+                  alt=""
+                  loading="lazy"
+                >
+                <span v-if="entry.photos.length > 4" class="ncard__thumb-more">+{{ entry.photos.length - 4 }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="split__collapsed-rail"
+        :aria-label="t('adminPool.notesExpand')"
+        @click="notesCollapsed = false"
+      >
+        <span class="split__collapsed-count">{{ contributorNotes.length }}</span>
+        <span class="split__collapsed-label">{{ t('adminPool.notesLabel') }}</span>
+      </button>
+    </div>
+    </div>
 
     <p class="pool__foot">{{ t('adminPool.nothingPublic') }}</p>
   </div>
@@ -878,6 +956,135 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
 
 .pager { display: flex; align-items: center; gap: 0.6rem; }
 .pager__at { font-family: var(--font-sans); font-size: 0.62rem; color: var(--muted); }
+
+/* ── Split: photos 60 / notes 40 ───────────────────────────────────────────
+   A permanent layout, not a section — the grid narrows to make room rather
+   than notes living somewhere you scroll to. Collapses to a slim rail so the
+   grid can reclaim the width when nobody needs the notes on screen. */
+.split { display: flex; align-items: flex-start; gap: 0; }
+.split__photos {
+  flex: 1 1 60%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.split__notes {
+  flex: 0 0 40%;
+  min-width: 0;
+  position: relative;
+  border-left: 1px solid var(--subtle);
+  transition: flex-basis 0.22s ease;
+}
+.split.is-collapsed .split__photos { flex-basis: 100%; }
+.split.is-collapsed .split__notes { flex-basis: 2.4rem; }
+
+.split__handle {
+  position: absolute;
+  top: 0.7rem;
+  left: -0.95rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 1px solid var(--subtle);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1;
+}
+.split__handle:hover { border-color: var(--accent); }
+.split__handle-arrow {
+  width: 0.4rem; height: 0.4rem;
+  border-right: 1.5px solid var(--dark);
+  border-bottom: 1.5px solid var(--dark);
+  transform: rotate(135deg);
+  transition: transform 0.22s ease;
+  margin-left: 0.15rem;
+}
+.split.is-collapsed .split__handle-arrow { transform: rotate(-45deg); margin-left: -0.1rem; }
+
+.split__notes-body { padding: 0.15rem 0.9rem 0.9rem 1.4rem; }
+.split.is-collapsed .split__notes-body { display: none; }
+.split__notes-head {
+  margin: 0 0 0.7rem;
+  font-family: var(--font-sans);
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.split__notes-head b { color: var(--dark); font-weight: 600; }
+
+.split__collapsed-rail {
+  display: none;
+  position: absolute;
+  inset: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding-top: 1.1rem;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.split.is-collapsed .split__collapsed-rail { display: flex; }
+.split__collapsed-count {
+  width: 1.3rem; height: 1.3rem;
+  background: var(--accent);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-sans);
+  font-size: 0.6rem; font-weight: 600;
+}
+.split__collapsed-label {
+  writing-mode: vertical-rl;
+  font-family: var(--font-sans);
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── Contributor note cards ─────────────────────────────────────────────── */
+.cardlist { display: flex; flex-direction: column; gap: 0.6rem; }
+.ncard {
+  border: 1px solid var(--subtle);
+  border-left: 2px solid var(--accent);
+  background: #fff;
+  padding: 0.75rem 0.85rem;
+}
+.ncard__body { display: flex; flex-direction: column; gap: 0.4rem; }
+.ncard__head { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.ncard__name { font-family: var(--font-serif); font-size: 0.94rem; color: var(--dark); }
+.ncard__name--anon { font-style: italic; color: var(--muted); }
+.ncard__count {
+  font-family: var(--font-sans);
+  font-size: 0.54rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ncard__note {
+  margin: 0;
+  border-left: 2px solid var(--subtle);
+  padding-left: 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  line-height: 1.55;
+  color: var(--dark);
+}
+.ncard__photos { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.1rem; }
+.ncard__thumb { width: 2.2rem; height: 2.2rem; object-fit: cover; display: block; border: 1px solid var(--subtle); }
+.ncard__thumb-more {
+  width: 2.2rem; height: 2.2rem;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--paper);
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: var(--muted);
+}
 
 .btn {
   border: 1px solid var(--subtle);
