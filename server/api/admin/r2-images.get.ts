@@ -2,7 +2,7 @@ import { desc, eq, sql } from 'drizzle-orm'
 import type { BlobObject } from '@nuxthub/core/blob'
 
 interface ImageUsage {
-  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'event-gallery' | 'member-photo' | 'editorial-album'
+  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'event-gallery' | 'member-photo' | 'editorial-album' | 'contribution'
   label: string
   href?: string
   role?: string
@@ -92,7 +92,7 @@ export default defineEventHandler(async (event) => {
   const cached = getCachedR2Inventory<R2InventoryResponse>(cacheKey)
   if (cached) return cached
 
-  const [blobs, galleryPhotos, posts, events, members, heroRows, historyRows, clubroomRows, editorialAlbums, trashedKeys] = await Promise.all([
+  const [blobs, galleryPhotos, posts, events, members, heroRows, historyRows, clubroomRows, editorialAlbums, submissions, trashedKeys] = await Promise.all([
     listImageBlobs(prefix),
     db
       .select({
@@ -127,6 +127,23 @@ export default defineEventHandler(async (event) => {
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'clubroomImage')),
     listEditorialAlbumRefs(),
+    // Participant uploads are referenced by their submission row, never by an
+    // album: approving COPIES the object to content-albums/<id>/<hash>.<ext>
+    // (collectionSubmissions.albumKey), so an album only ever points at the
+    // copy. Without this every original — including those of published photos —
+    // reads as unreferenced, and this page offers bulk delete on that signal.
+    db
+      .select({
+        r2Key: schema.collectionSubmissions.r2Key,
+        review: schema.collectionSubmissions.review,
+        linkId: schema.collectionSubmissions.linkId,
+        linkLabel: schema.collectionLinks.label
+      })
+      .from(schema.collectionSubmissions)
+      .innerJoin(
+        schema.collectionLinks,
+        eq(schema.collectionSubmissions.linkId, schema.collectionLinks.id)
+      ),
     trashedKeySet()
   ])
 
@@ -175,6 +192,18 @@ export default defineEventHandler(async (event) => {
       label: member.nickname,
       href: '/admin/members',
       role: 'member photo'
+    })
+  }
+
+  // Every state counts as referenced, not just 'approved': pending is still to
+  // be looked at, and a rejected row is kept precisely so the call stays
+  // reversible. Only a contributions/ blob with no row at all is an orphan.
+  for (const row of submissions) {
+    addUsage(otherUsage, row.r2Key, {
+      kind: 'contribution',
+      label: row.linkLabel || 'Untitled collection',
+      href: `/admin/submissions/${row.linkId}`,
+      role: `submission · ${row.review}`
     })
   }
 
