@@ -1,12 +1,24 @@
 <script setup lang="ts">
+import { isPrivateR2Key } from '~~/shared/r2Prefixes'
+
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: 'R2 Images' })
 
 interface ImageUsage {
-  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'member-photo' | 'editorial-album'
+  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'event-gallery' | 'member-photo' | 'editorial-album' | 'contribution'
   label: string
   href?: string
   role?: string
+}
+
+// /images/ 404s the private prefix by design, so those rows have to come from
+// the authenticated route instead. Public-prefix keys keep using /images/ —
+// it is edge-cached, and every admin thumbnail is otherwise a full-size
+// original streamed through the Worker.
+function thumbUrl(key: string) {
+  return isPrivateR2Key(key)
+    ? `/api/admin/r2-images/preview?key=${encodeURIComponent(key)}`
+    : `/images/${key}`
 }
 
 interface R2Image {
@@ -976,8 +988,8 @@ onBeforeUnmount(() => {
                 {{ selectionOrder(image.key) || '' }}
               </span>
             </label>
-            <a :href="`/images/${image.key}`" target="_blank" rel="noopener">
-              <img :src="`/images/${image.key}`" alt="" loading="lazy">
+            <a :href="thumbUrl(image.key)" target="_blank" rel="noopener">
+              <img :src="thumbUrl(image.key)" alt="" loading="lazy">
             </a>
           </div>
 
@@ -1118,8 +1130,8 @@ onBeforeUnmount(() => {
                 <input type="checkbox" :checked="isTrashSelected(item.key)" :disabled="trashBusy" @change="toggleTrashSelected(item.key)">
                 <span class="image-row__check-box" aria-hidden="true" />
               </label>
-              <a :href="`/images/${item.key}`" target="_blank" rel="noopener">
-                <img :src="`/images/${item.key}`" alt="" loading="lazy">
+              <a :href="thumbUrl(item.key)" target="_blank" rel="noopener">
+                <img :src="thumbUrl(item.key)" alt="" loading="lazy">
               </a>
             </div>
 

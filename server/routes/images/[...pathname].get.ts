@@ -1,11 +1,9 @@
 import type { H3Event } from 'h3'
+import { isPrivateR2Key } from '~~/shared/r2Prefixes'
 
-// Nothing a participant uploads is ever legitimately public: publishing copies
-// the object out of this prefix into the album's own folder, so a key here is by
-// definition unpublished. That makes the gate a string comparison rather than a
-// per-request lookup — which matters, because this route is immutable-cached at
-// the edge and an auth *branch* here could hand out something already cached.
-const PRIVATE_PREFIX = 'contributions/'
+// The private-prefix gate is a string comparison rather than a per-request
+// lookup — which matters, because this route is immutable-cached at the edge and
+// an auth *branch* here could hand out something already cached.
 
 // Serves blobs from R2 (view-only). Public URL: /images/<r2Key>
 export default defineEventHandler(async (event) => {
@@ -14,8 +12,8 @@ export default defineEventHandler(async (event) => {
 
   // Same 404 as a missing object: no hint that the key exists. Contributors see
   // their own photos via /api/contribute/[token]/preview/[id], admins via the
-  // pool's own preview route.
-  if (pathname.replace(/^\/+/, '').startsWith(PRIVATE_PREFIX)) {
+  // pool's own preview route or /api/admin/r2-images/preview.
+  if (isPrivateR2Key(pathname)) {
     throw createError({ statusCode: 404, message: 'ไม่พบรูปภาพ' })
   }
 
