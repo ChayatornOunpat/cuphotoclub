@@ -1,5 +1,6 @@
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, lt, sql } from 'drizzle-orm'
 import type { BlobObject } from '@nuxthub/core/blob'
+import { PRIVATE_R2_PREFIX } from '~~/shared/r2Prefixes'
 
 interface ImageUsage {
   kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'event-gallery' | 'member-photo' | 'editorial-album' | 'contribution'
@@ -82,6 +83,54 @@ async function listEditorialAlbumRefs(): Promise<EditorialAlbumRef[]> {
   }))
 }
 
+// The key range this view could possibly show a submission in, or null if it
+// cannot show one at all. Every participant upload lives under
+// PRIVATE_R2_PREFIX, so a view scoped to any other prefix (content-albums/,
+// members/, …) needs none of these rows and skips the query outright.
+function submissionKeyPrefix(prefix?: string): string | null {
+  if (!prefix) return PRIVATE_R2_PREFIX
+  if (prefix.startsWith(PRIVATE_R2_PREFIX)) return prefix
+  // A partially typed prefix ('contrib') still narrows to the whole private tree.
+  if (PRIVATE_R2_PREFIX.startsWith(prefix)) return PRIVATE_R2_PREFIX
+  return null
+}
+
+// Exclusive upper bound of a prefix range: the prefix with its last character
+// bumped one code point. Lets collection_submissions_key_idx serve this as a
+// range scan — LIKE 'p%' cannot, because SQLite's default LIKE is
+// case-insensitive and so never matches a BINARY-collated index.
+function prefixUpperBound(prefix: string): string {
+  return prefix.slice(0, -1) + String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1)
+}
+
+// Participant uploads are referenced by their submission row, never by an
+// album: approving COPIES the object to content-albums/<id>/<hash>.<ext>
+// (collectionSubmissions.albumKey), so an album only ever points at the copy.
+// Without this every original — including those of published photos — reads as
+// unreferenced, and this page offers bulk delete on that signal.
+//
+// Deliberately unlimited: a truncated result would mark real originals
+// unreferenced, which is the exact deletion hazard the lookup exists to close.
+// The bound is the key range instead, and the label is joined in JS from the
+// (tiny) links table rather than in SQL, so a row stays three narrow columns
+// instead of repeating a label string per submission.
+async function listSubmissionRefs(prefix?: string) {
+  const keyPrefix = submissionKeyPrefix(prefix)
+  if (!keyPrefix) return []
+
+  return db
+    .select({
+      r2Key: schema.collectionSubmissions.r2Key,
+      review: schema.collectionSubmissions.review,
+      linkId: schema.collectionSubmissions.linkId
+    })
+    .from(schema.collectionSubmissions)
+    .where(and(
+      gte(schema.collectionSubmissions.r2Key, keyPrefix),
+      lt(schema.collectionSubmissions.r2Key, prefixUpperBound(keyPrefix))
+    ))
+}
+
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
 
@@ -92,7 +141,7 @@ export default defineEventHandler(async (event) => {
   const cached = getCachedR2Inventory<R2InventoryResponse>(cacheKey)
   if (cached) return cached
 
-  const [blobs, galleryPhotos, posts, events, members, heroRows, historyRows, clubroomRows, editorialAlbums, submissions, trashedKeys] = await Promise.all([
+  const [blobs, galleryPhotos, posts, events, members, heroRows, historyRows, clubroomRows, editorialAlbums, collectionLinkRows, submissions, trashedKeys] = await Promise.all([
     listImageBlobs(prefix),
     db
       .select({
@@ -127,23 +176,8 @@ export default defineEventHandler(async (event) => {
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'clubroomImage')),
     listEditorialAlbumRefs(),
-    // Participant uploads are referenced by their submission row, never by an
-    // album: approving COPIES the object to content-albums/<id>/<hash>.<ext>
-    // (collectionSubmissions.albumKey), so an album only ever points at the
-    // copy. Without this every original — including those of published photos —
-    // reads as unreferenced, and this page offers bulk delete on that signal.
-    db
-      .select({
-        r2Key: schema.collectionSubmissions.r2Key,
-        review: schema.collectionSubmissions.review,
-        linkId: schema.collectionSubmissions.linkId,
-        linkLabel: schema.collectionLinks.label
-      })
-      .from(schema.collectionSubmissions)
-      .innerJoin(
-        schema.collectionLinks,
-        eq(schema.collectionSubmissions.linkId, schema.collectionLinks.id)
-      ),
+    db.select({ id: schema.collectionLinks.id, label: schema.collectionLinks.label }).from(schema.collectionLinks),
+    listSubmissionRefs(prefix),
     trashedKeySet()
   ])
 
@@ -198,10 +232,13 @@ export default defineEventHandler(async (event) => {
   // Every state counts as referenced, not just 'approved': pending is still to
   // be looked at, and a rejected row is kept precisely so the call stays
   // reversible. Only a contributions/ blob with no row at all is an orphan.
+  // A row whose link somehow went missing still counts: the previous inner join
+  // dropped it, and dropping it here would offer the original up for deletion.
+  const collectionLabelById = new Map(collectionLinkRows.map(row => [row.id, row.label]))
   for (const row of submissions) {
     addUsage(otherUsage, row.r2Key, {
       kind: 'contribution',
-      label: row.linkLabel || 'Untitled collection',
+      label: collectionLabelById.get(row.linkId) || 'Untitled collection',
       href: `/admin/submissions/${row.linkId}`,
       role: `submission · ${row.review}`
     })
