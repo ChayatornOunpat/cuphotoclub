@@ -363,7 +363,10 @@ function fillQueue() {
 }
 
 async function startReview() {
-  if (reviewFilter.value !== 'pending') {
+  // The queue always reads from page 1's offset (see decide()'s refresh()
+  // loop) — starting from any other page leaves everything before that
+  // offset permanently unreviewed even though it's still counted as pending.
+  if (reviewFilter.value !== 'pending' || page.value !== 1) {
     await router.push({ query: { ...route.query, review: 'pending', page: undefined } })
     await refresh()
   }
@@ -381,11 +384,17 @@ async function reviewDecide(decision: Review) {
   await decide([item.id], decision)
   if (!queue.value.length) fillQueue()
 }
-// Skip defers rather than decides — it moves the photo to the back so an
-// uncertain call never stalls the pass.
-function skip() {
+// Rotates the local queue without deciding anything — an uncertain call
+// never stalls the pass. Next (E / →) defers the current photo to the back;
+// Previous (Q / ←) brings the last one back into view, undoing that.
+function reviewStep(delta: number) {
   if (queue.value.length < 2) return
-  queue.value = [...queue.value.slice(1), queue.value[0]!]
+  if (delta > 0) {
+    queue.value = [...queue.value.slice(1), queue.value[0]!]
+  } else {
+    const last = queue.value[queue.value.length - 1]!
+    queue.value = [last, ...queue.value.slice(0, -1)]
+  }
 }
 
 function onKey(e: KeyboardEvent) {
@@ -404,7 +413,8 @@ function onKey(e: KeyboardEvent) {
   if (!reviewing.value) return
   if (key === 'a') { e.preventDefault(); reviewDecide('approved') }
   else if (key === 'r') { e.preventDefault(); reviewDecide('rejected') }
-  else if (key === 's') { e.preventDefault(); skip() }
+  else if (key === 'q' || key === 'arrowleft') { e.preventDefault(); reviewStep(-1) }
+  else if (key === 'e' || key === 'arrowright') { e.preventDefault(); reviewStep(1) }
   else if (key === 'escape') { e.preventDefault(); stopReview() }
 }
 onMounted(() => window.addEventListener('keydown', onKey))
@@ -541,8 +551,11 @@ const FILTERS = ['pending', 'approved', 'rejected', 'all'] as const
           <button type="button" class="btn btn--reject" :disabled="!current" @click="reviewDecide('rejected')">
             {{ t('adminPool.reject') }} <span class="rev__key">R</span>
           </button>
-          <button type="button" class="btn" :disabled="queue.length < 2" @click="skip">
-            {{ t('adminPool.skip') }} <span class="rev__key">S</span>
+          <button type="button" class="btn" :disabled="queue.length < 2" @click="reviewStep(-1)">
+            {{ t('adminPool.prev') }} <span class="rev__key">Q / ←</span>
+          </button>
+          <button type="button" class="btn" :disabled="queue.length < 2" @click="reviewStep(1)">
+            {{ t('adminPool.next') }} <span class="rev__key">E / →</span>
           </button>
           <button type="button" class="btn" @click="stopReview">{{ t('adminPool.backToGrid') }}</button>
         </div>
