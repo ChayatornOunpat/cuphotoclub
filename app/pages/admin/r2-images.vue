@@ -5,7 +5,7 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: 'R2 Images' })
 
 interface ImageUsage {
-  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'event-gallery' | 'member-photo' | 'editorial-album' | 'contribution'
+  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'event-gallery' | 'member-photo' | 'editorial-album' | 'contribution' | 'collection-cover'
   label: string
   href?: string
   role?: string

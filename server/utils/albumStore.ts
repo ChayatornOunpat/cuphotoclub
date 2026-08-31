@@ -274,12 +274,23 @@ function listWhere(query: AlbumListQuery) {
   return clauses.length ? and(...clauses) : undefined
 }
 
+/** One public album's image srcs plus the metadata the photo grid tiles need. */
+export interface AlbumPhotoRef {
+  id: string
+  title: string
+  coverSrc: string
+  date: string
+  dateEnd?: string
+  photoCount: number
+  srcs: string[]
+}
+
 export const albumStore = {
   /**
    * Albums without their `rows` — for archives, admin tables, the home feed and
    * the sitemap. Pass `limit`/`offset` to page; `total` is the count before
    * paging so callers can render a pager. Use `list()` only when you genuinely
-   * need every photo (R2 reference scans, the photo grid).
+   * need every photo (R2 reference scans).
    */
   async listMeta(query: AlbumListQuery = {}): Promise<{ items: AlbumListItem[], total: number }> {
     await seedFromContentOnce()
@@ -325,6 +336,63 @@ export const albumStore = {
       .where(listWhere({}))
       .orderBy(desc(c.published), asc(c.id))
     return rows.map(row => ({ ...row, slug: row.slug || row.id, visibility: row.visibility ?? 'public' }))
+  },
+
+  /**
+   * Every public album's image srcs, for the home page photo grid.
+   *
+   * The grid needs each src but none of the surrounding layout, so this pulls
+   * the srcs out with json_each instead of shipping `rows_json` to the Worker.
+   * `list()` did the latter: ~3MB out of D1 and a JSON.parse per album on every
+   * cold isolate, which took seconds and left the Featured Work wall blank
+   * while the client waited. `photo_count` is already derived on write, so the
+   * count comes free rather than from re-walking the rows.
+   */
+  async listPhotoGrid(): Promise<AlbumPhotoRef[]> {
+    await seedFromContentOnce()
+
+    // The same picsum cover check listWhere() applies — see the note there for
+    // why a cover check is enough.
+    const mockFilter = realDataOnly()
+      ? sql` AND a.cover_src NOT LIKE '%picsum.photos%' AND a.auto_cover_src NOT LIKE '%picsum.photos%'`
+      : sql.empty()
+
+    const rows = await db.all<{
+      id: string
+      title: string
+      cover_src: string
+      date: string
+      date_end: string | null
+      photo_count: number
+      srcs: string | null
+    }>(sql`
+      SELECT a.id,
+             a.title,
+             a.cover_src,
+             a.date,
+             a.date_end,
+             a.photo_count,
+             (
+               SELECT group_concat(c.value ->> '$.src', char(10))
+               FROM json_each(a.rows_json) AS r,
+                    json_each(r.value -> '$.cells') AS c
+               WHERE c.value ->> '$.type' = 'image'
+                 AND trim(coalesce(c.value ->> '$.src', '')) <> ''
+             ) AS srcs
+      FROM content_albums AS a
+      WHERE a.visibility = 'public'${mockFilter}
+      ORDER BY a.published DESC
+    `)
+
+    return rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      coverSrc: row.cover_src ?? '',
+      date: row.date,
+      dateEnd: row.date_end ?? undefined,
+      photoCount: row.photo_count,
+      srcs: row.srcs ? row.srcs.split('\n') : []
+    }))
   },
 
   async list(): Promise<Album[]> {

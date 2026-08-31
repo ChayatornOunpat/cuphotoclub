@@ -3,7 +3,7 @@ import type { BlobObject } from '@nuxthub/core/blob'
 import { PRIVATE_R2_PREFIX } from '~~/shared/r2Prefixes'
 
 interface ImageUsage {
-  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'event-gallery' | 'member-photo' | 'editorial-album' | 'contribution'
+  kind: 'gallery' | 'hero' | 'history' | 'clubroom' | 'post-cover' | 'event-cover' | 'event-gallery' | 'member-photo' | 'editorial-album' | 'contribution' | 'collection-cover'
   label: string
   href?: string
   role?: string
@@ -176,7 +176,11 @@ export default defineEventHandler(async (event) => {
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'historyImage')),
     db.select({ value: schema.settings.value }).from(schema.settings).where(eq(schema.settings.key, 'clubroomImage')),
     listEditorialAlbumRefs(),
-    db.select({ id: schema.collectionLinks.id, label: schema.collectionLinks.label }).from(schema.collectionLinks),
+    db.select({
+      id: schema.collectionLinks.id,
+      label: schema.collectionLinks.label,
+      coverR2Key: schema.collectionLinks.coverR2Key
+    }).from(schema.collectionLinks),
     listSubmissionRefs(prefix),
     trashedKeySet()
   ])
@@ -241,6 +245,19 @@ export default defineEventHandler(async (event) => {
       label: collectionLabelById.get(row.linkId) || 'Untitled collection',
       href: `/admin/submissions/${row.linkId}`,
       role: `submission · ${row.review}`
+    })
+  }
+
+  // A collection's own cover, uploaded by an admin under covers/collections/.
+  // Nothing else in the inventory references it, so without this it reads as
+  // unreferenced — same hazard as the submission originals above, on the same
+  // page that offers bulk delete on exactly that signal.
+  for (const link of collectionLinkRows) {
+    addUsage(otherUsage, link.coverR2Key, {
+      kind: 'collection-cover',
+      label: link.label || 'Untitled collection',
+      href: `/admin/submissions/${link.id}`,
+      role: 'collection cover'
     })
   }
 
