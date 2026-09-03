@@ -38,6 +38,7 @@ export function decodeGridImage(src: string): Promise<DecodedGridImage> {
     const img = new Image()
     img.decoding = 'async'
     img.loading = 'eager'
+    img.src = src
     if (!img.complete) {
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve()
