@@ -21,6 +21,9 @@ interface R2InventoryImage {
 interface R2InventoryResponse {
   prefix: string
   total: number
+  // False until the r2_objects index has been fully checked against the
+  // bucket once; the page then drives POST /api/admin/r2-objects/sync.
+  indexReady: boolean
   linkedToAlbums: number
   referenced: number
   images: R2InventoryImage[]
@@ -116,21 +119,14 @@ export default defineEventHandler(async (event) => {
   const prefix = String(query.prefix || '').replace(/[^a-z0-9/_-]/gi, '') || undefined
 
   // The object list comes from the r2_objects index (server/utils/r2Objects.ts),
-  // not from walking the bucket — that walk took ~15 s at 16k objects.
-  // `?refresh=1` (the page's Refresh button) re-walks the bucket once to
-  // repair drift; an empty index means it was never filled, so fill it now.
-  const force = String(query.refresh || '') === '1'
+  // never from walking the bucket here — see that file for why the walk is a
+  // separate, stepped endpoint (POST /api/admin/r2-objects/sync).
   const cacheKey = prefix ?? ''
-  if (!force) {
-    const cached = getCachedR2Inventory<R2InventoryResponse>(cacheKey)
-    if (cached) return cached
-  }
-  if (force || (await countR2Objects()) === 0) {
-    await syncR2Objects()
-    invalidateR2Inventory()
-  }
+  const cached = getCachedR2Inventory<R2InventoryResponse>(cacheKey)
+  if (cached) return cached
 
-  const [objects, galleryPhotos, posts, events, members, heroRows, historyRows, clubroomRows, editorialAlbums, collectionLinkRows, submissions, trashedKeys] = await Promise.all([
+  const [indexReady, objects, galleryPhotos, posts, events, members, heroRows, historyRows, clubroomRows, editorialAlbums, collectionLinkRows, submissions, trashedKeys] = await Promise.all([
+    r2IndexReady(),
     listIndexedR2Images(prefix),
     db
       .select({
@@ -336,6 +332,7 @@ export default defineEventHandler(async (event) => {
   const response: R2InventoryResponse = {
     prefix: prefix ?? '',
     total: images.length,
+    indexReady,
     linkedToAlbums: images.filter(image => image.albums.length > 0).length,
     referenced: images.filter(image => image.albums.length > 0 || image.usages.length > 0).length,
     images

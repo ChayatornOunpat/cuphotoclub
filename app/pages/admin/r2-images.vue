@@ -33,6 +33,7 @@ interface R2Image {
 interface R2Inventory {
   prefix: string
   total: number
+  indexReady: boolean
   linkedToAlbums: number
   referenced: number
   images: R2Image[]
@@ -68,23 +69,22 @@ const { data, pending, error, refresh } = await useFetch<R2Inventory>('/api/admi
 })
 
 // Normal loads (and the auto-refresh / post-action reloads) read the
-// r2_objects index and are quick. Only the Refresh button asks the server to
-// re-walk the whole bucket (`refresh=1`, see server/utils/r2Objects.ts) to pick
-// up anything that reached R2 without being indexed — slow, so it's never
-// automatic.
-const rescanning = ref(false)
+// r2_objects index and are quick. Only the Refresh button re-checks that index
+// against the bucket, in resumable steps (useR2IndexSync, see
+// server/utils/r2Objects.ts), to pick up anything that reached R2 without
+// being indexed. It is slow, so it's never part of an ordinary reload.
+const { t } = useI18n()
+const indexSync = useR2IndexSync()
 async function rescanInventory() {
-  rescanning.value = true
-  try {
-    data.value = await $fetch<R2Inventory>('/api/admin/r2-images', {
-      query: { prefix: activePrefix.value || undefined, refresh: '1' }
-    })
-  } catch {
-    await refresh()
-  } finally {
-    rescanning.value = false
-  }
+  await indexSync.run()
+  await refresh()
 }
+
+// Until the index has been fully checked once the list is partial, so the
+// page counts first instead of offering it (it drives bulk delete).
+watch(() => data.value?.indexReady, (ready) => {
+  if (import.meta.client && ready === false && !indexSync.syncing.value && !indexSync.failed.value) rescanInventory()
+}, { immediate: true })
 
 // ── View toggle + trash inventory ──────────────────────────────────────────
 const view = ref<'inventory' | 'trash'>('inventory')
@@ -115,7 +115,7 @@ const AUTO_REFRESH_MS = 45_000
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 
 async function autoRefreshInventory() {
-  if (pending.value || rescanning.value) return
+  if (pending.value || indexSync.syncing.value) return
   if (deleteConfirm.active || passwordGate.active || deleteProgress.active || bulkDeleting.value) return
   if (import.meta.client && document.visibilityState !== 'visible') return
   await refresh()
@@ -911,13 +911,16 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="r2__refresh"
-        :disabled="view === 'trash' ? trashPending : (pending || rescanning)"
+        :disabled="view === 'trash' ? trashPending : (pending || indexSync.syncing.value)"
         @click="view === 'trash' ? refreshTrash() : rescanInventory()"
       >
         <Icon name="heroicons:arrow-path" />
         Refresh
       </button>
     </header>
+
+    <p v-if="indexSync.syncing.value" class="r2__sync">{{ t('adminR2.checking', { count: indexSync.checked.value.toLocaleString('en-US') }) }}</p>
+    <p v-else-if="indexSync.failed.value" class="r2__sync r2__sync--warn">{{ t('adminR2.checkFailed') }}</p>
 
     <nav class="r2__tabs" aria-label="R2 views">
       <button type="button" :class="{ 'is-active': view === 'inventory' }" @click="view = 'inventory'">
@@ -975,6 +978,10 @@ onBeforeUnmount(() => {
     </section>
 
     <p v-if="error" class="r2__error">Could not load R2 images.</p>
+    <div v-else-if="data && !data.indexReady" class="r2__empty">
+      <UiSpinner v-if="indexSync.syncing.value" />
+      <span>{{ t('adminR2.firstCount') }}</span>
+    </div>
     <div v-else-if="pending" class="r2__empty">
       <UiSpinner />
       <span>Loading R2 images</span>
@@ -1757,6 +1764,14 @@ onBeforeUnmount(() => {
   font-size: 0.78rem;
 }
 .r2__error { color: #b0243c; }
+
+.r2__sync {
+  margin: -0.5rem 0 1rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+.r2__sync--warn { color: #b0243c; }
 
 .r2__bulk {
   display: flex;

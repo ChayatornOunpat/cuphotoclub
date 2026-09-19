@@ -30,7 +30,7 @@ Use `admin-manage` / `requireManageUsers` only for user management and site sett
 
 ## R2 object index (`r2_objects`)
 
-The `r2_objects` D1 table lists every object in the R2 bucket. The storage & cost page reads it instead of walking the bucket. **Never call `blob.put` / `blob.delete` directly.** Use `putR2Object` / `deleteR2Object` from `server/utils/r2Objects.ts`, call `recordR2Objects` after a browser upload is confirmed, and call `forgetR2Objects` after a browser-side delete. `copyR2Object` records itself. Skipping these makes the storage numbers drift. The file header explains the full rule.
+The `r2_objects` D1 table lists every object in the R2 bucket. The storage & cost page reads it instead of walking the bucket. **Never call `blob.put` / `blob.delete` directly.** Use `putR2Object` / `deleteR2Object` from `server/utils/r2Objects.ts`, call `recordR2Objects` after a browser upload is confirmed, and call `forgetR2Objects` after a browser-side delete. `copyR2Object` records itself. Skipping these makes the storage numbers drift. The file header explains the full rule. **Never list the whole bucket inside one request.** Some R2 list calls take 15–90 s, so a full walk can't reliably finish inside Cloudflare's 100 s limit. Re-checks go through the stepped `syncR2ObjectsStep` / `POST /api/admin/r2-objects/sync`.
 
 ## Upload queue behaviour
 

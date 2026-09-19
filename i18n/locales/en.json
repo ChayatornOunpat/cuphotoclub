@@ -463,12 +463,20 @@
     "logsMeta": "Audit trail of admin changes",
     "viewLogs": "View logs"
   },
+  "adminR2": {
+    "checking": "Checking storage… {count} files so far",
+    "checkFailed": "Couldn't finish checking storage. Press Refresh to continue where it stopped.",
+    "firstCount": "Counting every file in storage for the first time. This takes a few minutes and only happens once — the list appears here when it's done."
+  },
   "adminCost": {
     "back": "Dashboard",
     "title": "Storage & Cost",
     "lead": "Live R2 object-storage usage for this site, with a monthly cost estimate. Bandwidth (egress) is free on R2, so storage is the only real cost.",
     "refresh": "Refresh",
     "refreshing": "Refreshing…",
+    "checking": "Checking storage… {count} files so far",
+    "checkFailed": "Couldn't finish checking storage. Press Refresh to continue where it stopped.",
+    "firstCount": "Counting every file in storage for the first time. This takes a few minutes and only happens once — the figures appear here when it's done.",
     "loading": "Loading usage…",
     "error": "Couldn't load usage data.",
     "updated": "Updated {time}",

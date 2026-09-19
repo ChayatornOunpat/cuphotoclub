@@ -9,6 +9,7 @@ interface LargestObject { key: string, bytes: number }
 interface Projection { gb: number, monthlyCost: number }
 interface CostResponse {
   generatedAt: string
+  indexReady: boolean
   totalBytes: number
   totalCount: number
   storageGb: number
@@ -30,27 +31,24 @@ interface CostResponse {
 }
 
 // Lazy so opening the page never waits on the fetch: the header renders at
-// once and the figures fill in. Normal loads read the r2_objects index and are
-// quick; Refresh re-walks the whole bucket (server/utils/r2Objects.ts) and can
-// take a while, which is what the button's "Refreshing…" state covers.
-const forceLive = ref(false)
+// once and the figures fill in. The figures come from the r2_objects index and
+// load quickly. Refresh re-checks that index against the bucket in resumable
+// steps (useR2IndexSync, server/utils/r2Objects.ts), which takes a while.
 const { data, pending, error, refresh } = await useFetch<CostResponse>('/api/admin/cost', {
-  query: { refresh: computed(() => (forceLive.value ? '1' : undefined)) },
-  watch: false,
   lazy: true
 })
 
-const refreshing = ref(false)
+const indexSync = useR2IndexSync()
 async function doRefresh() {
-  forceLive.value = true
-  refreshing.value = true
-  try {
-    await refresh()
-  } finally {
-    forceLive.value = false
-    refreshing.value = false
-  }
+  await indexSync.run()
+  await refresh()
 }
+
+// Until the index has been fully checked once its totals are partial, so the
+// page counts first instead of showing them.
+watch(() => data.value?.indexReady, (ready) => {
+  if (import.meta.client && ready === false && !indexSync.syncing.value && !indexSync.failed.value) doRefresh()
+}, { immediate: true })
 
 useHead({ title: () => `${t('adminCost.title')} - Admin` })
 
@@ -103,10 +101,14 @@ const currentTierGb = computed(() => {
         <p class="sub">{{ t('adminCost.lead') }}</p>
       </div>
       <div class="head-actions">
-        <button type="button" class="refresh" :disabled="refreshing || pending" @click="doRefresh">
-          {{ refreshing ? t('adminCost.refreshing') : t('adminCost.refresh') }}
+        <button type="button" class="refresh" :disabled="indexSync.syncing.value || pending" @click="doRefresh">
+          {{ indexSync.syncing.value ? t('adminCost.refreshing') : t('adminCost.refresh') }}
         </button>
-        <p v-if="data" class="stamp">
+        <p v-if="indexSync.syncing.value" class="stamp">
+          {{ t('adminCost.checking', { count: fmtNum(indexSync.checked.value) }) }}
+        </p>
+        <p v-else-if="indexSync.failed.value" class="stamp stamp--warn">{{ t('adminCost.checkFailed') }}</p>
+        <p v-else-if="data" class="stamp">
           {{ t('adminCost.updated', { time: formatDateTime(data.generatedAt) }) }}
         </p>
       </div>
@@ -114,6 +116,7 @@ const currentTierGb = computed(() => {
 
     <p v-if="error" class="empty">{{ t('adminCost.error') }}</p>
     <p v-else-if="pending && !data" class="empty">{{ t('adminCost.loading') }}</p>
+    <p v-else-if="data && !data.indexReady" class="empty">{{ t('adminCost.firstCount') }}</p>
 
     <template v-else-if="data">
       <!-- TOP STATS -->
@@ -252,6 +255,7 @@ const currentTierGb = computed(() => {
 .refresh:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .refresh:disabled { opacity: 0.5; cursor: default; }
 .stamp { color: var(--muted); font-size: 0.56rem; letter-spacing: 0.04em; text-align: right; }
+.stamp--warn { color: var(--accent); }
 
 .empty { color: var(--muted); font-size: 0.9rem; padding: 2rem 0; }
 

@@ -37,10 +37,11 @@ import type { BlobObject } from '@nuxthub/core/blob'
 // Drift and the safety net
 //   Some objects can still land outside these helpers: an upload whose browser
 //   tab closed before "complete", a file added with wrangler or the Cloudflare
-//   dashboard. syncR2Objects() walks the whole bucket once and repairs the
-//   table. It runs when an admin presses Refresh on the storage & cost page
-//   or the R2 Images page, and automatically the first time the table is
-//   found empty. Never call it on an ordinary page load.
+//   dashboard. syncR2ObjectsStep() re-walks the bucket in resumable steps and
+//   repairs the table (see the section further down for why it is stepped).
+//   The storage & cost and R2 Images pages drive it when an admin presses
+//   Refresh, and automatically until the first walk has ever completed.
+//   Never run it on an ordinary page load.
 //
 // Trash
 //   Trashed objects (r2_trash) still sit in R2 and still cost money, so they
@@ -178,25 +179,72 @@ export async function recordR2Copy(sourceKey: string, destKey: string) {
   if (head) await recordR2Objects([head])
 }
 
-export async function countR2Objects(): Promise<number> {
-  const [row] = await db.select({ n: sql<number>`count(*)` }).from(schema.r2Objects)
-  return Number(row?.n ?? 0)
+// ─── Re-checking the table against the bucket ───────────────────────────────
+//
+// Walking the whole bucket is slow AND unpredictable: R2 returns ~280 objects
+// per list call once metadata is included (~60 calls for 16k objects), and
+// some key ranges intermittently take 15–90 s per call. A single request that
+// walks everything therefore cannot be relied on to finish inside Cloudflare's
+// 100 s limit — the first version of this did exactly that, timed out on
+// every attempt, saved nothing, and so retried forever.
+//
+// So the walk runs in STEPS. Each call to syncR2ObjectsStep() continues from
+// where the last one stopped, reconciles every page the moment it arrives,
+// saves its position after every page, and returns after ~20 s. The admin
+// pages call it in a loop (POST /api/admin/r2-objects/sync) until it reports
+// done. A timeout or a slow page only delays the walk; it never loses it.
+//
+// R2 lists keys in byte order, which is also SQLite's BINARY text order, so
+// each page covers a known key range: (previous page's last key, this page's
+// last key]. Rows in that range that the page didn't return are gone from R2.
+
+const SYNC_SETTING_KEY = 'r2ObjectsSync'
+const SYNC_STEP_BUDGET_MS = 20_000
+// Consecutive failed steps before the saved cursor is thrown away and the walk
+// starts over (an expired or invalid cursor would otherwise fail forever).
+const SYNC_MAX_FAILURES = 3
+
+interface R2SyncRun {
+  cursor?: string
+  afterKey: string
+  startedAt: number
+  checked: number
+  failures: number
+}
+interface R2SyncState {
+  run: R2SyncRun | null
+  // Set once a walk has completed. Until then the table may be partial, so
+  // the pages show "counting…" instead of numbers.
+  completedAt: number | null
 }
 
-// Walk the whole bucket and make the table match it. Slow (one blob.list call
-// per 1,000 objects), so it is only for the Refresh button and first run —
-// never for a normal page load. Writes only what differs, to keep D1 row
-// writes low on repeat runs.
-export async function syncR2Objects() {
-  const startedAt = Date.now()
-  const listed: BlobObject[] = []
-  let cursor: string | undefined
-  do {
-    const result = await blob.list({ limit: 1000, cursor })
-    listed.push(...result.blobs)
-    cursor = result.hasMore ? result.cursor : undefined
-  } while (cursor)
+async function readSyncState(): Promise<R2SyncState> {
+  const [row] = await db
+    .select({ value: schema.settings.value })
+    .from(schema.settings)
+    .where(sql`${schema.settings.key} = ${SYNC_SETTING_KEY}`)
+  const value = row?.value as Partial<R2SyncState> | null | undefined
+  return { run: value?.run ?? null, completedAt: value?.completedAt ?? null }
+}
 
+async function writeSyncState(state: R2SyncState) {
+  await db
+    .insert(schema.settings)
+    .values({ key: SYNC_SETTING_KEY, value: state, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: schema.settings.key, set: { value: state, updatedAt: new Date() } })
+}
+
+// True once the table has been fully checked against the bucket at least once.
+export async function r2IndexReady(): Promise<boolean> {
+  return (await readSyncState()).completedAt !== null
+}
+
+// Make the table match one listed page. `afterKey` (exclusive) and `lastKey`
+// (inclusive, omitted on the final page) bound the key range the page covers.
+async function reconcilePage(blobs: BlobObject[], afterKey: string, lastKey: string | undefined, startedAt: number) {
+  const range = lastKey
+    ? sql`${schema.r2Objects.key} > ${afterKey} AND ${schema.r2Objects.key} <= ${lastKey}`
+    : sql`${schema.r2Objects.key} > ${afterKey}`
   const existing = await db
     .select({
       key: schema.r2Objects.key,
@@ -205,23 +253,59 @@ export async function syncR2Objects() {
       uploadedAt: schema.r2Objects.uploadedAt
     })
     .from(schema.r2Objects)
+    .where(range)
   const existingByKey = new Map(existing.map(row => [row.key, row]))
 
-  const changed = listed.filter((item) => {
+  // Writes only what differs, to keep D1 row writes low on repeat runs.
+  const changed = blobs.filter((item) => {
     const row = existingByKey.get(item.pathname)
     return !row || row.size !== (item.size ?? 0) || row.orderAt !== orderAtOf(item)
   })
-
-  // An object uploaded while the walk was running is in the table but not in
-  // `listed`; only drop rows older than the walk so we never remove those.
-  const listedKeys = new Set(listed.map(item => item.pathname))
+  // Only rows older than the walk: anything recorded since it started may be
+  // an upload that landed after this range was listed.
+  const listedKeys = new Set(blobs.map(item => item.pathname))
   const stale = existing
     .filter(row => !listedKeys.has(row.key) && row.uploadedAt.getTime() < startedAt)
     .map(row => row.key)
 
   await recordR2Objects(changed)
   await forgetR2Objects(stale)
-  return { total: listed.length, updated: changed.length, removed: stale.length }
+}
+
+// Run one step of the walk (see above). Never call it from a normal page
+// load; the admin pages drive it through POST /api/admin/r2-objects/sync.
+export async function syncR2ObjectsStep(): Promise<{ done: boolean, checked: number }> {
+  const state = await readSyncState()
+  const run: R2SyncRun = state.run ?? { afterKey: '', startedAt: Date.now(), checked: 0, failures: 0 }
+  const deadline = Date.now() + SYNC_STEP_BUDGET_MS
+
+  while (true) {
+    let page: Awaited<ReturnType<typeof blob.list>>
+    try {
+      page = await blob.list({ limit: 1000, cursor: run.cursor })
+    } catch (error) {
+      run.failures += 1
+      await writeSyncState({ ...state, run: run.failures >= SYNC_MAX_FAILURES ? null : run })
+      throw error
+    }
+
+    const lastKey = page.hasMore ? page.blobs.at(-1)?.pathname : undefined
+    if (page.blobs.length || !page.hasMore) {
+      await reconcilePage(page.blobs, run.afterKey, lastKey, run.startedAt)
+    }
+    run.checked += page.blobs.length
+    run.failures = 0
+
+    if (!page.hasMore) {
+      await writeSyncState({ run: null, completedAt: Date.now() })
+      return { done: true, checked: run.checked }
+    }
+
+    run.cursor = page.cursor
+    if (lastKey) run.afterKey = lastKey
+    await writeSyncState({ ...state, run })
+    if (Date.now() > deadline) return { done: false, checked: run.checked }
+  }
 }
 
 // Exclusive upper bound of a prefix range: the prefix with its last character
