@@ -98,7 +98,7 @@ export default defineEventHandler(async (event) => {
     }
     // After the album no longer points at them, so a failed album write never
     // leaves a row claiming a copy that is already gone.
-    for (const key of keys) await blob.delete(key).catch(() => {})
+    for (const key of keys) await deleteR2Object(key).catch(() => {})
 
     await db
       .update(schema.collectionSubmissions)
@@ -141,7 +141,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     // Objects this run created would otherwise sit in the album's folder with
     // nothing pointing at them.
-    for (const key of copiedKeys) await blob.delete(key).catch(() => {})
+    for (const key of copiedKeys) await deleteR2Object(key).catch(() => {})
     throw error
   }
 

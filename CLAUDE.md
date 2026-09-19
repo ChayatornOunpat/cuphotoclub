@@ -28,6 +28,10 @@ Use `admin-manage` / `requireManageUsers` only for user management and site sett
 - **Hero images page**: `app/pages/admin/hero-images.vue` → `/admin/hero-images`
 - **Dashboard**: `app/pages/admin/index.vue`
 
+## R2 object index (`r2_objects`)
+
+The `r2_objects` D1 table lists every object in the R2 bucket. The storage & cost page reads it instead of walking the bucket. **Never call `blob.put` / `blob.delete` directly.** Use `putR2Object` / `deleteR2Object` from `server/utils/r2Objects.ts`, call `recordR2Objects` after a browser upload is confirmed, and call `forgetR2Objects` after a browser-side delete. `copyR2Object` records itself. Skipping these makes the storage numbers drift. The file header explains the full rule.
+
 ## Upload queue behaviour
 
 `R2ImageUploader` has a `pendingQueue` — dragging new files while an upload is running appends them; they process after the current batch finishes. Do not reset `total`/`done` counters on a concurrent call. Queued files enter `total` only at the point they're queued (concurrent branch) — the drain loop must not re-count them. Files that can't be uploaded (limit reached / single-file mode) are surfaced via `skippedCount`, never dropped silently.

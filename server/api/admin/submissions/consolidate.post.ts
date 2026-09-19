@@ -95,7 +95,7 @@ export default defineEventHandler(async (event) => {
     // Unwind: objects this run created would otherwise sit in the album's folder
     // referenced by nothing, and an empty untitled draft would be left behind on
     // every failed attempt until the album list filled with litter.
-    for (const key of copiedKeys) await blob.delete(key).catch(() => {})
+    for (const key of copiedKeys) await deleteR2Object(key).catch(() => {})
     if (createdHere) await albumStore.remove(album.id).catch(() => {})
     throw error
   }

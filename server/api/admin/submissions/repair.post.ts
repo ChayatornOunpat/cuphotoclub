@@ -67,7 +67,7 @@ export default defineEventHandler(async (event) => {
       }
     }
   } catch (error) {
-    for (const key of copiedKeys) await blob.delete(key).catch(() => {})
+    for (const key of copiedKeys) await deleteR2Object(key).catch(() => {})
     throw error
   }
 

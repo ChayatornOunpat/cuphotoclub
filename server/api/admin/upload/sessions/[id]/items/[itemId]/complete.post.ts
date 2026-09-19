@@ -24,26 +24,30 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, message: item.error })
   }
   if (!uploaded.contentType?.startsWith('image/')) {
-    await blob.delete(item.key).catch(() => {})
+    await deleteR2Object(item.key).catch(() => {})
     item.status = 'failed'
     item.error = 'Uploaded object is not an image.'
     await saveUploadSessionItem(session, item)
     throw createError({ statusCode: 400, message: item.error })
   }
   if ((uploaded.size || 0) > MAX_UPLOAD_BYTES) {
-    await blob.delete(item.key).catch(() => {})
+    await deleteR2Object(item.key).catch(() => {})
     item.status = 'failed'
     item.error = 'Uploaded object is too large.'
     await saveUploadSessionItem(session, item)
     throw createError({ statusCode: 413, message: item.error })
   }
   if (uploaded.customMetadata?.hash !== item.hash) {
-    await blob.delete(item.key).catch(() => {})
+    await deleteR2Object(item.key).catch(() => {})
     item.status = 'failed'
     item.error = 'Uploaded object hash metadata did not match the manifest.'
     await saveUploadSessionItem(session, item)
     throw createError({ statusCode: 400, message: item.error })
   }
+
+  // The browser uploaded straight to R2, so this is where the object gets
+  // indexed (see server/utils/r2Objects.ts).
+  await recordR2Objects([uploaded])
 
   item.status = 'uploaded'
   item.error = undefined

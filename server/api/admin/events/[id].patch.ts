@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
   }
   if (data.coverR2Key !== undefined) {
     updates.coverR2Key = data.coverR2Key
-    if (row.coverR2Key && row.coverR2Key !== data.coverR2Key) await blob.delete(row.coverR2Key).catch(() => {})
+    if (row.coverR2Key && row.coverR2Key !== data.coverR2Key) await deleteR2Object(row.coverR2Key).catch(() => {})
   }
 
   await db.update(schema.events).set(updates).where(eq(schema.events.id, id))

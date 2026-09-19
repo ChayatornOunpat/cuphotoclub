@@ -315,6 +315,8 @@ export async function copyR2Object(sourceKey: string, destKey: string) {
       message: `Could not copy ${sourceKey} (R2 returned ${response.status}).`
     })
   }
+  // Keep the r2_objects index in step (see server/utils/r2Objects.ts).
+  await recordR2Copy(sourceKey, destKey)
 }
 
 export function r2DirectUploadConfig() {

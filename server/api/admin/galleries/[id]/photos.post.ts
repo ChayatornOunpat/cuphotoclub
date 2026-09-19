@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
 
   const ext = sanitizeUploadExt(file.filename?.split('.').pop() || 'jpg')
   const key = `photos/${album.slug}/originals/${crypto.randomUUID()}.${ext}`
-  await blob.put(key, file.data, { contentType: type })
+  await putR2Object(key, file.data, { contentType: type })
 
   const [maxOrderRow] = await db
     .select({ maxOrder: sql<number>`coalesce(max(sort_order), -1)` })

@@ -44,6 +44,9 @@ export default defineEventHandler(async (event) => {
     // A permanent delete also clears any trash record for the key, so purging
     // from the trash view leaves no dangling row pointing at a missing blob.
     await removeFromR2Trash(deleted.map(item => item.key))
+    // The browser deleted these straight from R2 via presigned URLs, so the
+    // index is updated here (see server/utils/r2Objects.ts).
+    await forgetR2Objects(deleted.map(item => item.key))
     await recordAdminAudit(actor, {
       action: 'delete',
       entityType: 'media',

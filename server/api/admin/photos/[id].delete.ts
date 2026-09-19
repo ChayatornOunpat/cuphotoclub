@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const [photo] = await db.select().from(schema.photos).where(eq(schema.photos.id, id)).limit(1)
   if (!photo) throw createError({ statusCode: 404, message: 'ไม่พบรูปภาพ' })
 
-  await blob.delete(photo.r2Key)
+  await deleteR2Object(photo.r2Key)
 
   // If this photo was the album cover, clear it.
   await db

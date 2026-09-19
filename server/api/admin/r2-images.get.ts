@@ -1,5 +1,4 @@
 import { and, desc, eq, gte, lt, sql } from 'drizzle-orm'
-import type { BlobObject } from '@nuxthub/core/blob'
 import { PRIVATE_R2_PREFIX } from '~~/shared/r2Prefixes'
 
 interface ImageUsage {
@@ -34,19 +33,6 @@ function addUsage(map: Map<string, ImageUsage[]>, key: string | null | undefined
   const items = map.get(normalized) ?? []
   items.push(usage)
   map.set(normalized, items)
-}
-
-async function listImageBlobs(prefix?: string): Promise<BlobObject[]> {
-  const blobs: BlobObject[] = []
-  let cursor: string | undefined
-
-  do {
-    const result = await blob.list({ prefix, limit: 1000, cursor })
-    blobs.push(...result.blobs.filter(item => item.contentType?.startsWith('image/')))
-    cursor = result.hasMore ? result.cursor : undefined
-  } while (cursor)
-
-  return blobs
 }
 
 interface EditorialAlbumRef {
@@ -95,14 +81,6 @@ function submissionKeyPrefix(prefix?: string): string | null {
   return null
 }
 
-// Exclusive upper bound of a prefix range: the prefix with its last character
-// bumped one code point. Lets collection_submissions_key_idx serve this as a
-// range scan — LIKE 'p%' cannot, because SQLite's default LIKE is
-// case-insensitive and so never matches a BINARY-collated index.
-function prefixUpperBound(prefix: string): string {
-  return prefix.slice(0, -1) + String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1)
-}
-
 // Participant uploads are referenced by their submission row, never by an
 // album: approving COPIES the object to content-albums/<id>/<hash>.<ext>
 // (collectionSubmissions.albumKey), so an album only ever points at the copy.
@@ -137,12 +115,23 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const prefix = String(query.prefix || '').replace(/[^a-z0-9/_-]/gi, '') || undefined
 
+  // The object list comes from the r2_objects index (server/utils/r2Objects.ts),
+  // not from walking the bucket — that walk took ~15 s at 16k objects.
+  // `?refresh=1` (the page's Refresh button) re-walks the bucket once to
+  // repair drift; an empty index means it was never filled, so fill it now.
+  const force = String(query.refresh || '') === '1'
   const cacheKey = prefix ?? ''
-  const cached = getCachedR2Inventory<R2InventoryResponse>(cacheKey)
-  if (cached) return cached
+  if (!force) {
+    const cached = getCachedR2Inventory<R2InventoryResponse>(cacheKey)
+    if (cached) return cached
+  }
+  if (force || (await countR2Objects()) === 0) {
+    await syncR2Objects()
+    invalidateR2Inventory()
+  }
 
-  const [blobs, galleryPhotos, posts, events, members, heroRows, historyRows, clubroomRows, editorialAlbums, collectionLinkRows, submissions, trashedKeys] = await Promise.all([
-    listImageBlobs(prefix),
+  const [objects, galleryPhotos, posts, events, members, heroRows, historyRows, clubroomRows, editorialAlbums, collectionLinkRows, submissions, trashedKeys] = await Promise.all([
+    listIndexedR2Images(prefix),
     db
       .select({
         photoId: schema.photos.id,
@@ -316,14 +305,14 @@ export default defineEventHandler(async (event) => {
   const editorialById = new Map(editorialAlbums.map(album => [album.id, album]))
   const folderCutoff = Date.now() - R2_ALBUM_FOLDER_GRACE_MS
 
-  const images: R2InventoryImage[] = blobs
-    .filter(item => !trashedKeys.has(item.pathname))
+  const images: R2InventoryImage[] = objects
+    .filter(item => !trashedKeys.has(item.key))
     .map(item => {
-    const albums = albumUsage.get(item.pathname) ?? []
-    const usages = otherUsage.get(item.pathname) ?? []
-    const folderId = item.pathname.match(/^content-albums\/([^/]+)\//)?.[1]
+    const albums = albumUsage.get(item.key) ?? []
+    const usages = otherUsage.get(item.key) ?? []
+    const folderId = item.key.match(/^content-albums\/([^/]+)\//)?.[1]
     const folderAlbum = folderId ? editorialById.get(folderId) : undefined
-    const uploadedRecently = (item.uploadedAt?.getTime() ?? 0) > folderCutoff
+    const uploadedRecently = item.uploadedAt.getTime() > folderCutoff
     if (folderAlbum && uploadedRecently && !usages.some(u => u.kind === 'editorial-album')) {
       usages.push({
         kind: 'editorial-album',
@@ -332,21 +321,17 @@ export default defineEventHandler(async (event) => {
         role: 'album folder'
       })
     }
-    // Queue-order stamp written at upload time; uploadedAt (completion time)
-    // is the fallback for images uploaded before the stamp existed.
-    const seq = Number(item.customMetadata?.seq)
     return {
-      key: item.pathname,
-      contentType: item.contentType,
+      key: item.key,
+      contentType: item.contentType ?? undefined,
       size: item.size,
-      uploadedAt: item.uploadedAt?.toISOString(),
-      orderAt: Number.isFinite(seq) && seq > 0 ? seq : (item.uploadedAt?.getTime() ?? 0),
+      uploadedAt: item.uploadedAt.toISOString(),
+      // Already sorted by this in SQL (listIndexedR2Images).
+      orderAt: item.orderAt,
       albums,
       usages
     }
   })
-
-  images.sort((a, b) => b.orderAt - a.orderAt || a.key.localeCompare(b.key))
 
   const response: R2InventoryResponse = {
     prefix: prefix ?? '',

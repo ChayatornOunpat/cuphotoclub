@@ -67,6 +67,25 @@ const { data, pending, error, refresh } = await useFetch<R2Inventory>('/api/admi
   query: computed(() => ({ prefix: activePrefix.value || undefined }))
 })
 
+// Normal loads (and the auto-refresh / post-action reloads) read the
+// r2_objects index and are quick. Only the Refresh button asks the server to
+// re-walk the whole bucket (`refresh=1`, see server/utils/r2Objects.ts) to pick
+// up anything that reached R2 without being indexed — slow, so it's never
+// automatic.
+const rescanning = ref(false)
+async function rescanInventory() {
+  rescanning.value = true
+  try {
+    data.value = await $fetch<R2Inventory>('/api/admin/r2-images', {
+      query: { prefix: activePrefix.value || undefined, refresh: '1' }
+    })
+  } catch {
+    await refresh()
+  } finally {
+    rescanning.value = false
+  }
+}
+
 // ── View toggle + trash inventory ──────────────────────────────────────────
 const view = ref<'inventory' | 'trash'>('inventory')
 
@@ -96,7 +115,7 @@ const AUTO_REFRESH_MS = 45_000
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
 
 async function autoRefreshInventory() {
-  if (pending.value) return
+  if (pending.value || rescanning.value) return
   if (deleteConfirm.active || passwordGate.active || deleteProgress.active || bulkDeleting.value) return
   if (import.meta.client && document.visibilityState !== 'visible') return
   await refresh()
@@ -892,8 +911,8 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="r2__refresh"
-        :disabled="view === 'trash' ? trashPending : pending"
-        @click="view === 'trash' ? refreshTrash() : refresh()"
+        :disabled="view === 'trash' ? trashPending : (pending || rescanning)"
+        @click="view === 'trash' ? refreshTrash() : rescanInventory()"
       >
         <Icon name="heroicons:arrow-path" />
         Refresh

@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
   if (replacedPhotoKey) {
     const references = await getR2DeleteReferences([replacedPhotoKey])
     const stillReferenced = [...references.values()].some(isR2DeleteReferenced)
-    if (!stillReferenced) await blob.delete(replacedPhotoKey).catch(() => {})
+    if (!stillReferenced) await deleteR2Object(replacedPhotoKey).catch(() => {})
   }
   if (Object.keys(updates).length) {
     await recordAdminAudit(actor, {

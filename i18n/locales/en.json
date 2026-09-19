@@ -472,7 +472,6 @@
     "loading": "Loading usage…",
     "error": "Couldn't load usage data.",
     "updated": "Updated {time}",
-    "cachedNote": "Cached up to 5 min — refresh for live figures",
     "storageUsed": "Storage used",
     "objects": "Objects",
     "objectsCount": "{count} objects",

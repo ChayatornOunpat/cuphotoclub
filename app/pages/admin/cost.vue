@@ -9,7 +9,6 @@ interface LargestObject { key: string, bytes: number }
 interface Projection { gb: number, monthlyCost: number }
 interface CostResponse {
   generatedAt: string
-  cached: boolean
   totalBytes: number
   totalCount: number
   storageGb: number
@@ -30,10 +29,15 @@ interface CostResponse {
   }
 }
 
+// Lazy so opening the page never waits on the fetch: the header renders at
+// once and the figures fill in. Normal loads read the r2_objects index and are
+// quick; Refresh re-walks the whole bucket (server/utils/r2Objects.ts) and can
+// take a while, which is what the button's "Refreshing…" state covers.
 const forceLive = ref(false)
 const { data, pending, error, refresh } = await useFetch<CostResponse>('/api/admin/cost', {
   query: { refresh: computed(() => (forceLive.value ? '1' : undefined)) },
-  watch: false
+  watch: false,
+  lazy: true
 })
 
 const refreshing = ref(false)
@@ -43,6 +47,7 @@ async function doRefresh() {
   try {
     await refresh()
   } finally {
+    forceLive.value = false
     refreshing.value = false
   }
 }
@@ -103,7 +108,6 @@ const currentTierGb = computed(() => {
         </button>
         <p v-if="data" class="stamp">
           {{ t('adminCost.updated', { time: formatDateTime(data.generatedAt) }) }}
-          <span v-if="data.cached"> · {{ t('adminCost.cachedNote') }}</span>
         </p>
       </div>
     </div>

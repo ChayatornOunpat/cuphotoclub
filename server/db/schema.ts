@@ -431,3 +431,24 @@ export const r2Trash = sqliteTable('r2_trash', {
 }, table => [
   index('r2_trash_deleted_at_idx').on(table.deletedAt)
 ])
+
+// Index of every object in the R2 bucket: one row per key, kept in step with
+// R2 by the helpers in server/utils/r2Objects.ts. READ THAT FILE'S HEADER
+// before touching R2 — any code that puts, copies or deletes an object must go
+// through those helpers, or this table (and the storage/cost numbers built on
+// it) drifts from what Cloudflare actually bills.
+export const r2Objects = sqliteTable('r2_objects', {
+  key: text('object_key').primaryKey(),
+  // Top-level folder ('content-albums', 'members', …; '(root)' for none).
+  // Stored rather than derived so per-folder totals are one indexed GROUP BY.
+  folder: text('folder').notNull(),
+  size: integer('size').notNull().default(0),
+  contentType: text('content_type'),
+  uploadedAt: integer('uploaded_at', { mode: 'timestamp_ms' }).notNull(),
+  // Upload-queue order stamp (the object's `seq` custom metadata), falling
+  // back to uploadedAt. Same value the admin R2 inventory sorts by.
+  orderAt: integer('order_at').notNull().default(0)
+}, table => [
+  index('r2_objects_folder_idx').on(table.folder),
+  index('r2_objects_size_idx').on(table.size)
+])

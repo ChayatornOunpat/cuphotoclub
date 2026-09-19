@@ -195,7 +195,7 @@ async function cleanupExpiredUploadSessions(now: Date, event?: H3Event) {
           for (const key of keys) {
             if (swept >= SWEEP_OBJECTS_PER_RUN) break
             if (referenced.has(key)) continue
-            await blob.delete(key).catch(() => {})
+            await deleteR2Object(key).catch(() => {})
             swept++
           }
         }

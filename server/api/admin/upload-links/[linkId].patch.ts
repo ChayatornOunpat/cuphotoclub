@@ -82,7 +82,7 @@ export default defineEventHandler(async (event) => {
   // at it. Delete after the row is committed, so a failed write never orphans
   // the image that is still in use. Same order as the events cover.
   if (input.coverR2Key !== undefined && existing.coverR2Key && existing.coverR2Key !== input.coverR2Key) {
-    await blob.delete(existing.coverR2Key).catch(() => {})
+    await deleteR2Object(existing.coverR2Key).catch(() => {})
   }
 
   // Photos already approved were copied into the previous album's folder.

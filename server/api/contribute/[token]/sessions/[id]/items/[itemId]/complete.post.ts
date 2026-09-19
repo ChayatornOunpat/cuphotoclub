@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     // Only remove it if this contributor has no accepted copy already — the
     // same key can be re-confirmed after a successful upload.
     if (!(await contributorOwnsKey(contributor.id, item.key))) {
-      await blob.delete(item.key).catch(() => {})
+      await deleteR2Object(item.key).catch(() => {})
     }
     item.status = 'failed'
     item.error = 'Link closed before the upload was confirmed.'
@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, message: 'อัปโหลดไม่สำเร็จ กรุณาลองใหม่' })
   }
   if (!uploaded.contentType?.startsWith('image/')) {
-    await blob.delete(item.key).catch(() => {})
+    await deleteR2Object(item.key).catch(() => {})
     item.status = 'failed'
     item.error = 'Uploaded object is not an image.'
     await saveUploadSessionItem(session, item)
@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
   // makes the admin's byte limit a rule instead of a request, since compression
   // itself runs in the browser and can be bypassed.
   if ((uploaded.size || 0) > maxBytes) {
-    await blob.delete(item.key).catch(() => {})
+    await deleteR2Object(item.key).catch(() => {})
     item.status = 'failed'
     item.error = 'Uploaded object is too large.'
     await saveUploadSessionItem(session, item)
@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
     })
   }
   if (uploaded.customMetadata?.hash !== item.hash) {
-    await blob.delete(item.key).catch(() => {})
+    await deleteR2Object(item.key).catch(() => {})
     item.status = 'failed'
     item.error = 'Uploaded object hash metadata did not match the manifest.'
     await saveUploadSessionItem(session, item)
@@ -99,6 +99,10 @@ export default defineEventHandler(async (event) => {
       type: uploaded.contentType || item.type
     })
     .onConflictDoNothing()
+
+  // The browser uploaded straight to R2, so this is where the object gets
+  // indexed (see server/utils/r2Objects.ts).
+  await recordR2Objects([uploaded])
 
   item.status = 'uploaded'
   item.error = undefined
