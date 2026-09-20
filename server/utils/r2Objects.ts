@@ -334,6 +334,17 @@ export async function listIndexedR2Images(prefix?: string) {
     .orderBy(sql`${schema.r2Objects.orderAt} desc`, schema.r2Objects.key)
 }
 
+// The biggest objects in the index, trashed ones excluded (they are already
+// on their way out, and the largest-files view offers "move to trash").
+export async function listLargestR2Objects(limit: number) {
+  return db
+    .select()
+    .from(schema.r2Objects)
+    .where(sql`${schema.r2Objects.key} NOT IN (SELECT object_key FROM r2_trash)`)
+    .orderBy(sql`${schema.r2Objects.size} desc`)
+    .limit(limit)
+}
+
 export interface R2FolderUsage { prefix: string, bytes: number, count: number }
 export interface R2LargestObject { key: string, bytes: number }
 

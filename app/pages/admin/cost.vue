@@ -173,9 +173,12 @@ const currentTierGb = computed(() => {
 
         <!-- LARGEST -->
         <section v-if="data.largest.length" class="panel">
-          <div class="panel__head">
-            <h2>{{ t('adminCost.largestTitle') }}</h2>
-            <p>{{ t('adminCost.largestLead') }}</p>
+          <div class="panel__head panel__head--split">
+            <div>
+              <h2>{{ t('adminCost.largestTitle') }}</h2>
+              <p>{{ t('adminCost.largestLead') }}</p>
+            </div>
+            <NuxtLink :to="localePath('/admin/largest-files')" class="panel__action">{{ t('adminCost.manageLargest') }}</NuxtLink>
           </div>
           <ul class="largest">
             <li v-for="obj in data.largest" :key="obj.key">
@@ -276,6 +279,9 @@ const currentTierGb = computed(() => {
 .cols .panel { margin-bottom: 0; }
 .panel--muted { background: var(--paper); }
 .panel__head { margin-bottom: 1.1rem; }
+.panel__head--split { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.panel__action { flex-shrink: 0; font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dark); text-decoration: none; border: 1px solid var(--subtle); padding: 0.45rem 0.8rem; }
+.panel__action:hover { border-color: var(--accent); color: var(--accent); }
 .panel__head h2 { font-family: var(--font-serif); font-size: 1.4rem; font-weight: 300; }
 .panel__head p { color: var(--muted); font-size: 0.72rem; line-height: 1.6; margin-top: 0.25rem; }
 
