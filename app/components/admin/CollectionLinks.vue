@@ -2,7 +2,7 @@
 // Photo collections: create, share, tune, close. Standalone — nothing ties a
 // collection to an event or activity. Closing is the important one — it ends
 // uploading *and* contributor editing, which is the whole permission model
-// (docs/event-photo-submissions.md).
+// (docs/dev/event-photo-submissions.md).
 
 const { t } = useI18n()
 const localePath = useLocalePath()

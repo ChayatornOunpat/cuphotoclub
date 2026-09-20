@@ -1,5 +1,5 @@
 // Let go of this browser's contributor identity for one collection — the "not
-// me" half of the returning-visitor screen (see docs/event-photo-submissions.md
+// me" half of the returning-visitor screen (see docs/dev/event-photo-submissions.md
 // §2). Phones get handed around at an event and the cookie outlives the person
 // holding it, so there has to be a way out that is not "clear your cookies".
 //

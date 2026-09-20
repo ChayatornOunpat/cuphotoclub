@@ -1,7 +1,7 @@
 import type { H3Event } from 'h3'
 import { and, eq, sql } from 'drizzle-orm'
 
-// Photo collections — see docs/event-photo-submissions.md. Standalone: a
+// Photo collections — see docs/dev/event-photo-submissions.md. Standalone: a
 // collection has no relationship to events/activities.
 //
 // Two identities meet here and must never be confused:

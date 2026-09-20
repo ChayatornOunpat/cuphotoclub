@@ -11,7 +11,7 @@
 // Everything about the upload itself (presign → PUT → complete, compression,
 // retries, the pending queue) still lives in R2ImageUploader; this page only
 // decides composition, chrome and state. Caps, compression and the byte ceiling
-// are the admin's, set on the link (see docs/event-photo-submissions.md).
+// are the admin's, set on the link (see docs/dev/event-photo-submissions.md).
 //
 // The layout is `contribute`, not `site`: no nav, no footer nav columns. See
 // app/layouts/contribute.vue for why.

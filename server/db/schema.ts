@@ -102,7 +102,7 @@ export const events = sqliteTable('events', {
   updatedAt
 })
 
-// ── Photo collections (docs/event-photo-submissions.md) ─────────────────────
+// ── Photo collections (docs/dev/event-photo-submissions.md) ──────────────────
 // Participants upload photos through a share link an admin creates from the
 // dashboard. Standalone on purpose — no reference to events/activities, which
 // run on their own lifecycle. Everything lands in an admin-only pool; an admin
