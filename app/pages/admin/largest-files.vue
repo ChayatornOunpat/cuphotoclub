@@ -103,6 +103,75 @@ function onKey(event: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
+// ── Download ───────────────────────────────────────────────────────────────
+// Yesterday's migration re-encoded the old JPEGs as WebP in place, so a
+// converted object keeps its .jpg key while holding WebP bytes (that is what
+// let it skip repointing every album and hero slot). Downloading therefore
+// needs two things: a name matching what the bytes actually are, and — for
+// anything that still wants a JPEG — a re-encode.
+//
+// The re-encode runs here in the browser, through a canvas: Workers cannot
+// encode images, and Cloudflare's transform service both costs quota and
+// cannot reach the private contributions/ prefix. It is lossy (WebP → JPEG is
+// a second generation) and usually produces a LARGER file, so it is offered
+// beside the untouched original rather than instead of it.
+const JPEG_QUALITY = 0.92
+const downloading = ref('')
+
+function baseName(key: string) {
+  return (key.split('/').pop() ?? key).replace(/\.[^.]+$/, '')
+}
+
+function save(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = name
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+async function downloadOriginal(file: LargestFile) {
+  downloading.value = file.key
+  try {
+    const blob = await $fetch<Blob>(fileUrl(file.key), { responseType: 'blob' })
+    // Name it after the real type, not the key's (possibly stale) extension.
+    const ext = (blob.type || file.contentType || '').split('/')[1] || 'bin'
+    save(blob, `${baseName(file.key)}.${ext === 'jpeg' ? 'jpg' : ext}`)
+  } catch {
+    notice.value = t('adminLargest.downloadFailed')
+  } finally {
+    downloading.value = ''
+  }
+}
+
+async function downloadAsJpeg(file: LargestFile) {
+  downloading.value = file.key
+  try {
+    const image = new Image()
+    image.src = fileUrl(file.key)
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = image.naturalWidth
+    canvas.height = image.naturalHeight
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('no 2d context')
+    // JPEG has no alpha; without this, transparent pixels turn black.
+    context.fillStyle = '#FFFFFF'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(image, 0, 0)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY))
+    if (!blob) throw new Error('encode failed')
+    save(blob, `${baseName(file.key)}.jpg`)
+  } catch {
+    notice.value = t('adminLargest.downloadFailed')
+  } finally {
+    downloading.value = ''
+  }
+}
+
 // ── Trash ──────────────────────────────────────────────────────────────────
 interface TrashResult { items: { key: string, status: 'trashed' | 'blocked', referenced: boolean }[] }
 const working = ref(false)
@@ -271,7 +340,16 @@ async function trash(keys: string[], force = false) {
             <p v-else class="lfv__hint">{{ t('adminLargest.unusedHint') }}</p>
 
             <div class="lfv__actions">
-              <a :href="fileUrl(viewing.key)" download class="lfv__download">{{ t('adminLargest.download') }}</a>
+              <button type="button" class="lfv__download" :disabled="!!downloading" @click="downloadOriginal(viewing)">
+                {{ downloading === viewing.key ? t('adminLargest.preparing') : t('adminLargest.download') }}
+              </button>
+              <button
+                v-if="viewing.contentType === 'image/webp'"
+                type="button"
+                class="lfv__download"
+                :disabled="!!downloading"
+                @click="downloadAsJpeg(viewing)"
+              >{{ t('adminLargest.downloadJpeg') }}</button>
               <button type="button" class="lfv__trash" :disabled="working" @click="trash([viewing.key])">{{ t('adminLargest.moveToTrash') }}</button>
             </div>
           </aside>
@@ -351,7 +429,9 @@ async function trash(keys: string[], force = false) {
 .lfv__usage:hover { color: var(--accent); }
 .lfv__hint { font-size: 0.68rem; line-height: 1.6; color: color-mix(in srgb, var(--body-bg) 62%, transparent); }
 .lfv__actions { margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem; }
-.lfv__download { text-align: center; border: 1px solid color-mix(in srgb, var(--body-bg) 30%, transparent); color: var(--body-bg); padding: 0.75rem 1rem; font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; }
+.lfv__download { text-align: center; border: 1px solid color-mix(in srgb, var(--body-bg) 30%, transparent); background: none; color: var(--body-bg); padding: 0.75rem 1rem; font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; cursor: pointer; }
+.lfv__download:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.lfv__download:disabled { opacity: 0.5; cursor: default; }
 .lfv__trash { border: 1px solid var(--accent); background: none; color: var(--accent); padding: 0.75rem 1rem; font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
 .lfv__trash:disabled { opacity: 0.5; cursor: default; }
 

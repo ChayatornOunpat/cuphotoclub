@@ -498,7 +498,10 @@
     "usedBy": "Used by",
     "referencedHint": "Moving this to trash removes it from the places listed above. Trash keeps the file until you purge it.",
     "unusedHint": "Nothing points at this file. Trash keeps it until you purge it, so this is reversible.",
-    "download": "Download file"
+    "download": "Download original",
+    "downloadJpeg": "Download as JPEG",
+    "preparing": "Preparing…",
+    "downloadFailed": "Could not prepare that download."
   },
   "adminR2": {
     "checking": "Checking storage… {count} files so far",

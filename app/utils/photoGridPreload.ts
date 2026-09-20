@@ -24,8 +24,15 @@ const decoding = new Map<string, Promise<DecodedGridImage>>()
 // the full-size R2 original (~300 KB → ~15 KB). format=auto lets Cloudflare
 // pick avif/webp per browser support; results are edge-cached for a year (the
 // origin /images route sends immutable cache headers).
+//
+// onerror=redirect is the safety net for the free plan's 5,000 unique
+// transformations a month: past that, a NEW transform returns error 9422 (a
+// broken tile), while cached ones keep serving. With the redirect, an
+// over-quota tile falls back to the full-size original from /images — heavier,
+// but the grid still shows the photo. Only works because the source is on this
+// same zone.
 export function gridThumbSrc(src: string): string {
-  return `/cdn-cgi/image/width=400,quality=75,format=auto${src}`
+  return `/cdn-cgi/image/width=400,quality=75,format=auto,onerror=redirect${src}`
 }
 
 // Fetch + decode an image and resolve with its intrinsic dimensions. Safe to
