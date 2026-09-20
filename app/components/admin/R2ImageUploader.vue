@@ -9,6 +9,10 @@ const { t } = useI18n()
 // the bytes per pixel of the old JPEG at 90. Overridable per instance via props.
 const COMPRESS_MAX_DIM_DEFAULT = 3040
 const COMPRESS_QUALITY_DEFAULT = 85 // percent
+// Quality used when the admin turns resizing off. Every pixel is kept, so the
+// only compression is the format itself — high enough that the re-encode is
+// invisible, since a JPEG source makes it a second generation.
+const FULL_SIZE_QUALITY = 0.92
 
 const props = withDefaults(defineProps<{
   prefix?: string
@@ -101,10 +105,13 @@ const UPLOAD_BATCH_DELAY_MS = 1_000
 const UPLOAD_SESSION_SIZE = 250
 const RESOURCE_LIMIT_PAUSE_MS = 30_000
 
-const autoCompress = ref(props.compress)
+// Resizing is what this toggle controls. Conversion to WebP is NOT optional:
+// storing untouched originals is what filled the bucket with 8 GB of full-size
+// JPEGs, so "off" now means full resolution in WebP, not the original file.
+const resizeLarge = ref(props.compress)
 // The contribute page learns its policy from the API after mount, so the prop
 // can change once after the first render.
-watch(() => props.compress, (value) => { autoCompress.value = value })
+watch(() => props.compress, (value) => { resizeLarge.value = value })
 let resourcePausePromise: Promise<void> | null = null
 let resourcePauseTimer: ReturnType<typeof setInterval> | null = null
 let shouldStopCurrentUpload = false
@@ -352,10 +359,22 @@ async function convertHeic(file: File): Promise<File> {
   return new File([blob], name, { type: 'image/jpeg' })
 }
 
+// Re-encodes to WebP, resizing first when the admin asked for it. Returns the
+// file untouched when there is nothing to gain: an already-WebP file that
+// needs no resize, or a small one where a second generation would cost more
+// quality than it saves bytes.
 async function compressImage(file: File): Promise<File> {
+  const maxDim = resizeLarge.value ? compressMaxDim.value : Infinity
+  const quality = resizeLarge.value ? compressQuality.value : FULL_SIZE_QUALITY
+
   const bmp = await createImageBitmap(file)
+  const needsResize = bmp.width > maxDim || bmp.height > maxDim
+  if (!needsResize && (file.type === 'image/webp' || file.size <= COMPRESS_MIN_BYTES)) {
+    bmp.close()
+    return file
+  }
+
   let w = bmp.width, h = bmp.height
-  const maxDim = compressMaxDim.value
   if (w > maxDim || h > maxDim) {
     if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim }
     else        { w = Math.round(w * maxDim / h); h = maxDim }
@@ -366,7 +385,7 @@ async function compressImage(file: File): Promise<File> {
   bmp.close()
   const type = (await supportsWebpEncode()) ? 'image/webp' : 'image/jpeg'
   const compressed = await new Promise<Blob>((res, rej) =>
-    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), type, compressQuality.value)
+    canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), type, quality)
   )
   // Never ship a result larger than the original. When the original wins, hand
   // it back untouched: re-wrapping it under the encoder's name and MIME type
@@ -429,7 +448,7 @@ async function createUploadSessionBatch(files: File[], sessionStart: number, seq
     async (file, index) => {
       try {
         const decoded = isHeicFile(file) ? await convertHeic(file) : file
-        const toUpload = autoCompress.value && decoded.size > COMPRESS_MIN_BYTES ? await compressImage(decoded) : decoded
+        const toUpload = await compressImage(decoded)
         return {
           file,
           toUpload,
@@ -880,7 +899,7 @@ function onDrop(e: DragEvent) {
              approaches it. Naming a ceiling here only reads as one on the file
              being picked. Compression off is the case where it really applies. -->
         <p class="r2up__hint">
-          {{ autoCompress ? t('uploader.hintR2Compressed') : t('uploader.hintR2', { mb: maxBytesLabel }) }}
+          {{ resizeLarge ? t('uploader.hintR2Compressed') : t('uploader.hintR2', { mb: maxBytesLabel }) }}
         </p>
       </template>
       <p v-else class="r2up__full">{{ t('uploader.limitReached') }}</p>
@@ -890,13 +909,15 @@ function onDrop(e: DragEvent) {
 
     <!-- Compress toggle -->
     <div v-if="showCompressControl" class="r2up__compress">
-      <span class="r2up__compress-label">{{ t('uploader.autoCompress') }}</span>
+      <span class="r2up__compress-label">{{ t('uploader.resizeLarge') }}</span>
       <div class="r2up__compress-toggle">
-        <button type="button" class="r2up__compress-btn" :class="{ active: autoCompress }" @click="autoCompress = true">{{ t('uploader.on') }}</button>
-        <button type="button" class="r2up__compress-btn" :class="{ active: !autoCompress }" @click="autoCompress = false">{{ t('uploader.off') }}</button>
+        <button type="button" class="r2up__compress-btn" :class="{ active: resizeLarge }" @click="resizeLarge = true">{{ t('uploader.on') }}</button>
+        <button type="button" class="r2up__compress-btn" :class="{ active: !resizeLarge }" @click="resizeLarge = false">{{ t('uploader.off') }}</button>
       </div>
       <span class="r2up__compress-detail">
-        {{ autoCompress ? t('uploader.compressOn', { dim: compressMaxDim, quality: Math.round(compressQuality * 100) }) : t('uploader.compressOff') }}
+        {{ resizeLarge
+          ? t('uploader.compressOn', { dim: compressMaxDim, quality: Math.round(compressQuality * 100) })
+          : t('uploader.compressOff', { quality: Math.round(FULL_SIZE_QUALITY * 100) }) }}
       </span>
     </div>
 
