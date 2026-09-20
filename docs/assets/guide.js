@@ -4,6 +4,16 @@
   'use strict';
   var root = document.documentElement;
 
+  /* localStorage throws outright in private mode and wherever site data is
+     blocked. Remembering a preference is a convenience, never a requirement,
+     so both accessors swallow that and the guide carries on with defaults. */
+  function saveSetting(key, value) {
+    try { localStorage.setItem(key, value); } catch { return; }
+  }
+  function readSetting(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+
   /* ── language ───────────────────────────────────────────────
      Both languages are in the markup; a class on <html> hides one. */
   var langBtn = document.getElementById('lang');
@@ -18,7 +28,7 @@
     }
     var q = document.getElementById('q');
     if (q) q.placeholder = q.getAttribute('data-ph-' + (l === 'th' ? 'th' : 'en'));
-    if (remember) { try { localStorage.setItem('cu-lang', l); } catch (e) {} }
+    if (remember) saveSetting('cu-lang', l);
   }
 
   var startLang = 'en';
@@ -26,8 +36,7 @@
   if (urlLang === 'th' || urlLang === 'en') {
     startLang = urlLang;
   } else {
-    var stored = null;
-    try { stored = localStorage.getItem('cu-lang'); } catch (e) {}
+    var stored = readSetting('cu-lang');
     if (stored) startLang = stored;
     else if ((navigator.language || '').toLowerCase().indexOf('th') === 0) startLang = 'th';
   }
@@ -53,8 +62,7 @@
 
   /* ── theme ──────────────────────────────────────────────────── */
   var themeBtn = document.getElementById('theme');
-  var storedTheme = null;
-  try { storedTheme = localStorage.getItem('cu-theme'); } catch (e) {}
+  var storedTheme = readSetting('cu-theme');
   if (storedTheme) root.setAttribute('data-theme', storedTheme);
 
   if (themeBtn) {
@@ -63,7 +71,7 @@
         || (!root.getAttribute('data-theme') && matchMedia('(prefers-color-scheme:dark)').matches);
       var next = dark ? 'light' : 'dark';
       root.setAttribute('data-theme', next);
-      try { localStorage.setItem('cu-theme', next); } catch (e) {}
+      saveSetting('cu-theme', next);
     });
   }
 
