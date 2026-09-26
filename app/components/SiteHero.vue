@@ -32,7 +32,9 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
     <div class="hero__bg" data-hero-dim :style="{ transform: `translateY(${offset}px)` }">
       <AppImg v-if="hero.image" :src="hero.image" alt="" width="1920" height="1080" sizes="sm:100vw md:100vw lg:100vw xl:100vw xxl:100vw 3xl:100vw" eager optimize @load="emit('ready')" />
     </div>
-    <div class="hero__body">
+    <!-- data-chrome-glass: the nav fades in a glass panel once this block's
+         first line scrolls up underneath it (see layouts/site.vue). -->
+    <div class="hero__body" data-chrome-glass>
       <p class="hero__kicker">{{ hero.kicker }}<span>{{ hero.kickerAccent }}</span></p>
       <h1 class="hero__title">
         <template v-for="(line, i) in hero.title" :key="i">

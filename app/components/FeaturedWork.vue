@@ -45,7 +45,6 @@ onBeforeUnmount(() => {
     <div class="wrap">
       <div class="gallery__heading">
         <div class="eyebrow">
-          <span class="num">01</span>
           <span>{{ t('home.featuredWork') }}</span>
         </div>
       </div>

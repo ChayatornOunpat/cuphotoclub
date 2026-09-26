@@ -2,6 +2,9 @@
 defineProps<{
   links: { label: string, to: string, join?: boolean }[]
   light: boolean
+  // Halfway state: still over a dark header, but sitting on top of its text,
+  // so the nav gets a faint dark glass panel to keep its own text readable.
+  glass?: boolean
 }>()
 
 const { t } = useI18n()
@@ -20,7 +23,7 @@ watch(open, v => {
 </script>
 
 <template>
-  <nav :class="{ light, 'menu-open': open }">
+  <nav data-site-nav :class="{ light, glass, 'menu-open': open }">
     <NuxtLink :to="localePath('/')" class="logo" draggable="false" @click="close">
       <span class="cu">CU</span>PHOTOCLUB
     </NuxtLink>
@@ -74,13 +77,36 @@ nav {
   align-items: center;
   justify-content: space-between;
   padding: 1.5rem 3rem;
-  transition: background 0.4s ease;
 }
-nav.light {
-  background: rgba(245, 244, 240, 0.93);
+/* Both backgrounds (glass and light) live on one layer behind the nav's
+   content, so glass → light is a single colour crossfade rather than two
+   separate fades. It also lets the blur fade in with the panel: a
+   `backdrop-filter` on the nav itself would snap on, since it can't
+   transition from `none`. */
+nav::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  background-color: rgba(18, 18, 20, 0.3);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(245, 244, 240, 0);
+  pointer-events: none;
+  transition: opacity 0.4s ease, background-color 0.4s ease, border-color 0.4s ease;
+}
+nav.glass::before {
+  opacity: 1;
+  border-bottom-color: rgba(245, 244, 240, 0.1);
+}
+nav.light::before {
+  opacity: 1;
+  background-color: rgba(245, 244, 240, 0.93);
   backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--subtle);
+  border-bottom-color: var(--subtle);
 }
+/* The mobile overlay behind the nav is already opaque cream. */
+nav.menu-open::before { opacity: 0; }
 
 .logo {
   font-family: var(--font-sans);

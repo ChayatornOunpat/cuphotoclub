@@ -12,12 +12,17 @@ useHead(localeHead)
 // the page's own markup via data-attributes:
 //   [data-chrome-header] → nav goes light once this element scrolls past
 //                          (no such element on a page → nav is always light)
+//   [data-chrome-glass]  → while still over the header, the nav picks up a
+//                          faint dark glass panel once this element (the
+//                          header's first text) scrolls up under it, so the
+//                          light nav text stays readable against it
 //   [data-parallax]      → translated on scroll for a parallax header
 //   [data-hero-dim]      → darkened as its header scrolls upward
 const site = ref(defaultSite)
 const localizedSite = useLocalizedSite(site)
 
 const navLight = ref(false)
+const navGlass = ref(false)
 const progress = ref(0)
 
 function heroDimProgress(el: HTMLElement): number {
@@ -34,6 +39,14 @@ function onScroll() {
 
   const header = document.querySelector('[data-chrome-header]')
   navLight.value = header ? header.getBoundingClientRect().bottom < 64 : true
+
+  // Glass is the in-between state: the nav is still transparent over a dark
+  // header, but its text now overlaps the header's own text. Measure the nav
+  // instead of hardcoding its height, which differs between breakpoints.
+  const navEl = document.querySelector<HTMLElement>('[data-site-nav]')
+  const glassFrom = document.querySelector<HTMLElement>('[data-chrome-glass]')
+  navGlass.value = !navLight.value && !!glassFrom && !!navEl
+    && glassFrom.getBoundingClientRect().top < navEl.getBoundingClientRect().bottom
 
   const els = document.querySelectorAll<HTMLElement>('[data-parallax]')
   for (const el of els) el.style.transform = `translateY(${window.scrollY * 0.2}px)`
@@ -61,7 +74,7 @@ useNuxtApp().hook('page:finish', () => nextTick(onScroll))
     <div id="progress-track" :class="{ 'is-light': navLight }">
       <div id="progress" :style="{ width: progress + '%' }" />
     </div>
-    <SiteNav v-if="localizedSite" :links="localizedSite.nav.links" :light="navLight" />
+    <SiteNav v-if="localizedSite" :links="localizedSite.nav.links" :light="navLight" :glass="navGlass" />
     <main>
       <slot />
     </main>
